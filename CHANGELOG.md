@@ -1,3 +1,10 @@
+## 0.1.4 — confirmed Active semantics for Premium UX (TEST)
+
+- Active room count now means backend-confirmed `active` or `partial` execution, never a failed or interrupted requested activity.
+- Failed activity retains safe stop/recover affordances when Foundation source approval permits.
+- Active room attention reflects unavailable native devices; prevents optimistic overview stats.
+- All v0.1.3 Experience V1 semantics preserved. No stable or physical HA acceptance.
+
 ## 0.1.3 — Premium UX public experience contract (TEST)
 
 - Native `sensor.rhi_multimedia_experience` publishes versioned Multimedia Experience V1 across configured rooms, activities, logical device roles, Foundation binding health, native AV playback/volume/source readback, availability, route labels and executable stop/recover readiness.

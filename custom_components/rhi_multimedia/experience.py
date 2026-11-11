@@ -100,8 +100,11 @@ def build_experience(context: dict, hass: Any, selected: dict, revision: int = 1
             amp = next((device for device in devices.values()
                         if device["role"] == "player" and device["volume_level"] is not None), None)
         bound = all(device["foundation_approved"] for device in devices.values())
-        active = bool(state.activity)
-        needs_attention = state.phase in ("error", "partial", "interrupted") or not bound
+        requested = bool(state.activity)
+        active = requested and state.phase in ("active", "partial")
+        needs_attention = (state.phase in ("error", "partial", "interrupted") or not bound
+                           or (active and any(not devices[item]["available"] for item in state.devices
+                                              if item in devices)))
         busy = state.phase in ("starting", "stopping")
         rooms.append({
             "id": key,
@@ -134,9 +137,9 @@ def build_experience(context: dict, hass: Any, selected: dict, revision: int = 1
             "devices": list(devices.values()),
             "activities": activities,
             "commands": {
-                "stop": {"enabled": active and bound and not busy,
+                "stop": {"enabled": requested and bound and not busy,
                          "reason": "" if bound else "Foundation selection changed"},
-                "recover": {"enabled": active and bound and state.phase in ("error", "partial", "interrupted"),
+                "recover": {"enabled": requested and bound and state.phase in ("error", "partial", "interrupted"),
                             "reason": "" if bound else "Foundation selection changed"},
             },
             "attention": bool(needs_attention),
