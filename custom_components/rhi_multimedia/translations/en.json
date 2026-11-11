@@ -1,0 +1,12 @@
+{
+  "title": "RHI Multimedia",
+  "config": {
+    "step": {"user": {"title": "Configure multimedia", "description": "Paste a validated JSON map of rooms, devices and activities. No commands run until you choose an activity.", "data": {"name": "Name", "rooms": "Rooms, devices and activities (JSON)"}}},
+    "error": {"invalid_configuration": "The room, device or activity mapping is invalid. Check JSON, entities, and referenced roles."},
+    "abort": {"already_configured": "Multimedia is already configured."}
+  },
+  "options": {
+    "step": {"init": {"title": "Edit room and activity configuration", "description": "Save changes atomically. The integration reloads using the validated new configuration; no source-device identity is copied.", "data": {"rooms": "Rooms and activities (JSON)"}}},
+    "error": {"invalid_configuration": "Invalid configuration; nothing has been saved."}
+  }
+}

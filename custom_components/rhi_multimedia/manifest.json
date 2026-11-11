@@ -1,0 +1,18 @@
+{
+  "domain": "rhi_multimedia",
+  "name": "Robotix Home Intelligence - Multimedia Module",
+  "after_dependencies": [
+    "rhi_foundation"
+  ],
+  "codeowners": [
+    "@npinguin"
+  ],
+  "config_flow": true,
+  "documentation": "https://robotix.be/",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/npinguin/rhi-multimedia/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

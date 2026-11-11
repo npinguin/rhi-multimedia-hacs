@@ -1,0 +1,38 @@
+start_activity:
+  name: Start multimedia activity
+  description: Runs a configured real AV activity and checks source feedback.
+  fields:
+    room:
+      required: true
+      example: salon
+      selector:
+        text: {}
+    activity:
+      required: true
+      example: watch_apple_tv
+      selector:
+        text: {}
+stop_activity:
+  name: Stop multimedia activity
+  description: Stops the activity and releases only devices not claimed by other rooms.
+  fields:
+    room:
+      required: true
+      selector:
+        text: {}
+recover_activity:
+  name: Recover multimedia activity
+  description: Reruns the previous route and checks device readback after interruption.
+  fields:
+    room:
+      required: true
+      selector:
+        text: {}
+inspect_room:
+  name: Inspect multimedia sources
+  description: Publishes native source_list and current input state for each configured endpoint.
+  fields:
+    room:
+      required: true
+      selector:
+        text: {}
