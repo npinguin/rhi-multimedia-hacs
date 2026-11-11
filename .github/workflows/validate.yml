@@ -1,0 +1,30 @@
+name: Validate HACS Distribution
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+      - name: Verify provenance and runtime identity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          p=json.loads(Path('DISTRIBUTION_SOURCE.json').read_text())
+          runtime=Path('custom_components/rhi_multimedia')
+          m=json.loads((runtime/'manifest.json').read_text())
+          assert m['version']==p['manifest_version']
+          h={f.relative_to(runtime).as_posix():hashlib.sha256(f.read_bytes()).hexdigest() for f in runtime.rglob('*') if f.is_file()}
+          digest=hashlib.sha256(''.join(f'{k}:{h[k]}\n' for k in sorted(h)).encode()).hexdigest()
+          assert digest==p['runtime_aggregate_sha256']
+          assert len(h)==p['runtime_file_count']
+          assert p['source_repository']=='npinguin/rhi-multimedia'
+          assert p['channel']=='candidate' and p['approved_release'] is False
+          print('Public HACS source/provenance identity PASS')
+          PY
