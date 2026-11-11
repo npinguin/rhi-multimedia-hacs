@@ -6,13 +6,16 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN, EVENT_UPDATE
+from .experience import build_experience
+from .foundation import selected_index
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     context = hass.data[DOMAIN]
     rooms = context["engine"].rooms
-    async_add_entities([RoomSensor(context, entry.entry_id, room, kind)
-                        for room in rooms for kind in ("status", "sources")])
+    async_add_entities([RoomExperienceSensor(context, entry.entry_id),
+                        *(RoomSensor(context, entry.entry_id, room, kind)
+                          for room in rooms for kind in ("status", "sources"))])
 
 
 class RoomSensor(SensorEntity):
@@ -48,3 +51,33 @@ class RoomSensor(SensorEntity):
         s = self.context["engine"].states[self.room]
         return {"activity": s.activity, "progress": s.progress, "error": s.error,
                 "warnings": list(s.warnings), "devices": sorted(s.devices)}
+
+
+class RoomExperienceSensor(SensorEntity):
+    """Single versioned public Multimedia contract, not a frontend-derived scan."""
+
+    _attr_has_entity_name = False
+    _attr_should_poll = False
+    _attr_icon = "mdi:television-guide"
+
+    def __init__(self, context, entry_id: str):
+        self.context = context
+        self._attr_unique_id = f"{entry_id}:experience_v1"
+        self._attr_name = "RHI Multimedia Experience"
+        self._revision = 1
+
+    async def async_added_to_hass(self):
+        self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
+
+    def _changed(self, room):
+        self._revision += 1
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return "ready"
+
+    @property
+    def extra_state_attributes(self):
+        return build_experience(self.context, self.hass, selected_index(self.hass),
+                                revision=self._revision)

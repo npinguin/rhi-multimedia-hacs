@@ -1,3 +1,10 @@
+## 0.1.3 — Premium UX public experience contract (TEST)
+
+- Native `sensor.rhi_multimedia_experience` publishes versioned Multimedia Experience V1 across configured rooms, activities, logical device roles, Foundation binding health, native AV playback/volume/source readback, availability, route labels and executable stop/recover readiness.
+- Source state changes and activity transitions refresh the contract; failed/partial/restarted statuses never count as confirmed execution.
+- No frontend-only physical source discovery, synthetic device state or optimistic command outcome.
+- Supports independent HACS Multimedia UX Dashboard. No target HA field acceptance or stable approval.
+
 ## 0.1.2 — HACS TEST: canonical Robotix branding parity
 
 - Added the seven exact Robotix PNG assets already shipped by Foundation, Mobility and Energy. No new logo or generated imagery.

@@ -1,12 +1,12 @@
 {
   "source_repository": "npinguin/rhi-multimedia",
-  "source_commit": "47c3388784cf9186248a56132112998246c9d863",
-  "manifest_version": "0.1.2",
-  "distribution_release": "MU0.1.2",
+  "source_commit": "061f2722bd497fc2f1f4a1e189ec554dffe43220",
+  "manifest_version": "0.1.3",
+  "distribution_release": "MU0.1.3",
   "channel": "candidate",
   "approved_release": false,
-  "runtime_file_count": 22,
-  "runtime_aggregate_sha256": "639e08e38e16b97d835522999433c844fe7185b1b51314c0b365843cf08ce8e9",
+  "runtime_file_count": 23,
+  "runtime_aggregate_sha256": "c2b4778a26972c18563c1219c4a6abf7eb9ccd28de9e914b8aa2ec27d4f3e6d9",
   "branding_files": {
     "icon.png": "960321934daedcd75e08e7146d4f983dae0081e910d00750793053205a43d3ba",
     "icon@2x.png": "20df6bc79a72407dac2feaea43a96381eeb0c93005e3e75bd2a9877d05239261",

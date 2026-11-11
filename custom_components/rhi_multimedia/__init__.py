@@ -13,6 +13,9 @@ from homeassistant.const import Platform
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+from .const import EVENT_UPDATE
 
 from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
@@ -84,6 +87,20 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     hass.data[DOMAIN] = {"entry": entry, "engine": engine, "adapter": adapter}
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        # Refresh the published UX experience when native source readback changes.
+        # Watch ONLY endpoints chosen in Multimedia after Foundation selection.
+        # No domain-wide HA device discovery or guessed relationships.
+        watched_entities = {
+            device["entity"]
+            for specification in rooms.values()
+            for device in specification["devices"].values()
+        }
+        bus = getattr(hass, "bus", None)
+        if bus is not None:
+            def source_changed(event) -> None:
+                if event.data.get("entity_id") in watched_entities:
+                    async_dispatcher_send(hass, EVENT_UPDATE, "*")
+            entry.async_on_unload(bus.async_listen("state_changed", source_changed))
         _register_services(hass, engine, adapter, rooms)
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     except Exception:
