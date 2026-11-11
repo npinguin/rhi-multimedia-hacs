@@ -24,6 +24,16 @@ jobs:
           digest=hashlib.sha256(''.join(f'{k}:{h[k]}\n' for k in sorted(h)).encode()).hexdigest()
           assert digest==p['runtime_aggregate_sha256']
           assert len(h)==p['runtime_file_count']
+          expected={'icon.png','icon@2x.png','logo.png','logo@2x.png'}
+          branding=p.get('branding_files')
+          assert isinstance(branding,dict) and set(branding)==expected, 'Missing RHI public branding provenance'
+          for name,digest in branding.items():
+              path=Path('brand')/name
+              canonical=runtime/'brand'/name
+              assert path.is_file() and canonical.is_file(), f'Missing HACS branding: {name}'
+              assert path.read_bytes()==canonical.read_bytes(), f'HACS root branding differs: {name}'
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==digest, f'Branding provenance mismatch: {name}'
+          assert (runtime/'icon.png').is_file() and (runtime/'logo.png').is_file()
           assert p['source_repository']=='npinguin/rhi-multimedia'
           assert p['channel']=='candidate' and p['approved_release'] is False
           print('Public HACS source/provenance identity PASS')
