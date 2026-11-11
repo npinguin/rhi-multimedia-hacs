@@ -1,3 +1,11 @@
+## 0.1.2 — HACS TEST: canonical Robotix branding parity
+
+- Added the seven exact Robotix PNG assets already shipped by Foundation, Mobility and Energy. No new logo or generated imagery.
+- HACS mirror now includes the four standard root `brand/` images as well as the canonical runtime icons and logos.
+- Source package, distribution staging, checksums and public HACS Validate explicitly reject missing or changed logos.
+- Retains v0.1.1 Foundation-first Multimedia wizard; hardware functionality not changed or field qualified.
+- Immutable earlier v0.1.0 and v0.1.1 HACS prereleases remain unchanged.
+
 ## 0.1.1 — engineering candidate: Foundation-first guided Multimedia setup
 
 - Publish Screen, Amplifier and Media Source technical concepts to RHI Foundation. Foundation alone selects integrations and devices.
