@@ -1,12 +1,203 @@
 {
   "title": "RHI Multimedia",
   "config": {
-    "step": {"user": {"title": "Configure multimedia", "description": "Paste a validated JSON map of rooms, devices and activities. No commands run until you choose an activity.", "data": {"name": "Name", "rooms": "Rooms, devices and activities (JSON)"}}},
-    "error": {"invalid_configuration": "The room, device or activity mapping is invalid. Check JSON, entities, and referenced roles."},
-    "abort": {"already_configured": "Multimedia is already configured."}
+    "step": {
+      "user": {
+        "title": "Multimedia setup",
+        "description": "Foundation discovers and selects integrations/devices per multimedia concept first. If no selections exist, create the integration and then configure Screen, Amplifier and Media Sources in RHI Foundation. Next open Multimedia Configure to link rooms, input routes and activities.",
+        "data": {
+          "name": "Name",
+          "confirm": "Create Multimedia and configure Foundation first"
+        }
+      },
+      "room": {
+        "title": "Add a Multimedia room",
+        "description": "Choose a Home Assistant area when available. A central device can be used by several rooms.",
+        "data": {
+          "area": "Home Assistant room",
+          "room_name": "Custom room name"
+        }
+      },
+      "display": {
+        "title": "Screen / TV",
+        "description": "Select one of the displays already selected in Foundation. Music-only rooms may have no screen.",
+        "data": {
+          "display": "Screen"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / amplifier",
+        "description": "Optional receiver or speaker zone from Foundation. Leave empty if the TV handles audio itself.",
+        "data": {
+          "amplifier": "Audio output"
+        }
+      },
+      "sources": {
+        "title": "Media sources",
+        "description": "Choose the Foundation-selected Apple TV, Shield, console or player used in this room. The same central source can be linked across rooms.",
+        "data": {
+          "sources": "Media sources"
+        }
+      },
+      "activity": {
+        "title": "Create an activity",
+        "description": "Choose a standard activity pattern. Multimedia links the logical roles; no physical HDMI connection is inferred.",
+        "data": {
+          "activity_type": "Activity type",
+          "activity_name": "Activity name",
+          "primary_source": "Primary media source"
+        }
+      },
+      "route": {
+        "title": "Physical input routes",
+        "description": "Confirm the exact input or sound mode exposed by Home Assistant for this device. No guessed HDMI routing.",
+        "data": {
+          "source": "Input / source",
+          "sound_mode": "Sound mode"
+        }
+      },
+      "next": {
+        "title": "Continue",
+        "description": "Add more rooms or activities, or review everything before saving.",
+        "data": {
+          "action": "Next"
+        }
+      },
+      "review": {
+        "title": "Review and save",
+        "description": "Save only when all linked entities are still approved by Foundation. No device commands are sent during configuration.",
+        "data": {
+          "confirm": "Save Multimedia configuration"
+        }
+      }
+    },
+    "error": {
+      "room_required": "Enter a room name.",
+      "room_exists": "The room is already configured.",
+      "not_foundation_selected": "This device is not in the current Foundation selection.",
+      "room_requires_av_endpoint": "A room requires at least one selected screen, amplifier or source.",
+      "invalid_activity": "Choose a supported activity type.",
+      "screen_required": "This activity needs a screen.",
+      "source_required": "Choose a media source selected in Foundation.",
+      "audio_required": "Choose an amplifier or media player for music.",
+      "activity_required": "Enter an activity name.",
+      "activity_exists": "An activity with this name already exists.",
+      "route_changed": "The device's available inputs have changed; select a current value.",
+      "confirm_save": "Confirm to save.",
+      "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry."
+    },
+    "abort": {
+      "already_configured": "Multimedia is already configured."
+    }
   },
   "options": {
-    "step": {"init": {"title": "Edit room and activity configuration", "description": "Save changes atomically. The integration reloads using the validated new configuration; no source-device identity is copied.", "data": {"rooms": "Rooms and activities (JSON)"}}},
-    "error": {"invalid_configuration": "Invalid configuration; nothing has been saved."}
+    "step": {
+      "init": {
+        "title": "Manage Multimedia",
+        "description": "Foundation keeps ownership of integrations and device selection. Edit rooms and activities here.",
+        "data": {
+          "action": "What would you like to do?"
+        }
+      },
+      "existing_room": {
+        "title": "Select room",
+        "data": {
+          "room": "Room"
+        }
+      },
+      "existing_activity": {
+        "title": "Select activity",
+        "data": {
+          "activity": "Activity"
+        }
+      },
+      "room": {
+        "title": "Add a Multimedia room",
+        "description": "Choose a Home Assistant area when available. A central device can be used by several rooms.",
+        "data": {
+          "area": "Home Assistant room",
+          "room_name": "Custom room name"
+        }
+      },
+      "display": {
+        "title": "Screen / TV",
+        "description": "Select one of the displays already selected in Foundation. Music-only rooms may have no screen.",
+        "data": {
+          "display": "Screen"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / amplifier",
+        "description": "Optional receiver or speaker zone from Foundation. Leave empty if the TV handles audio itself.",
+        "data": {
+          "amplifier": "Audio output"
+        }
+      },
+      "sources": {
+        "title": "Media sources",
+        "description": "Choose the Foundation-selected Apple TV, Shield, console or player used in this room. The same central source can be linked across rooms.",
+        "data": {
+          "sources": "Media sources"
+        }
+      },
+      "activity": {
+        "title": "Create an activity",
+        "description": "Choose a standard activity pattern. Multimedia links the logical roles; no physical HDMI connection is inferred.",
+        "data": {
+          "activity_type": "Activity type",
+          "activity_name": "Activity name",
+          "primary_source": "Primary media source"
+        }
+      },
+      "route": {
+        "title": "Physical input routes",
+        "description": "Confirm the exact input or sound mode exposed by Home Assistant for this device. No guessed HDMI routing.",
+        "data": {
+          "source": "Input / source",
+          "sound_mode": "Sound mode"
+        }
+      },
+      "next": {
+        "title": "Continue",
+        "description": "Add more rooms or activities, or review everything before saving.",
+        "data": {
+          "action": "Next"
+        }
+      },
+      "review": {
+        "title": "Review and save",
+        "description": "Save only when all linked entities are still approved by Foundation. No device commands are sent during configuration.",
+        "data": {
+          "confirm": "Save Multimedia configuration"
+        }
+      },
+      "validate_room_update": {
+        "title": "Device changes affect existing activities",
+        "description": "These activities reference changed or removed devices: {affected}. Confirm removing those activities, then recreate them with the new routing. Nothing is changed until final Save.",
+        "data": {
+          "confirm_remove": "Remove affected activities and continue"
+        }
+      },
+      "edit_room": {
+        "title": "Edit room devices"
+      }
+    },
+    "error": {
+      "last_activity": "Keep at least one activity in a room; remove the room if unused.",
+      "room_required": "Enter a room name.",
+      "room_exists": "The room is already configured.",
+      "not_foundation_selected": "This device is not in the current Foundation selection.",
+      "room_requires_av_endpoint": "A room requires at least one selected screen, amplifier or source.",
+      "invalid_activity": "Choose a supported activity type.",
+      "screen_required": "This activity needs a screen.",
+      "source_required": "Choose a media source selected in Foundation.",
+      "audio_required": "Choose an amplifier or media player for music.",
+      "activity_required": "Enter an activity name.",
+      "activity_exists": "An activity with this name already exists.",
+      "route_changed": "The device's available inputs have changed; select a current value.",
+      "confirm_save": "Confirm to save.",
+      "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry.",
+      "confirm_remove_incompatible": "Confirm the affected activities before continuing."
+    }
   }
 }

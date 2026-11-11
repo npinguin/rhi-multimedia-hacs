@@ -1,3 +1,12 @@
+## 0.1.1 — engineering candidate: Foundation-first guided Multimedia setup
+
+- Publish Screen, Amplifier and Media Source technical concepts to RHI Foundation. Foundation alone selects integrations and devices.
+- Consume only Foundation SelectedDomainBuildInput, with stable candidate provenance; remove native-registry rediscovery fallback.
+- Replace JSON configuration with a HA wizard for rooms, physical roles, optional audio, sources and exact input routes.
+- Support an empty first-time entry while Foundation selection is commissioned; no commands, sensors or fake runtime.
+- Reject unapproved/stale bindings at runtime; preserve original P0 engine and all existing action tests.
+- v0.1.1 is not approved for stable release; target-HA integration tests still required.
+
 # Changelog
 
 ## 0.1.0 — first HACS TEST candidate

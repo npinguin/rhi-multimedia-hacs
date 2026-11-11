@@ -18,6 +18,7 @@ from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
 from .validation import validate_rooms
+from .foundation import register_with_foundation, selected_index
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.SELECT]
@@ -27,6 +28,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """HA boot: only register physical commands after a real config entry is loaded."""
     hass.data.setdefault(DOMAIN, {})
+    register_with_foundation(hass)
     return True
 
 
@@ -34,7 +36,34 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     """Load persisted user configuration and the last actual activity attempt."""
     if hass.data.get(DOMAIN, {}).get("engine"):
         raise ValueError("RHI Multimedia supports one household configuration entry")
-    rooms = validate_rooms(entry.options.get(CONF_ROOMS, entry.data.get(CONF_ROOMS)))
+    register_with_foundation(hass)
+    configured = entry.options.get(CONF_ROOMS, entry.data.get(CONF_ROOMS, {}))
+    if not configured:
+        # Empty config entry is a real Foundation-first onboarding state. It has
+        # no command services, physical devices or fake runtime projections.
+        hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration"}
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        return True
+    rooms = validate_rooms(configured)
+    # 0.1.0 used hand-authored JSON without Foundation candidate identity.
+    # Preserve the user's old room/activity data, but never grant its devices
+    # command rights by inventing mappings during the upgrade.
+    if any("foundation_candidate_id" not in dev or "foundation_concept" not in dev
+           for spec in rooms.values() for dev in spec["devices"].values()):
+        hass.data[DOMAIN] = {"entry": entry, "phase": "legacy_foundation_review_required"}
+        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        return True
+    selected = selected_index(hass)
+    invalid = [f"{room}/{key}" for room, spec in rooms.items()
+               for key, dev in spec["devices"].items()
+               if (dev.get("foundation_concept"), dev["entity"]) not in selected
+               or selected[(dev.get("foundation_concept"), dev["entity"])].candidate_id != dev.get("foundation_candidate_id")]
+    if invalid:
+        from homeassistant.exceptions import ConfigEntryNotReady
+        raise ConfigEntryNotReady(
+            "Multimedia has no matching approved Foundation source selection for: "
+            + ", ".join(invalid) + ". Review Foundation technical selections and Multimedia mappings."
+        )
     store = Store(hass, STORE_VERSION, f"rhi_multimedia_{entry.entry_id}")
     adapter = HAAdapter(hass, store)
     engine = ActivityEngine(rooms, adapter)
@@ -61,6 +90,15 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         hass.data.pop(DOMAIN, None)
         raise
     _LOGGER.info("RHI Multimedia loaded %s real AV rooms", len(rooms))
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
+    """Migrate the entry schema only; never invent approved source bindings."""
+    if entry.version > 2:
+        return False
+    if entry.version < 2:
+        hass.config_entries.async_update_entry(entry, version=2)
     return True
 
 
@@ -102,6 +140,11 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     """Remove service writers and native projections with the owning config entry."""
+    if hass.data.get(DOMAIN, {}).get("phase") in {
+        "awaiting_foundation_configuration", "legacy_foundation_review_required"
+    }:
+        hass.data.pop(DOMAIN, None)
+        return True
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     context = hass.data.get(DOMAIN, {})

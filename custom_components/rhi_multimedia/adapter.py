@@ -27,7 +27,21 @@ class HAAdapter:
         payload = {**(data or {}), **(target or {})}
         await self.hass.services.async_call(domain, service, payload, blocking=True)
 
+    def _require_selected_source(self, device: dict) -> None:
+        # The runtime must not keep command rights if Foundation technical
+        # selection was removed after initial setup. Do not re-discover the
+        # device here or silently trust a former config-entry binding.
+        candidate = device.get("foundation_candidate_id")
+        if not candidate:
+            return  # Legacy pure engine unit tests do not carry HA source contracts.
+        from .foundation import selected_index
+        approved = selected_index(self.hass).get((device.get("foundation_concept"), device["entity"]))
+        if approved is None or approved.candidate_id != candidate:
+            raise MediaError(f"{device['entity']}: Foundation source selection changed; "
+                             "review Multimedia device mappings before sending commands")
+
     async def power(self, device: dict, on: bool) -> None:
+        self._require_selected_source(device)
         explicit = device.get("power_on" if on else "power_off")
         if explicit:
             await self._call(explicit["action"], explicit.get("data"), explicit.get("target"))
@@ -80,6 +94,7 @@ class HAAdapter:
             await asyncio.sleep(min(.4, remaining))
 
     async def configure(self, device: dict, operation: dict) -> None:
+        self._require_selected_source(device)
         entity = device["entity"]
         kind = operation["type"]
         if kind in ("source", "sound_mode"):
