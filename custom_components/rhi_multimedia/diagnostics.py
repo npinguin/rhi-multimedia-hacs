@@ -10,7 +10,9 @@ async def async_get_config_entry_diagnostics(hass, entry):
     context = hass.data.get(DOMAIN, {})
     engine = context.get("engine")
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
+    from .frontend import ux_diagnostics
     return {
+        "ux": ux_diagnostics(hass, entry),
         "identity": {"domain": DOMAIN, "version": manifest["version"],
                      "config_entry_id": entry.entry_id},
         "health": {"loaded": engine is not None,

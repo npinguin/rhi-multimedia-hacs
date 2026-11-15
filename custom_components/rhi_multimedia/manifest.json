@@ -1,10 +1,11 @@
 {
   "domain": "rhi_multimedia",
-  "name": "Robotix Home Intelligence - Multimedia Module",
+  "name": "Robotix Multimedia",
   "after_dependencies": [
     "rhi_foundation",
     "http",
-    "frontend"
+    "frontend",
+    "lovelace"
   ],
   "codeowners": [
     "@npinguin"
@@ -16,5 +17,5 @@
   "issue_tracker": "https://github.com/npinguin/rhi-multimedia/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.5"
+  "version": "0.1.6"
 }

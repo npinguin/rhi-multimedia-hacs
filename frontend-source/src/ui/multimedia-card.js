@@ -161,4 +161,4 @@ class HomeBrainMultimediaCard extends HTMLElement {
 
 if(!customElements.get('homebrain-multimedia-card'))customElements.define('homebrain-multimedia-card',HomeBrainMultimediaCard);
 window.customCards=window.customCards||[];
-if(!window.customCards.some(card=>card.type==='homebrain-multimedia-card'))window.customCards.push({type:'homebrain-multimedia-card',name:'Robotix Home Intelligence Multimedia',description:'Premium room/activity dashboard backed by RHI Multimedia Experience V1.',preview:false});
+if(!window.customCards.some(card=>card.type==='homebrain-multimedia-card'))window.customCards.push({type:'homebrain-multimedia-card',name:'Robotix Multimedia',description:'Premium room/activity dashboard backed by RHI Multimedia Experience V1.',preview:false});
