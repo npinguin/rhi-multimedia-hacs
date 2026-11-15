@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "principle": "one source concern, one owner",
+  "owners": {
+    "shared_core": {"path": "src/vendor", "owns": ["Pinned RHI UX Core visual grammar and provenance only"]},
+    "runtime": {"path": "src/runtime", "owns": ["Reading only Multimedia Experience V1", "Backend-owned intent eligibility", "Home Assistant service dispatch boundary"]},
+    "domain": {"path": "src/domain", "owns": ["Experience-to-view projection", "User-facing status labels", "Presentation metadata only"]},
+    "ui": {"path": "src/ui", "owns": ["Navigation", "Overview", "Rooms", "Activities", "Devices", "Diagnostics", "Transient interaction state", "Presentation events"]},
+    "assets": {"path": "src/assets", "owns": ["Multimedia domain visual masters", "RHI UX Core company SVG unchanged"]},
+    "package": {"path": "tools/build.mjs", "owns": ["Deterministic bundle and complete dist", "Build-time Core injection", "Version authority from integration manifest"]}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "rhi-multimedia-ux",
+  "description": "Robotix Home Intelligence Multimedia Premium Dashboard for Home Assistant",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "clean": "node tools/clean.mjs",
+    "build": "node tools/build.mjs",
+    "test:contract": "node tests/gateway.test.mjs",
+    "test:ui": "node tests/card.test.mjs",
+    "test:package": "node tools/verify-dist.mjs && node tests/package.test.mjs",
+    "test": "npm run test:contract && npm run test:ui && npm run test:package",
+    "validate": "npm run build && npm run test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

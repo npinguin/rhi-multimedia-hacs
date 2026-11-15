@@ -1,0 +1,60 @@
+:host,.rhi-ux-root{
+  --rhi-color-primary:#1467F5;
+  --rhi-color-primary-soft:#EAF3FF;
+  --rhi-color-text:#0F172A;
+  --rhi-color-muted:#64748B;
+  --rhi-color-muted-soft:#758399;
+  --rhi-color-line:#DCE5EF;
+  --rhi-color-line-soft:#EAF0F6;
+  --rhi-color-surface:#FFFFFF;
+  --rhi-color-surface-soft:#F8FAFC;
+  --rhi-color-ok:#22C55E;
+  --rhi-color-attention:#F59E0B;
+  --rhi-color-error:#B42318;
+  --rhi-color-unknown:#94A3B8;
+
+  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);
+  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);
+  --rhi-font-display:clamp(29px,2.55vw,42px);
+  --rhi-font-section:clamp(18px,1.4vw,22px);
+  --rhi-font-card:15px;
+  --rhi-font-body:12.5px;
+  --rhi-font-small:11px;
+  --rhi-font-label:10.5px;
+  --rhi-font-value:13px;
+  --rhi-font-diagnostic:10px;
+  --rhi-weight-regular:400;
+  --rhi-weight-medium:500;
+  --rhi-weight-strong:600;
+  --rhi-line-height-tight:1.15;
+  --rhi-line-height-body:1.42;
+
+  --rhi-space-1:4px;
+  --rhi-space-2:7px;
+  --rhi-space-3:10px;
+  --rhi-space-4:14px;
+  --rhi-space-5:18px;
+  --rhi-space-6:24px;
+  --rhi-radius-sm:9px;
+  --rhi-radius-md:12px;
+  --rhi-radius-lg:16px;
+  --rhi-radius-xl:20px;
+  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);
+  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);
+  --rhi-page-max:1640px;
+  --rhi-page-pad-x:24px;
+  --rhi-page-pad-y:14px;
+  --rhi-control-h:38px;
+  --rhi-icon-action:18px;
+  --rhi-icon-status:24px;
+  --rhi-break-phone:430px;
+  --rhi-break-tablet:760px;
+  --rhi-break-desktop:1024px;
+  --rhi-domain-accent:var(--rhi-color-primary);
+
+  color:var(--rhi-color-text);
+  font-family:var(--rhi-font-family);
+  font-size:var(--rhi-font-body);
+  font-weight:var(--rhi-weight-regular);
+  line-height:var(--rhi-line-height-body);
+}

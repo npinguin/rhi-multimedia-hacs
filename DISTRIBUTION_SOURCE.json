@@ -1,16 +1,91 @@
 {
-  "source_repository": "npinguin/rhi-multimedia",
-  "source_commit": "428e61011e5d3973e91c123811f2bcf119f01511",
-  "manifest_version": "0.1.4",
-  "distribution_release": "MU0.1.4",
-  "channel": "candidate",
-  "approved_release": false,
-  "runtime_file_count": 23,
-  "runtime_aggregate_sha256": "d6089db9543c6830c3dab58d19c3719ce2e3e89891ab3a0ac7558d32456d7d11",
+  "status": "PROTECTED_TEST_CANDIDATE",
+  "source_commit": "6b7eb33887a79275f73843286370b9a0e191d601",
+  "source_zip_sha256": "277dafb0f14bbaeb9e5f78d67e877673f9f8fdfe34ba93897ab60c4c91b04e3c",
+  "protected_zip_sha256": "080fd5b7280d7951ec949f8446b9196048f423f01b4467f174b00553b980ca7d",
+  "manifest_version": "0.1.5",
+  "platforms": {
+    "aarch64": {
+      "ha_image": "ghcr.io/home-assistant/home-assistant@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82",
+      "python": "3.14.10",
+      "extension_suffix": ".cpython-314-aarch64-linux-musl.so",
+      "cython": "3.2.9",
+      "compiler": "cc (Alpine 15.2.0) 15.2.0",
+      "protected_zip_sha256": "f7495d7a465814c424192d98d3b3a74748d0126925aa7bd549c25a2dd97346c1"
+    },
+    "x86_64": {
+      "ha_image": "ghcr.io/home-assistant/home-assistant@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82",
+      "python": "3.14.10",
+      "extension_suffix": ".cpython-314-x86_64-linux-musl.so",
+      "cython": "3.2.9",
+      "compiler": "cc (Alpine 15.2.0) 15.2.0",
+      "protected_zip_sha256": "2cd12a51ab6513cbba1fc95c99e7f37977f2a4aad843938bb0453a61b0b40013"
+    }
+  },
+  "protected_modules": [
+    "adapter.py",
+    "engine.py",
+    "experience.py",
+    "foundation.py",
+    "source_discovery.py",
+    "validation.py"
+  ],
+  "readable_native_adapters": [
+    "__init__.py",
+    "config_flow.py",
+    "const.py",
+    "diagnostics.py",
+    "frontend.py",
+    "select.py",
+    "sensor.py"
+  ],
+  "runtime_files": {
+    "DISTRIBUTION_NOTICE.md": "2bc7a79a5d0db25dbb19603c882e14b4d3310bf30ee026d4407a9f73901a3541",
+    "__init__.py": "7d48142acc4ceb9955a50e151c1174494e3138385c95dfb8bfd00b4d7127bfec",
+    "adapter.cpython-314-aarch64-linux-musl.so": "39a7decb56816a35fb463a73a77019822dc5998e8b60651ac243eca410f759ba",
+    "adapter.cpython-314-x86_64-linux-musl.so": "f58071ebc1b8cad24f20ff57460d5a848e9570ad731f216d76f68e1eeddbeeb6",
+    "assets/robotix_home_assistant_logo.png": "20df6bc79a72407dac2feaea43a96381eeb0c93005e3e75bd2a9877d05239261",
+    "brand/icon.png": "960321934daedcd75e08e7146d4f983dae0081e910d00750793053205a43d3ba",
+    "brand/icon@2x.png": "20df6bc79a72407dac2feaea43a96381eeb0c93005e3e75bd2a9877d05239261",
+    "brand/logo.png": "d9bded56e39e44bdf9cc06ba6db92d1ac16e3e497a95071e6672034f4e1884ee",
+    "brand/logo@2x.png": "0b6af551f2939c13d18eb9ef763c0dbed5e75c0956da8548d9b17315e44a568c",
+    "config_flow.py": "976974772844ec466fd4976aa291bc46dd019aba95680aa0da9c5a98df42746e",
+    "const.py": "e069223f0b676bbe160ca3200916dc84b9a6b3e6c35ee441b34f431ade882ee6",
+    "diagnostics.py": "16379e77a399a2f0f0ee564565f49732a6a0bfb29d298951924457b70bd0fe83",
+    "engine.cpython-314-aarch64-linux-musl.so": "82cdb9dac1277d888fab7997483ffcf5a06c9041ad2ebc5583dea3efe15e42ca",
+    "engine.cpython-314-x86_64-linux-musl.so": "d7d53e0481bfcf082f314a33f0055fb44341930d804c337c7f5b7d1054f8ae71",
+    "experience.cpython-314-aarch64-linux-musl.so": "68da46f1636b4928563ff6e59b89e1c6751ffd83bd4fb15f2d958e4c8f106f1c",
+    "experience.cpython-314-x86_64-linux-musl.so": "6639cb0a76f0b7600dc0cab5bcab751b412e545dabc165fc0024367d40792ff3",
+    "foundation.cpython-314-aarch64-linux-musl.so": "415b0c579eb110ec6715424fa778f4cec812870a4003a005aaaa9ec24ef0191e",
+    "foundation.cpython-314-x86_64-linux-musl.so": "93f65b921495376d46549f7e2d0e8960c0a7c167bacc5b40328645e705bf89ff",
+    "frontend.py": "fd941b0bac37f3a5c700385d8484207727af2abe7258558a3be300b46571d0e7",
+    "frontend/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "frontend/PACKAGE_MANIFEST.json": "066714f305d540a455428e3e9c93c676e63582be614fdc31a90ca68b2d2697e4",
+    "frontend/assets/branding/company-logo.svg": "264f0d86798a2a53e30b8beb5cae366e4b0916adbb3716b3deb23b5ddbed053d",
+    "frontend/assets/heroes/multimedia-overview.svg": "6d5786c6ca7f84257dca8e91116b6cd8522b6af162d5c9e215d8264052159b9b",
+    "frontend/rhi-multimedia-ux.js": "741c87a896bd44df06554b53a5b5bec903c61011137daf47a0ae7d5465105abe",
+    "frontend/rhi-multimedia-ux.js.sha256": "adbea1349abc9490061b0746e910e2f38e841a3c566f44c5edb5f0c5679c33b4",
+    "icon.png": "8925e28f6d3e2eafde22a14896e58ec292bfddd1ae58d881a6b4de1ac1c30bc2",
+    "logo.png": "960321934daedcd75e08e7146d4f983dae0081e910d00750793053205a43d3ba",
+    "manifest.json": "d037ba7230fdbe240318b6dcfaa8f5c6e74f1d74ba27b5bc8c9b8ef7fd1c0657",
+    "select.py": "fe9f90f0b09d8923609d92d7e30c9798609d695decf757503c49fff6450f625c",
+    "sensor.py": "52730a2d7bd840ee1543d79388e470903b8979c02b4f722f305806772aca5086",
+    "services.yaml": "08afe7a74d6d07a03e8cfd5f043ed9a2b3590d45aaabc146e6136c605aa6e91e",
+    "source_discovery.cpython-314-aarch64-linux-musl.so": "2e0807d0071ebf66bbd87de0cb6b8e39552bd1cbab66613aff31f03918d2e4e2",
+    "source_discovery.cpython-314-x86_64-linux-musl.so": "656009cc7a9df9a515547b42335fd26f6786f586253ec68016ca0cfd479e1300",
+    "strings.json": "86e4b500e4180f0777c604fc24c82eca5d69c8fff162081be1b65fd7f9c7c1f7",
+    "translations/en.json": "86e4b500e4180f0777c604fc24c82eca5d69c8fff162081be1b65fd7f9c7c1f7",
+    "validation.cpython-314-aarch64-linux-musl.so": "a569e5f3622f870395b7925f892201f180b50270658046bafd894a60308d29b1",
+    "validation.cpython-314-x86_64-linux-musl.so": "03c32eb0d58187c1ebb3420e814b7e58df7533e5bb615583f30ea2108c5a001e"
+  },
   "branding_files": {
     "icon.png": "960321934daedcd75e08e7146d4f983dae0081e910d00750793053205a43d3ba",
-    "icon@2x.png": "20df6bc79a72407dac2feaea43a96381eeb0c93005e3e75bd2a9877d05239261",
+    "logo@2x.png": "0b6af551f2939c13d18eb9ef763c0dbed5e75c0956da8548d9b17315e44a568c",
     "logo.png": "d9bded56e39e44bdf9cc06ba6db92d1ac16e3e497a95071e6672034f4e1884ee",
-    "logo@2x.png": "0b6af551f2939c13d18eb9ef763c0dbed5e75c0956da8548d9b17315e44a568c"
-  }
+    "icon@2x.png": "20df6bc79a72407dac2feaea43a96381eeb0c93005e3e75bd2a9877d05239261"
+  },
+  "runtime_file_count": 37,
+  "source_repository": "npinguin/rhi-multimedia",
+  "approved_release": false,
+  "basic_cutover_ready": false
 }

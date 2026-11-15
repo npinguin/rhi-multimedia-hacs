@@ -360,9 +360,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         options = {"add_room": "Add room", "edit_room": "Edit room devices and connections",
                    "add_activity": "Add activity",
                    "edit_activity": "Edit activity", "remove_activity": "Remove activity",
-                   "remove_room": "Remove room", "review": "Review and save"}
+                   "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card"}
         if user_input:
             action = user_input["action"]
+            if action == "frontend":
+                return await self.async_step_frontend()
             if action == "add_room":
                 return await self.async_step_room()
             if action == "review":
@@ -409,5 +411,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         return self.async_show_form(step_id="existing_activity", data_schema=vol.Schema({
             vol.Required("activity"): vol.In(choices)}))
 
+    async def async_step_frontend(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(title="", data={**self._entry.options, **user_input})
+        return self.async_show_form(step_id="frontend", data_schema=vol.Schema({
+            vol.Required("enable_ux", default=self._entry.options.get("enable_ux", True)): bool}))
+
     async def _finish(self):
-        return self.async_create_entry(title="", data={CONF_ROOMS: self._rooms})
+        return self.async_create_entry(title="", data={**self._entry.options, CONF_ROOMS: self._rooms})

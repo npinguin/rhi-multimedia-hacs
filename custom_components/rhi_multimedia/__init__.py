@@ -32,6 +32,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """HA boot: only register physical commands after a real config entry is loaded."""
     hass.data.setdefault(DOMAIN, {})
     register_with_foundation(hass)
+    if getattr(hass, "http", None) is not None:
+        from .frontend import async_register_frontend
+        await async_register_frontend(hass)
     return True
 
 
@@ -45,7 +48,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         # Empty config entry is a real Foundation-first onboarding state. It has
         # no command services, physical devices or fake runtime projections.
         hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration"}
-        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        _register_entry_listeners(hass, entry)
         return True
     rooms = validate_rooms(configured)
     # 0.1.0 used hand-authored JSON without Foundation candidate identity.
@@ -54,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     if any("foundation_candidate_id" not in dev or "foundation_concept" not in dev
            for spec in rooms.values() for dev in spec["devices"].values()):
         hass.data[DOMAIN] = {"entry": entry, "phase": "legacy_foundation_review_required"}
-        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        _register_entry_listeners(hass, entry)
         return True
     selected = selected_index(hass)
     invalid = [f"{room}/{key}" for room, spec in rooms.items()
@@ -102,7 +105,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
                     async_dispatcher_send(hass, EVENT_UPDATE, "*")
             entry.async_on_unload(bus.async_listen("state_changed", source_changed))
         _register_services(hass, engine, adapter, rooms)
-        entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+        _register_entry_listeners(hass, entry)
     except Exception:
         hass.data.pop(DOMAIN, None)
         raise
@@ -117,6 +120,24 @@ async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
     if entry.version < 2:
         hass.config_entries.async_update_entry(entry, version=2)
     return True
+
+
+def _register_entry_listeners(hass, entry):
+    if getattr(hass, "http", None) is not None:
+        from .frontend import async_setup_ux
+        async_setup_ux(hass, entry)
+    previous = dict(entry.options)
+
+    async def update(hass, updated):
+        nonlocal previous
+        current = dict(updated.options)
+        changed = {key for key in previous.keys() | current.keys()
+                   if key not in previous or key not in current or previous[key] != current[key]}
+        previous = current
+        if changed != {"enable_ux"}:
+            await _async_update_listener(hass, updated)
+
+    entry.async_on_unload(entry.add_update_listener(update))
 
 
 async def _async_update_listener(hass, entry) -> None:

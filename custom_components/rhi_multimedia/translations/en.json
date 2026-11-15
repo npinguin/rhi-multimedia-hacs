@@ -180,6 +180,13 @@
       },
       "edit_room": {
         "title": "Edit room devices"
+      },
+      "frontend": {
+        "title": "Multimedia dashboard card",
+        "description": "Enable the bundled card without changing room mappings or the activity engine.",
+        "data": {
+          "enable_ux": "Enable bundled dashboard card"
+        }
       }
     },
     "error": {
