@@ -14,11 +14,13 @@ from homeassistant.helpers import selector
 
 from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
 from .source_discovery import area_choices, av_sources, source_lists
-from .validation import validate_rooms
+from .validation import route_status, validate_rooms
 
 NONE = "__none__"
 CUSTOM_AREA = "__custom_room__"
 UNCHANGED = "__no_source_change__"
+REMOVE_ROUTE = "__remove_configured_route__"
+DIRECT_ONLY = "__direct_only__"
 ACTIVITIES = {
     "watch_tv": "Watch TV (screen + optional amplifier)",
     "watch_source": "Watch a media source (screen + optional amplifier + player)",
@@ -44,19 +46,58 @@ def _sources(flow, concept: str, area_id: str | None = None) -> dict[str, str]:
     available, _ = av_sources(flow.hass)
     entries = [x for x in available if x.concept == concept]
     entries.sort(key=lambda x: (x.area_id != area_id, not x.available, x.entity_id))
-    return {x.entity_id: f"{x.entity_id} ({x.provider})"
-            + (" · in this room" if area_id and x.area_id == area_id else "")
-            + (" · currently unavailable" if not x.available else "")
-            for x in entries}
+    choices = {x.entity_id: f"{x.entity_id} ({x.provider})"
+               + (" · in this room" if area_id and x.area_id == area_id else "")
+               + (" · currently unavailable" if not x.available else "")
+               for x in entries}
+    for device in (flow._previous_room or {}).get("devices", {}).values():
+        if device.get("foundation_concept") == concept:
+            choices.setdefault(device["entity"], device["entity"] + " · existing link (needs review)")
+    return choices
+
+
+def _area_default(flow, concept: str, area_id: str | None) -> str:
+    """Suggest only one unambiguous Foundation-selected endpoint in this HA area."""
+    if not area_id:
+        return NONE
+    available, _ = av_sources(flow.hass)
+    matches = [source.entity_id for source in available if source.concept == concept
+               and source.area_id == area_id and source.available]
+    return matches[0] if len(matches) == 1 else NONE
 
 
 def _source_ref(flow, entity_id: str, concept: str) -> dict:
     matches, _ = av_sources(flow.hass)
     candidate = next((x for x in matches if x.entity_id == entity_id and x.concept == concept), None)
+    old = (flow._previous_room or {}).get("devices", {})
+    previous = next((dev for dev in old.values()
+                     if dev.get("entity") == entity_id and dev.get("foundation_concept") == concept
+                     and (candidate is None or dev.get("foundation_candidate_id") == candidate.candidate_id)), None)
+    if previous is not None:
+        return deepcopy(previous)
     if candidate is None:
         raise ValueError(f"{entity_id}: no longer selected in Foundation/{concept}")
-    return {"entity": entity_id, "physical_id": f"ha_entity:{entity_id}",
-            "role": "receiver" if concept == "amplifier" else "player" if concept == "source" else "display",
+    renamed = [dev for dev in old.values() if dev.get("foundation_concept") == concept
+               and dev.get("foundation_candidate_id") == candidate.candidate_id]
+    if len(renamed) == 1:
+        device = deepcopy(renamed[0])
+        old_entity = device["entity"]
+        device["entity"] = entity_id
+        for action in ("power_on", "power_off"):
+            for container in ("data", "target"):
+                payload = device.get(action, {}).get(container, {})
+                if payload.get("entity_id") == old_entity:
+                    payload["entity_id"] = entity_id
+        return device
+    # A shared source must retain its original reservation identity when a
+    # second room is added, even if the first room used an older custom ID.
+    existing = next((dev for room in flow._rooms.values() for dev in room["devices"].values()
+                     if dev["entity"] == entity_id), None)
+    physical = existing.get("physical_id", entity_id) if existing else f"ha_entity:{entity_id}"
+    role = ("remote" if entity_id.startswith("remote.") else "receiver" if concept == "amplifier"
+            else "player" if concept == "source" else "display")
+    return {"entity": entity_id, "physical_id": physical,
+            "role": role,
             "foundation_concept": concept, "foundation_candidate_id": candidate.candidate_id,
             "power_mode": "passive" if entity_id.startswith("remote.") else "native"}
 
@@ -64,6 +105,7 @@ def _source_ref(flow, entity_id: str, concept: str) -> dict:
 class _Wizard:
     def _begin(self, rooms=None, name="Multimedia"):
         self._rooms = deepcopy(rooms or {})
+        self._original_rooms = deepcopy(self._rooms)
         self._name = name
         self._room_id = None
         self._activity_key = None
@@ -110,6 +152,8 @@ class _Wizard:
                     self._rooms[self._room_id]["devices"]["screen"] = _source_ref(self, chosen, "display")
                 return await self.async_step_amplifier()
         default = (self._previous_room or {}).get("devices", {}).get("screen", {}).get("entity", NONE)
+        if not self._editing_room:
+            default = _area_default(self, "display", self._rooms[self._room_id]["area_id"])
         default = default if default in choices else NONE
         return self.async_show_form(step_id="display", errors=errors,
             data_schema=vol.Schema({vol.Required("display", default=default):
@@ -127,6 +171,8 @@ class _Wizard:
                     self._rooms[self._room_id]["devices"]["amplifier"] = _source_ref(self, chosen, "amplifier")
                 return await self.async_step_sources()
         default = (self._previous_room or {}).get("devices", {}).get("amplifier", {}).get("entity", NONE)
+        if not self._editing_room:
+            default = _area_default(self, "amplifier", self._rooms[self._room_id]["area_id"])
         default = default if default in choices else NONE
         return self.async_show_form(step_id="amplifier", errors=errors,
             data_schema=vol.Schema({vol.Required("amplifier", default=default):
@@ -142,8 +188,12 @@ class _Wizard:
             else:
                 devices = self._rooms[self._room_id]["devices"]
                 for entity in selected:
-                    key = "source_" + _slug(entity)
-                    devices[key] = _source_ref(self, entity, "source")
+                    device = _source_ref(self, entity, "source")
+                    key = next((role for role, prior in (self._previous_room or {}).get("devices", {}).items()
+                                if prior.get("foundation_concept") == "source"
+                                and prior.get("foundation_candidate_id") == device.get("foundation_candidate_id")
+                                and prior.get("foundation_candidate_id")), "source_" + _slug(entity))
+                    devices[key] = device
                 if not devices:
                     errors["base"] = "room_requires_av_endpoint"
                 elif self._editing_room:
@@ -165,7 +215,10 @@ class _Wizard:
         activities = self._rooms[self._room_id]["activities"]
         affected = [key for key, activity in activities.items()
                     if any(role not in new_devices or role not in old_devices
-                           or new_devices[role]["entity"] != old_devices[role]["entity"]
+                           or new_devices[role].get("foundation_candidate_id") != old_devices[role].get("foundation_candidate_id")
+                           or new_devices[role].get("foundation_concept") != old_devices[role].get("foundation_concept")
+                           or (not new_devices[role].get("foundation_candidate_id")
+                               and new_devices[role]["entity"] != old_devices[role]["entity"])
                            for role in activity.get("devices", []))]
         if not affected:
             self._editing_room = False
@@ -181,8 +234,6 @@ class _Wizard:
                 activities.pop(key, None)
             self._editing_room = False
             self._previous_room = None
-            if not activities:
-                return await self.async_step_activity()
             return await self.async_step_next()
         return self.async_show_form(step_id="validate_room_update",
             data_schema=vol.Schema({vol.Required("confirm_remove", default=False): bool}),
@@ -191,12 +242,20 @@ class _Wizard:
     async def async_step_activity(self, user_input=None):
         room = self._rooms[self._room_id]
         devices = room["devices"]
-        source_keys = {k: v["entity"] for k, v in devices.items() if k.startswith("source_")}
         editing = self._editing_activity
         previous = room["activities"].get(editing, {}) if editing else {}
+        # Remote endpoints are controls, not new playback sources. Keep an
+        # existing legacy cast editable without silently changing its intent.
+        source_keys = {k: v["entity"] for k, v in devices.items() if k.startswith("source_")
+                       and (v["entity"].startswith("media_player.") or k in previous.get("devices", []))}
         errors = {}
+        choices = dict(ACTIVITIES)
+        if not editing:
+            choices[DIRECT_ONLY] = "Direct device control only (no activity)"
         if user_input is not None:
             kind = user_input.get("activity_type")
+            if kind == DIRECT_ONLY and not editing:
+                return await self.async_step_next()
             source = user_input.get("primary_source", NONE)
             if kind not in ACTIVITIES:
                 errors["base"] = "invalid_activity"
@@ -211,8 +270,9 @@ class _Wizard:
                 if not label:
                     errors["base"] = "activity_required"
                 else:
-                    key = _slug(label)
-                    if key in room["activities"] and key != editing:
+                    proposed_key = _slug(label)
+                    key = editing or proposed_key
+                    if proposed_key in room["activities"] and proposed_key != editing:
                         errors["base"] = "activity_exists"
                     else:
                         cast = []
@@ -225,16 +285,28 @@ class _Wizard:
                         self._activity_key = key
                         self._activity_name = label
                         self._activity_cast = cast
-                        self._steps = []
+                        self._activity_type = kind
+                        # A label-only edit must preserve routes and custom steps,
+                        # including when an endpoint is temporarily unavailable.
+                        # A changed cast needs explicit new routing.
+                        same_cast = previous.get("devices") == cast
+                        self._activity_previous = deepcopy(previous) if same_cast else {}
+                        self._steps = deepcopy(self._activity_previous.get("steps", []))
                         self._route_cursor = 0
                         return await self.async_step_route()
         label = previous.get("name", "Watch TV")
+        previous_cast = previous.get("devices", [])
+        previous_source = next((key for key in previous_cast if key in source_keys), NONE)
+        default_kind = previous.get("activity_type")
+        if default_kind not in ACTIVITIES:
+            default_kind = ("listen_music" if previous_cast and "screen" not in previous_cast
+                            else "watch_source" if previous_source != NONE else "watch_tv")
         schema = {
-            vol.Required("activity_type", default="watch_tv"): vol.In(ACTIVITIES),
+            vol.Required("activity_type", default=default_kind): vol.In(choices),
             vol.Required("activity_name", default=label): str,
         }
         if source_keys:
-            schema[vol.Required("primary_source", default=NONE)] = vol.In(
+            schema[vol.Required("primary_source", default=previous_source)] = vol.In(
                 {NONE: "None / built-in TV", **source_keys})
         return self.async_show_form(step_id="activity", errors=errors,
                                     data_schema=vol.Schema(schema),
@@ -246,38 +318,56 @@ class _Wizard:
             key = self._activity_cast[self._route_cursor]
             entity = devices[key]["entity"]
             options = source_lists(self.hass, entity)
-            if not any(options.values()):
+            existing = [step for step in self._steps if step["device"] == key]
+            if not any(options.values()) and not any(step["type"] in ("source", "sound_mode") for step in existing):
                 self._route_cursor += 1
                 continue
             if user_input is not None:
-                for field, kind in (("source", "source"), ("sound_mode", "sound_mode")):
+                changes = []
+                for field in ("source", "sound_mode"):
                     chosen = user_input.get(field, UNCHANGED)
                     offered = options["source_list" if field == "source" else "sound_mode_list"]
-                    if chosen != UNCHANGED and chosen in offered:
-                        self._steps.append({"type": kind, "device": key, "candidates": [chosen]})
-                    elif chosen != UNCHANGED:
+                    if chosen == UNCHANGED:
+                        continue
+                    prior = [step for step in existing if step["type"] == field]
+                    if chosen in offered or (chosen == REMOVE_ROUTE and prior):
+                        changes.append((field, chosen))
+                    else:
                         return self.async_show_form(step_id="route", errors={"base": "route_changed"},
-                                                    data_schema=vol.Schema(self._route_fields(options)))
+                                                    data_schema=vol.Schema(self._route_fields(options, existing)),
+                                                    description_placeholders={"device": entity})
+                # Validate the whole form before applying any route change.
+                for field, chosen in changes:
+                    matching = [idx for idx, step in enumerate(self._steps)
+                                if step["device"] == key and step["type"] == field]
+                    position = matching[0] if matching else len(self._steps)
+                    self._steps = [step for step in self._steps
+                                   if not (step["device"] == key and step["type"] == field)]
+                    if chosen != REMOVE_ROUTE:
+                        self._steps.insert(position, {"type": field, "device": key, "candidates": [chosen]})
                 self._route_cursor += 1
                 user_input = None
                 continue
-            return self.async_show_form(step_id="route", data_schema=vol.Schema(self._route_fields(options)),
+            return self.async_show_form(step_id="route", data_schema=vol.Schema(self._route_fields(options, existing)),
                                         description_placeholders={"device": entity})
         activities = self._rooms[self._room_id]["activities"]
-        if self._editing_activity and self._editing_activity != self._activity_key:
-            activities.pop(self._editing_activity, None)
         self._editing_activity = None
-        activities[self._activity_key] = {"name": self._activity_name,
+        activities[self._activity_key] = {**self._activity_previous, "name": self._activity_name,
+                                         "activity_type": self._activity_type,
                                          "devices": list(self._activity_cast), "steps": list(self._steps)}
         return await self.async_step_next()
 
     @staticmethod
-    def _route_fields(options):
+    def _route_fields(options, existing=()):
         schema = {}
         for field, values in (("source", options["source_list"]), ("sound_mode", options["sound_mode_list"])):
-            if values:
-                schema[vol.Required(field, default=UNCHANGED)] = vol.In(
-                    {UNCHANGED: "No change / already routed", **{v: v for v in values}})
+            prior = [step for step in existing if step["type"] == field]
+            if values or prior:
+                choices = {UNCHANGED: ("Keep configured route" if prior else "No change / already routed"),
+                           **{v: v for v in values}}
+                if prior:
+                    choices[REMOVE_ROUTE] = "Remove configured route"
+                schema[vol.Required(field, default=UNCHANGED)] = vol.In(choices)
         return schema
 
     async def async_step_next(self, user_input=None):
@@ -291,6 +381,93 @@ class _Wizard:
         return self.async_show_form(step_id="next", data_schema=vol.Schema({
             vol.Required("action", default="review"): vol.In(NEXT)}))
 
+    def _review_summary(self):
+        lines = []
+        for room in self._rooms.values():
+            lines.append(f"{room.get('name', 'Room')}:")
+            if room.get("harmony_controller"):
+                lines.append("  Harmony owns every declared endpoint; Premium activities retained but disabled.")
+            for key, device in room["devices"].items():
+                state = self.hass.states.get(device["entity"])
+                lines.append(f"  {key}: {device['entity']} ({state.state if state else 'unavailable'})")
+            for activity in room["activities"].values():
+                lines.append(f"  {activity.get('name', 'Activity')}:")
+                for step in activity.get("steps", []):
+                    if step["type"] not in ("source", "sound_mode"):
+                        continue
+                    device = room["devices"][step["device"]]
+                    state = self.hass.states.get(device["entity"])
+                    preview = route_status(step, state.state if state else "unavailable",
+                                           state.attributes if state else {})
+                    lines.append(f"    {step['device']} · {' / '.join(step['candidates'])}: {preview['status']}")
+        return "\n".join(lines) or "No rooms"
+
+    def _review_configuration(self):
+        if self._rooms:
+            validate_rooms(self._rooms)
+        current, _ = av_sources(self.hass)
+        selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
+        for room_id, room in self._rooms.items():
+            previous = self._original_rooms.get(room_id, {})
+            for key, device in room["devices"].items():
+                if ((device.get("foundation_concept"), device.get("entity"),
+                     device.get("foundation_candidate_id")) not in selected
+                        and previous.get("devices", {}).get(key) != device):
+                    raise ValueError("New or changed device not selected")
+            for activity_id, activity in room["activities"].items():
+                if activity == previous.get("activities", {}).get(activity_id):
+                    continue
+                for key in activity["devices"]:
+                    device = room["devices"][key]
+                    if (device.get("foundation_concept"), device["entity"],
+                            device.get("foundation_candidate_id")) not in selected:
+                        raise ValueError("Changed activity includes a revoked source")
+        engine = self.hass.data.get(DOMAIN, {}).get("engine")
+        # Changing an opaque external controller is a physical ownership
+        # handoff, not a name edit. Require hub OFF and no affected Premium task.
+        affected = set()
+        for room_id in self._rooms.keys() | self._original_rooms.keys():
+            before = self._original_rooms.get(room_id, {})
+            after = self._rooms.get(room_id, {})
+            old, new = before.get("harmony_controller"), after.get("harmony_controller")
+            if not (old or new) or (old == new and before.get("devices") == after.get("devices")):
+                continue
+            for spec, controller in ((before, old), (after, new)):
+                if not controller:
+                    continue
+                device = spec["devices"].get(controller, {})
+                entity = device.get("entity")
+                candidate = next((source for source in current if source.entity_id == entity
+                                  and source.candidate_id == device.get("foundation_candidate_id")
+                                  and source.concept == "source" and source.provider == "harmony"), None)
+                state = self.hass.states.get(entity) if entity else None
+                if (not candidate or not state or state.state != "off"
+                        or state.attributes.get("current_activity") != "PowerOff"
+                        or "activity_starting" not in state.attributes or state.attributes["activity_starting"] is not None):
+                    return "stop_harmony_before_edit"
+            for spec in (before, after):
+                affected.update(device.get("physical_id", device["entity"]) for device in spec.get("devices", {}).values())
+        if engine and affected:
+            for room_id, state in engine.states.items():
+                scope = engine.rooms[room_id]["devices"]
+                overlap = any(device.get("physical_id", device["entity"]) in affected for device in scope.values())
+                task = getattr(engine, "_room_tasks", {}).get(room_id)
+                if overlap and (state.phase != "idle" or state.devices or (task and not task.done())):
+                    return "stop_room_before_edit"
+        if engine:
+            for room_id, state in engine.states.items():
+                if state.phase == "idle" and not state.devices:
+                    continue
+                before = self._original_rooms.get(room_id, {})
+                after = self._rooms.get(room_id, {})
+                if any(before.get("devices", {}).get(key) != after.get("devices", {}).get(key)
+                       for key in state.devices):
+                    return "stop_room_before_edit"
+                for activity in (state.activity, getattr(state, "retiring_activity", None)):
+                    if activity and before.get("activities", {}).get(activity) != after.get("activities", {}).get(activity):
+                        return "stop_room_before_edit"
+        return None
+
     async def async_step_review(self, user_input=None):
         errors = {}
         if user_input:
@@ -298,22 +475,19 @@ class _Wizard:
                 errors["base"] = "confirm_save"
             else:
                 try:
-                    if self._rooms:
-                        validate_rooms(self._rooms)
-                    current, _ = av_sources(self.hass)
-                    selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
-                    for room in self._rooms.values():
-                        for device in room["devices"].values():
-                            assert ((device["foundation_concept"], device["entity"],
-                                     device["foundation_candidate_id"]) in selected)
-                except (ValueError, TypeError, AssertionError, KeyError):
+                    reason = self._review_configuration()
+                except (ValueError, TypeError, KeyError):
                     errors["base"] = "selection_changed"
                 else:
-                    return await self._finish()
+                    if reason:
+                        errors["base"] = reason
+                    else:
+                        return await self._finish()
         return self.async_show_form(step_id="review", errors=errors,
                                     data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
                                     description_placeholders={"rooms": str(len(self._rooms)),
-                                        "activities": str(sum(len(r["activities"]) for r in self._rooms.values()))})
+                                        "activities": str(sum(len(r["activities"]) for r in self._rooms.values())),
+                                        "summary": self._review_summary()})
 
 
 class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
@@ -358,9 +532,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         options = {"add_room": "Add room", "edit_room": "Edit room devices and connections",
-                   "add_activity": "Add activity",
+                   "add_activity": "Add activity", "rename_room": "Rename room / change area",
                    "edit_activity": "Edit activity", "remove_activity": "Remove activity",
-                   "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card"}
+                   "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card",
+                   "harmony_owner": "Harmony / Premium control ownership"}
         if user_input:
             action = user_input["action"]
             if action == "frontend":
@@ -383,6 +558,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             if self._option_action == "remove_room":
                 self._rooms.pop(self._room_id)
                 return await self.async_step_review()
+            if self._option_action == "rename_room":
+                return await self.async_step_room_settings()
+            if self._option_action == "harmony_owner":
+                return await self.async_step_harmony_owner()
             if self._option_action == "edit_room":
                 self._editing_room = True
                 self._previous_room = deepcopy(self._rooms[self._room_id])
@@ -394,16 +573,58 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         return self.async_show_form(step_id="existing_room", data_schema=vol.Schema({
             vol.Required("room"): vol.In(choices)}))
 
+    async def async_step_harmony_owner(self, user_input=None):
+        room = self._rooms[self._room_id]
+        sources, _ = av_sources(self.hass)
+        approved = {(source.entity_id, source.candidate_id) for source in sources
+                    if source.provider == "harmony" and source.concept == "source"
+                    and source.entity_id.startswith("remote.")}
+        options = {NONE: "Premium owns the room"}
+        for key, device in room["devices"].items():
+            if (device["entity"], device.get("foundation_candidate_id")) in approved:
+                options[key] = "Harmony owns the room: " + device["entity"]
+        prior = room.get("harmony_controller", NONE)
+        if prior != NONE and prior not in options:
+            options[prior] = "Existing Harmony controller (selection needs review)"
+        errors = {}
+        if user_input is not None:
+            chosen = user_input.get("controller")
+            if chosen not in options or not user_input.get("confirm"):
+                errors["base"] = "confirm_harmony_scope"
+            else:
+                if chosen == NONE:
+                    room.pop("harmony_controller", None)
+                else:
+                    room["harmony_controller"] = chosen
+                return await self.async_step_review()
+        return self.async_show_form(step_id="harmony_owner", errors=errors,
+            data_schema=vol.Schema({vol.Required("controller", default=prior): vol.In(options),
+                                    vol.Required("confirm", default=False): bool}))
+
+    async def async_step_room_settings(self, user_input=None):
+        room = self._rooms[self._room_id]
+        areas = area_choices(self.hass)
+        errors = {}
+        if user_input is not None:
+            name = str(user_input.get("room_name", "")).strip()
+            area = user_input.get("area", CUSTOM_AREA)
+            if not name or (area != CUSTOM_AREA and area not in areas):
+                errors["base"] = "room_required"
+            else:
+                room.update(name=name, area_id=area if area in areas else None)
+                return await self.async_step_review()
+        return self.async_show_form(step_id="room_settings", errors=errors,
+            data_schema=vol.Schema({vol.Required("room_name", default=room.get("name", self._room_id)): str,
+              vol.Required("area", default=room.get("area_id") if room.get("area_id") in areas else CUSTOM_AREA):
+                  vol.In({**areas, CUSTOM_AREA: "No Home Assistant area"})}))
+
     async def async_step_existing_activity(self, user_input=None):
         choices = {key: row.get("name", key) for key, row in self._rooms[self._room_id]["activities"].items()}
         if not choices:
-            return await self.async_step_activity()
+            return await self.async_step_review()
         if user_input:
             key = user_input["activity"]
             if self._option_action == "remove_activity":
-                if len(choices) == 1:
-                    return self.async_show_form(step_id="existing_activity", errors={"base": "last_activity"},
-                                                data_schema=vol.Schema({vol.Required("activity"): vol.In(choices)}))
                 self._rooms[self._room_id]["activities"].pop(key)
                 return await self.async_step_review()
             self._editing_activity = key

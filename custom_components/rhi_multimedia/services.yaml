@@ -36,3 +36,24 @@ inspect_room:
       required: true
       selector:
         text: {}
+
+control_device:
+  name: Control device
+  description: Execute a supported native device action within a configured room.
+  fields:
+    room:
+      required: true
+      selector:
+        text:
+    device:
+      required: true
+      selector:
+        text:
+    action:
+      required: true
+      selector:
+        text:
+    value:
+      description: Optional source, sound mode, remote key, volume (0–1), mute boolean, or offered native group peer.
+      selector:
+        object:

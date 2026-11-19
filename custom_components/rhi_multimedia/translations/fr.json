@@ -1,0 +1,231 @@
+{
+  "title": "RHI Multimedia",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration Multimedia",
+        "description": "Foundation détecte et sélectionne d’abord les intégrations et appareils par concept multimédia. Si aucune sélection n’existe, créez l’intégration puis configurez l’écran, l’amplificateur et les sources dans RHI Foundation. Ouvrez ensuite la configuration Multimedia pour associer pièces, routes et activités.",
+        "data": {
+          "name": "Nom",
+          "confirm": "Créer Multimedia et configurer Foundation d’abord"
+        }
+      },
+      "room": {
+        "title": "Ajouter une pièce Multimedia",
+        "description": "Choisissez une zone Home Assistant si disponible. Un appareil central peut être utilisé dans plusieurs pièces.",
+        "data": {
+          "area": "Pièce Home Assistant",
+          "room_name": "Nom personnalisé de la pièce"
+        }
+      },
+      "display": {
+        "title": "Écran / TV",
+        "description": "Choisissez un écran déjà sélectionné dans Foundation. Une pièce dédiée à la musique peut ne pas avoir d’écran.",
+        "data": {
+          "display": "Écran"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / amplificateur",
+        "description": "Récepteur ou zone audio facultatif de Foundation. Laissez vide si la TV gère elle-même le son.",
+        "data": {
+          "amplifier": "Sortie audio"
+        }
+      },
+      "sources": {
+        "title": "Sources multimédias",
+        "description": "Choisissez l’Apple TV, Shield, console ou lecteur sélectionné dans Foundation. Une même source centrale peut être associée à plusieurs pièces.",
+        "data": {
+          "sources": "Sources multimédias"
+        }
+      },
+      "activity": {
+        "title": "Créer une activité",
+        "description": "Choisissez un modèle d’activité. Multimedia associe les rôles logiques sans supposer de connexion HDMI physique.",
+        "data": {
+          "activity_type": "Type d’activité",
+          "activity_name": "Nom de l’activité",
+          "primary_source": "Source multimédia principale"
+        }
+      },
+      "route": {
+        "title": "Routes d’entrée physiques",
+        "description": "Confirmez l’entrée ou le mode sonore exact fourni par Home Assistant pour cet appareil. Aucune route HDMI n’est supposée.",
+        "data": {
+          "source": "Entrée / source",
+          "sound_mode": "Mode sonore"
+        }
+      },
+      "next": {
+        "title": "Continuer",
+        "description": "Ajoutez des pièces ou activités, ou vérifiez tout avant d’enregistrer.",
+        "data": {
+          "action": "Suivant"
+        }
+      },
+      "review": {
+        "title": "Vérifier et enregistrer",
+        "description": "Vérifiez les appareils et routes sélectionnés ci-dessous. Différé signifie que l’appareil doit être allumé pour la vérification. Les associations indisponibles inchangées sont conservées. Aucune commande physique n’est envoyée.\n\n{summary}",
+        "data": {
+          "confirm": "Enregistrer la configuration Multimedia"
+        }
+      }
+    },
+    "error": {
+      "room_required": "Saisissez un nom de pièce.",
+      "room_exists": "Cette pièce est déjà configurée.",
+      "not_foundation_selected": "Cet appareil ne figure pas dans la sélection Foundation actuelle.",
+      "room_requires_av_endpoint": "Une pièce nécessite au moins un écran, amplificateur ou source sélectionné.",
+      "invalid_activity": "Choisissez un type d’activité pris en charge.",
+      "screen_required": "Cette activité nécessite un écran.",
+      "source_required": "Choisissez une source sélectionnée dans Foundation.",
+      "audio_required": "Choisissez un amplificateur ou lecteur pour la musique.",
+      "activity_required": "Saisissez un nom d’activité.",
+      "activity_exists": "Une activité portant ce nom existe déjà.",
+      "route_changed": "Les entrées disponibles de l’appareil ont changé ; choisissez une valeur actuelle.",
+      "confirm_save": "Confirmez pour enregistrer.",
+      "selection_changed": "La sélection Foundation a changé ou une source a disparu. Vérifiez les associations et réessayez.",
+      "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
+      "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
+      "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils."
+    },
+    "abort": {
+      "already_configured": "Multimedia est déjà configuré."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Gérer Multimedia",
+        "description": "Foundation reste responsable des intégrations et de la sélection des appareils. Modifiez ici les pièces et activités.",
+        "data": {
+          "action": "Que souhaitez-vous faire ?"
+        }
+      },
+      "existing_room": {
+        "title": "Choisir une pièce",
+        "data": {
+          "room": "Pièce"
+        }
+      },
+      "existing_activity": {
+        "title": "Choisir une activité",
+        "data": {
+          "activity": "Activité"
+        }
+      },
+      "room": {
+        "title": "Ajouter une pièce Multimedia",
+        "description": "Choisissez une zone Home Assistant si disponible. Un appareil central peut être utilisé dans plusieurs pièces.",
+        "data": {
+          "area": "Pièce Home Assistant",
+          "room_name": "Nom personnalisé de la pièce"
+        }
+      },
+      "display": {
+        "title": "Écran / TV",
+        "description": "Choisissez un écran déjà sélectionné dans Foundation. Une pièce dédiée à la musique peut ne pas avoir d’écran.",
+        "data": {
+          "display": "Écran"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / amplificateur",
+        "description": "Récepteur ou zone audio facultatif de Foundation. Laissez vide si la TV gère elle-même le son.",
+        "data": {
+          "amplifier": "Sortie audio"
+        }
+      },
+      "sources": {
+        "title": "Sources multimédias",
+        "description": "Choisissez l’Apple TV, Shield, console ou lecteur sélectionné dans Foundation. Une même source centrale peut être associée à plusieurs pièces.",
+        "data": {
+          "sources": "Sources multimédias"
+        }
+      },
+      "activity": {
+        "title": "Créer une activité",
+        "description": "Choisissez un modèle d’activité. Multimedia associe les rôles logiques sans supposer de connexion HDMI physique.",
+        "data": {
+          "activity_type": "Type d’activité",
+          "activity_name": "Nom de l’activité",
+          "primary_source": "Source multimédia principale"
+        }
+      },
+      "route": {
+        "title": "Routes d’entrée physiques",
+        "description": "Confirmez l’entrée ou le mode sonore exact fourni par Home Assistant pour cet appareil. Aucune route HDMI n’est supposée.",
+        "data": {
+          "source": "Entrée / source",
+          "sound_mode": "Mode sonore"
+        }
+      },
+      "next": {
+        "title": "Continuer",
+        "description": "Ajoutez des pièces ou activités, ou vérifiez tout avant d’enregistrer.",
+        "data": {
+          "action": "Suivant"
+        }
+      },
+      "review": {
+        "title": "Vérifier et enregistrer",
+        "description": "Vérifiez les appareils et routes sélectionnés ci-dessous. Différé signifie que l’appareil doit être allumé pour la vérification. Les associations indisponibles inchangées sont conservées. Aucune commande physique n’est envoyée.\n\n{summary}",
+        "data": {
+          "confirm": "Enregistrer la configuration Multimedia"
+        }
+      },
+      "validate_room_update": {
+        "title": "Les modifications d’appareils affectent les activités existantes",
+        "description": "Ces activités utilisent des appareils modifiés ou supprimés : {affected}. Confirmez la suppression de ces activités, puis recréez-les avec les nouvelles routes. Rien n’est modifié avant l’enregistrement final.",
+        "data": {
+          "confirm_remove": "Supprimer les activités concernées et continuer"
+        }
+      },
+      "edit_room": {
+        "title": "Modifier les appareils de la pièce"
+      },
+      "frontend": {
+        "title": "Carte de tableau de bord Multimedia",
+        "description": "Activez la carte intégrée sans modifier les associations des pièces ni le moteur d’activités.",
+        "data": {
+          "enable_ux": "Activer la carte intégrée"
+        }
+      },
+      "room_settings": {
+        "title": "Nom et emplacement de la pièce",
+        "description": "Modifiez le nom affiché ou la zone sans remplacer l’identité de la pièce.",
+        "data": {
+          "room_name": "Nom de la pièce",
+          "area": "Zone Home Assistant"
+        }
+      },
+      "harmony_owner": {
+        "title": "Responsable de la commande de la pièce",
+        "description": "Choisissez un seul responsable. Avant de transférer à Harmony, associez tous les appareils natifs que le hub peut contrôler, y compris les appareils partagés et les zones couplées. Arrêtez toutes les activités Premium concernées et placez Harmony sur PowerOff. Désactivez les automatisations et commandes concurrentes. Les autres pièces Premium ne peuvent pas commander les appareils partagés déclarés tant que Harmony en est responsable. Les activités Premium existantes sont conservées.",
+        "data": {
+          "controller": "Responsable de la commande",
+          "confirm": "Je confirme le périmètre complet et le transfert à un seul responsable"
+        }
+      }
+    },
+    "error": {
+      "room_required": "Saisissez un nom de pièce.",
+      "room_exists": "Cette pièce est déjà configurée.",
+      "not_foundation_selected": "Cet appareil ne figure pas dans la sélection Foundation actuelle.",
+      "room_requires_av_endpoint": "Une pièce nécessite au moins un écran, amplificateur ou source sélectionné.",
+      "invalid_activity": "Choisissez un type d’activité pris en charge.",
+      "screen_required": "Cette activité nécessite un écran.",
+      "source_required": "Choisissez une source sélectionnée dans Foundation.",
+      "audio_required": "Choisissez un amplificateur ou lecteur pour la musique.",
+      "activity_required": "Saisissez un nom d’activité.",
+      "activity_exists": "Une activité portant ce nom existe déjà.",
+      "route_changed": "Les entrées disponibles de l’appareil ont changé ; choisissez une valeur actuelle.",
+      "confirm_save": "Confirmez pour enregistrer.",
+      "selection_changed": "La sélection Foundation a changé ou une source a disparu. Vérifiez les associations et réessayez.",
+      "confirm_remove_incompatible": "Confirmez les activités concernées avant de continuer.",
+      "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
+      "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
+      "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils."
+    }
+  }
+}

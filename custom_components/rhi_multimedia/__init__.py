@@ -12,8 +12,9 @@ import voluptuous as vol
 from homeassistant.const import Platform
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import EVENT_UPDATE
 
@@ -21,10 +22,10 @@ from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
 from .validation import validate_rooms
-from .foundation import register_with_foundation, selected_index
+from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.SELECT]
+PLATFORMS = [Platform.SENSOR, Platform.SELECT, Platform.BUTTON]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -59,17 +60,9 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         hass.data[DOMAIN] = {"entry": entry, "phase": "legacy_foundation_review_required"}
         _register_entry_listeners(hass, entry)
         return True
-    selected = selected_index(hass)
-    invalid = [f"{room}/{key}" for room, spec in rooms.items()
-               for key, dev in spec["devices"].items()
-               if (dev.get("foundation_concept"), dev["entity"]) not in selected
-               or selected[(dev.get("foundation_concept"), dev["entity"])].candidate_id != dev.get("foundation_candidate_id")]
-    if invalid:
-        from homeassistant.exceptions import ConfigEntryNotReady
-        raise ConfigEntryNotReady(
-            "Multimedia has no matching approved Foundation source selection for: "
-            + ", ".join(invalid) + ". Review Foundation technical selections and Multimedia mappings."
-        )
+    # Missing/revoked selections degrade only the affected actions. Retain the
+    # configured rooms and their identities for inspection and repair; the adapter
+    # revalidates the exact Foundation selection before every native write.
     store = Store(hass, STORE_VERSION, f"rhi_multimedia_{entry.entry_id}")
     adapter = HAAdapter(hass, store)
     engine = ActivityEngine(rooms, adapter)
@@ -83,6 +76,10 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             state = engine.states[room]
             state.phase = "interrupted"
             state.activity = prior.get("activity") if prior.get("activity") in rooms[room]["activities"] else None
+            retiring = prior.get("retiring_activity")
+            state.retiring_activity = retiring if retiring in rooms[room]["activities"] else None
+            if state.retiring_activity:
+                state.activity = None
             state.devices = set(prior.get("devices") or []) & set(rooms[room]["devices"])
             state.error = "Home Assistant restarted; recover or stop to reconcile physical device state"
             state.progress = "Recovery required"
@@ -93,17 +90,58 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         # Refresh the published UX experience when native source readback changes.
         # Watch ONLY endpoints chosen in Multimedia after Foundation selection.
         # No domain-wide HA device discovery or guessed relationships.
-        watched_entities = {
-            device["entity"]
-            for specification in rooms.values()
-            for device in specification["devices"].values()
-        }
-        bus = getattr(hass, "bus", None)
-        if bus is not None:
-            def source_changed(event) -> None:
-                if event.data.get("entity_id") in watched_entities:
-                    async_dispatcher_send(hass, EVENT_UPDATE, "*")
-            entry.async_on_unload(bus.async_listen("state_changed", source_changed))
+        watched_entities: dict[str, set[str]] = {}
+        unsubscribe_sources = None
+
+        def refresh_source_tracker() -> None:
+            nonlocal unsubscribe_sources
+            updated: dict[str, set[str]] = {}
+            for room, specification in rooms.items():
+                for device in specification["devices"].values():
+                    updated.setdefault(device["entity"], set()).add(room)
+                    remote = adapter.paired_remote(device)
+                    if remote:
+                        updated.setdefault(remote["entity"], set()).add(room)
+            if updated == watched_entities and unsubscribe_sources is not None:
+                return
+            if unsubscribe_sources is not None:
+                unsubscribe_sources()
+            watched_entities.clear()
+            watched_entities.update(updated)
+            unsubscribe_sources = async_track_state_change_event(
+                hass, tuple(watched_entities), source_changed)
+
+        def remove_source_tracker() -> None:
+            if unsubscribe_sources is not None:
+                unsubscribe_sources()
+        async def source_changed(event) -> None:
+            if hass.data.get(DOMAIN, {}).get("engine") is not engine:
+                return
+            affected = watched_entities.get(event.data.get("entity_id"), ())
+            changed = False
+            for room in affected:
+                changed = await engine.reconcile(room) or changed
+            if affected and not changed:
+                async_dispatcher_send(hass, EVENT_UPDATE, "*")
+
+        # HA's indexed tracker schedules only selected source events on the
+        # event loop; a plain sync bus listener runs in an executor thread.
+        refresh_source_tracker()
+        entry.async_on_unload(remove_source_tracker)
+
+        async def selection_changed(event) -> None:
+            if (event.data.get("domain_id") != "multimedia"
+                    or hass.data.get(DOMAIN, {}).get("engine") is not engine):
+                return
+            refresh_source_tracker()
+            for room in rooms:
+                await engine.reconcile(room)
+            async_dispatcher_send(hass, EVENT_UPDATE, "*")
+
+        if getattr(hass, "bus", None) is not None:
+            entry.async_on_unload(hass.bus.async_listen(SELECTION_CHANGED_EVENT, selection_changed))
+        for room in rooms:
+            await engine.reconcile(room)
         _register_services(hass, engine, adapter, rooms)
         _register_entry_listeners(hass, entry)
     except Exception:
@@ -145,20 +183,44 @@ async def _async_update_listener(hass, entry) -> None:
 
 
 def _register_services(hass, engine, adapter, rooms: dict) -> None:
-    async def start(call: ServiceCall) -> None:
-        await engine.command(call.data["room"], call.data["activity"])
+    async def activity_result(call: ServiceCall, service: str, activity: str | None) -> dict:
+        room = call.data["room"]
+        response = {"room": room, "service": service, "activity": activity}
+        try:
+            result = await adapter.with_context(call.context, engine.command(room, activity))
+        except asyncio.CancelledError:
+            if asyncio.current_task().cancelling():
+                raise
+            return {**response, "result": "cancelled"}
+        return {**response, "result": "confirmed" if result["phase"] == ("active" if activity else "idle") else "failed",
+                "phase": result["phase"], "error": result["error"]}
 
-    async def stop(call: ServiceCall) -> None:
-        await engine.command(call.data["room"], None)
+    async def start(call: ServiceCall) -> dict:
+        return await activity_result(call, "start_activity", call.data["activity"])
 
-    async def recover(call: ServiceCall) -> None:
+    async def stop(call: ServiceCall) -> dict:
+        return await activity_result(call, "stop_activity", None)
+
+    async def recover(call: ServiceCall) -> dict:
         room = call.data["room"]
         if room not in engine.states:
             raise MediaError(f"Unknown room: {room}")
         activity = engine.states[room].activity
         if not activity:
             raise MediaError(f"{room}: no previous activity to recover")
-        await engine.command(room, activity)
+        return await activity_result(call, "recover_activity", activity)
+
+    async def control(call: ServiceCall) -> dict:
+        response = {"room": call.data["room"], "service": "control_device",
+                    "device": call.data["device"], "action": call.data["action"]}
+        try:
+            result = await adapter.with_context(call.context, engine.control(
+                response["room"], response["device"], response["action"], call.data.get("value")))
+        except asyncio.CancelledError:
+            if asyncio.current_task().cancelling():
+                raise
+            result = "cancelled"
+        return {**response, "result": result}
 
     async def inspect(call: ServiceCall) -> None:
         room = call.data["room"]
@@ -171,9 +233,12 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
         "stop_activity": (stop, vol.Schema({vol.Required("room"): str})),
         "recover_activity": (recover, vol.Schema({vol.Required("room"): str})),
         "inspect_room": (inspect, vol.Schema({vol.Required("room"): str})),
+        "control_device": (control, vol.Schema({vol.Required("room"): str, vol.Required("device"): str,
+                                                vol.Required("action"): str, vol.Optional("value"): object})),
     }
     for service, (handler, schema) in definitions.items():
-        hass.services.async_register(DOMAIN, service, handler, schema=schema)
+        response = SupportsResponse.NONE if service == "inspect_room" else SupportsResponse.OPTIONAL
+        hass.services.async_register(DOMAIN, service, handler, schema=schema, supports_response=response)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
@@ -193,7 +258,7 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
             task.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
-    for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room"):
+    for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room", "control_device"):
         hass.services.async_remove(DOMAIN, name)
     hass.data.pop(DOMAIN, None)
     return True

@@ -13,7 +13,10 @@ function walk(dir){return existsSync(dir)?readdirSync(dir,{withFileTypes:true}).
 export function assemble(){
   const spec=parse('src/manifest.json');
   const vendor=parse('src/vendor/RHI_UX_CORE.json');
-  if(vendor.version!=='1.6.4'||!read('src/runtime/multimedia-gateway.js').includes('RHI_MULTIMEDIA_EXPERIENCE_V1'))throw Error('source ownership/contract version drift');
+  const gateway=read('src/runtime/multimedia-gateway.js');
+  const status=read('../custom_components/rhi_multimedia/sensor.py');
+  if(vendor.version!=='1.6.4'||!gateway.includes('rhi_multimedia_room')||!status.includes('"rhi_multimedia_room"')||
+     gateway.includes('RHI_MULTIMEDIA_EXPERIENCE_V1')||status.includes('RoomExperienceSensor'))throw Error('native source ownership / retired interface drift');
   const logo=read('src/assets/branding/company-logo.svg');
   if(!logo.includes('Robotix.be')||!logo.includes('#0B4C86'))throw Error('Canonical Robotix company SVG missing or invalid');
   const modules=spec.modules;

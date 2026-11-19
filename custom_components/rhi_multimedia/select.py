@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from homeassistant.components.select import SelectEntity
+from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN, EVENT_UPDATE
@@ -27,9 +28,14 @@ class RoomActivitySelect(SelectEntity):
     async def async_added_to_hass(self):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
+    @callback
     def _changed(self, room):
         if room == self.room:
             self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        return not self.context["engine"].rooms[self.room].get("harmony_controller")
 
     @property
     def current_option(self) -> str:
@@ -43,4 +49,5 @@ class RoomActivitySelect(SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option not in self._attr_options:
             raise ValueError(f"Unknown activity: {option}")
-        await self.context["engine"].command(self.room, None if option == "off" else option)
+        await self.context["adapter"].with_context(getattr(self, "_context", None),
+            self.context["engine"].command(self.room, None if option == "off" else option))

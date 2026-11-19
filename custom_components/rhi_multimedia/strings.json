@@ -65,7 +65,7 @@
       },
       "review": {
         "title": "Review and save",
-        "description": "Save only when all linked entities are still approved by Foundation. No device commands are sent during configuration.",
+        "description": "Review the actual selected devices and input routes below. Deferred means the device must be awake before verification. Unchanged unavailable links are retained. No physical commands are sent.\n\n{summary}",
         "data": {
           "confirm": "Save Multimedia configuration"
         }
@@ -84,7 +84,10 @@
       "activity_exists": "An activity with this name already exists.",
       "route_changed": "The device's available inputs have changed; select a current value.",
       "confirm_save": "Confirm to save.",
-      "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry."
+      "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry.",
+      "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
+      "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
+      "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints."
     },
     "abort": {
       "already_configured": "Multimedia is already configured."
@@ -166,7 +169,7 @@
       },
       "review": {
         "title": "Review and save",
-        "description": "Save only when all linked entities are still approved by Foundation. No device commands are sent during configuration.",
+        "description": "Review the actual selected devices and input routes below. Deferred means the device must be awake before verification. Unchanged unavailable links are retained. No physical commands are sent.\n\n{summary}",
         "data": {
           "confirm": "Save Multimedia configuration"
         }
@@ -187,10 +190,25 @@
         "data": {
           "enable_ux": "Enable bundled dashboard card"
         }
+      },
+      "room_settings": {
+        "title": "Room name and location",
+        "description": "Change the display name or area without replacing room identity.",
+        "data": {
+          "room_name": "Room name",
+          "area": "Home Assistant area"
+        }
+      },
+      "harmony_owner": {
+        "title": "Room control ownership",
+        "description": "Choose one owner. Before transferring to Harmony, include every native endpoint the hub may control, including shared devices and coupled zones. Stop all affected Premium activities and set the Harmony hub to PowerOff. Disable competing automations and dashboard writers. Shared declared endpoints cannot be controlled by other Premium rooms while Harmony owns this scope. Existing Premium activity definitions are retained.",
+        "data": {
+          "controller": "Room control owner",
+          "confirm": "I confirm the complete affected scope and single-writer cutover"
+        }
       }
     },
     "error": {
-      "last_activity": "Keep at least one activity in a room; remove the room if unused.",
       "room_required": "Enter a room name.",
       "room_exists": "The room is already configured.",
       "not_foundation_selected": "This device is not in the current Foundation selection.",
@@ -204,7 +222,10 @@
       "route_changed": "The device's available inputs have changed; select a current value.",
       "confirm_save": "Confirm to save.",
       "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry.",
-      "confirm_remove_incompatible": "Confirm the affected activities before continuing."
+      "confirm_remove_incompatible": "Confirm the affected activities before continuing.",
+      "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
+      "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
+      "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints."
     }
   }
 }

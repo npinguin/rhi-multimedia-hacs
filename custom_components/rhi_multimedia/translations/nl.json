@@ -1,0 +1,231 @@
+{
+  "title": "RHI Multimedia",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Multimedia instellen",
+        "description": "Foundation detecteert en selecteert eerst integraties en apparaten per multimediaconcept. Maak de integratie aan als er nog geen selectie is en configureer scherm, versterker en mediabronnen in RHI Foundation. Open daarna Multimedia Configureren om ruimtes, ingangsroutes en activiteiten te koppelen.",
+        "data": {
+          "name": "Naam",
+          "confirm": "Multimedia aanmaken en eerst Foundation configureren"
+        }
+      },
+      "room": {
+        "title": "Multimediaruimte toevoegen",
+        "description": "Kies indien beschikbaar een Home Assistant-ruimte. Een centraal apparaat kan in meerdere ruimtes worden gebruikt.",
+        "data": {
+          "area": "Home Assistant-ruimte",
+          "room_name": "Eigen ruimtenaam"
+        }
+      },
+      "display": {
+        "title": "Scherm / tv",
+        "description": "Kies een scherm dat al in Foundation geselecteerd is. Voor muziek is een scherm niet verplicht.",
+        "data": {
+          "display": "Scherm"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / versterker",
+        "description": "Optionele receiver of luidsprekerzone uit Foundation. Laat leeg als de tv zelf het geluid afspeelt.",
+        "data": {
+          "amplifier": "Audio-uitgang"
+        }
+      },
+      "sources": {
+        "title": "Mediabronnen",
+        "description": "Kies de Apple TV, Shield, console of speler die in Foundation is geselecteerd. Dezelfde centrale bron kan aan meerdere ruimtes gekoppeld zijn.",
+        "data": {
+          "sources": "Mediabronnen"
+        }
+      },
+      "activity": {
+        "title": "Activiteit aanmaken",
+        "description": "Kies een standaardactiviteit. Multimedia koppelt de logische rollen; fysieke HDMI-verbindingen worden niet verondersteld.",
+        "data": {
+          "activity_type": "Type activiteit",
+          "activity_name": "Activiteitsnaam",
+          "primary_source": "Primaire mediabron"
+        }
+      },
+      "route": {
+        "title": "Fysieke ingangsroutes",
+        "description": "Bevestig de exacte ingang of geluidsmodus die Home Assistant voor dit apparaat aanbiedt. HDMI-routes worden niet geraden.",
+        "data": {
+          "source": "Ingang / bron",
+          "sound_mode": "Geluidsmodus"
+        }
+      },
+      "next": {
+        "title": "Verder",
+        "description": "Voeg ruimtes of activiteiten toe of controleer alles voor het opslaan.",
+        "data": {
+          "action": "Volgende"
+        }
+      },
+      "review": {
+        "title": "Controleren en opslaan",
+        "description": "Controleer hieronder de geselecteerde apparaten en ingangsroutes. Uitgesteld betekent dat het apparaat ingeschakeld moet zijn voor verificatie. Ongewijzigde onbeschikbare koppelingen blijven behouden. Er worden geen fysieke opdrachten verstuurd.\n\n{summary}",
+        "data": {
+          "confirm": "Multimedia-configuratie opslaan"
+        }
+      }
+    },
+    "error": {
+      "room_required": "Voer een ruimtenaam in.",
+      "room_exists": "Deze ruimte is al geconfigureerd.",
+      "not_foundation_selected": "Dit apparaat staat niet in de huidige Foundation-selectie.",
+      "room_requires_av_endpoint": "Een ruimte vereist minstens één geselecteerd scherm, versterker of bron.",
+      "invalid_activity": "Kies een ondersteund activiteitstype.",
+      "screen_required": "Deze activiteit vereist een scherm.",
+      "source_required": "Kies een mediabron die in Foundation geselecteerd is.",
+      "audio_required": "Kies een versterker of mediaspeler voor muziek.",
+      "activity_required": "Voer een activiteitsnaam in.",
+      "activity_exists": "Er bestaat al een activiteit met deze naam.",
+      "route_changed": "De beschikbare ingangen van het apparaat zijn gewijzigd; kies een actuele waarde.",
+      "confirm_save": "Bevestig om op te slaan.",
+      "selection_changed": "De Foundation-selectie is gewijzigd of een bron is verdwenen. Controleer de koppelingen en probeer opnieuw.",
+      "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
+      "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
+      "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt."
+    },
+    "abort": {
+      "already_configured": "Multimedia is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Multimedia beheren",
+        "description": "Foundation blijft verantwoordelijk voor integraties en apparaatselectie. Bewerk hier ruimtes en activiteiten.",
+        "data": {
+          "action": "Wat wil je doen?"
+        }
+      },
+      "existing_room": {
+        "title": "Ruimte kiezen",
+        "data": {
+          "room": "Ruimte"
+        }
+      },
+      "existing_activity": {
+        "title": "Activiteit kiezen",
+        "data": {
+          "activity": "Activiteit"
+        }
+      },
+      "room": {
+        "title": "Multimediaruimte toevoegen",
+        "description": "Kies indien beschikbaar een Home Assistant-ruimte. Een centraal apparaat kan in meerdere ruimtes worden gebruikt.",
+        "data": {
+          "area": "Home Assistant-ruimte",
+          "room_name": "Eigen ruimtenaam"
+        }
+      },
+      "display": {
+        "title": "Scherm / tv",
+        "description": "Kies een scherm dat al in Foundation geselecteerd is. Voor muziek is een scherm niet verplicht.",
+        "data": {
+          "display": "Scherm"
+        }
+      },
+      "amplifier": {
+        "title": "Audio / versterker",
+        "description": "Optionele receiver of luidsprekerzone uit Foundation. Laat leeg als de tv zelf het geluid afspeelt.",
+        "data": {
+          "amplifier": "Audio-uitgang"
+        }
+      },
+      "sources": {
+        "title": "Mediabronnen",
+        "description": "Kies de Apple TV, Shield, console of speler die in Foundation is geselecteerd. Dezelfde centrale bron kan aan meerdere ruimtes gekoppeld zijn.",
+        "data": {
+          "sources": "Mediabronnen"
+        }
+      },
+      "activity": {
+        "title": "Activiteit aanmaken",
+        "description": "Kies een standaardactiviteit. Multimedia koppelt de logische rollen; fysieke HDMI-verbindingen worden niet verondersteld.",
+        "data": {
+          "activity_type": "Type activiteit",
+          "activity_name": "Activiteitsnaam",
+          "primary_source": "Primaire mediabron"
+        }
+      },
+      "route": {
+        "title": "Fysieke ingangsroutes",
+        "description": "Bevestig de exacte ingang of geluidsmodus die Home Assistant voor dit apparaat aanbiedt. HDMI-routes worden niet geraden.",
+        "data": {
+          "source": "Ingang / bron",
+          "sound_mode": "Geluidsmodus"
+        }
+      },
+      "next": {
+        "title": "Verder",
+        "description": "Voeg ruimtes of activiteiten toe of controleer alles voor het opslaan.",
+        "data": {
+          "action": "Volgende"
+        }
+      },
+      "review": {
+        "title": "Controleren en opslaan",
+        "description": "Controleer hieronder de geselecteerde apparaten en ingangsroutes. Uitgesteld betekent dat het apparaat ingeschakeld moet zijn voor verificatie. Ongewijzigde onbeschikbare koppelingen blijven behouden. Er worden geen fysieke opdrachten verstuurd.\n\n{summary}",
+        "data": {
+          "confirm": "Multimedia-configuratie opslaan"
+        }
+      },
+      "validate_room_update": {
+        "title": "Apparaatwijzigingen beïnvloeden bestaande activiteiten",
+        "description": "Deze activiteiten verwijzen naar gewijzigde of verwijderde apparaten: {affected}. Bevestig het verwijderen van die activiteiten en maak ze opnieuw aan met de nieuwe routes. Er wijzigt niets vóór het definitief opslaan.",
+        "data": {
+          "confirm_remove": "Betrokken activiteiten verwijderen en doorgaan"
+        }
+      },
+      "edit_room": {
+        "title": "Apparaten in ruimte bewerken"
+      },
+      "frontend": {
+        "title": "Multimedia-dashboardkaart",
+        "description": "Schakel de meegeleverde kaart in zonder de ruimtekoppelingen of activiteitsengine te wijzigen.",
+        "data": {
+          "enable_ux": "Meegeleverde dashboardkaart inschakelen"
+        }
+      },
+      "room_settings": {
+        "title": "Ruimtenaam en locatie",
+        "description": "Wijzig de weergavenaam of ruimte zonder de identiteit te vervangen.",
+        "data": {
+          "room_name": "Ruimtenaam",
+          "area": "Home Assistant-ruimte"
+        }
+      },
+      "harmony_owner": {
+        "title": "Eigenaarschap ruimtebediening",
+        "description": "Kies één eigenaar. Wijs vóór overdracht aan Harmony alle native apparaten toe die de hub kan bedienen, ook gedeelde apparaten en gekoppelde zones. Stop alle betrokken Premium-activiteiten en zet Harmony op PowerOff. Schakel concurrerende automatiseringen en dashboardbediening uit. Andere Premium-ruimtes mogen gedeelde toegewezen apparaten niet bedienen zolang Harmony eigenaar is. Bestaande Premium-activiteiten blijven bewaard.",
+        "data": {
+          "controller": "Eigenaar ruimtebediening",
+          "confirm": "Ik bevestig het volledige betrokken bereik en de overdracht naar één eigenaar"
+        }
+      }
+    },
+    "error": {
+      "room_required": "Voer een ruimtenaam in.",
+      "room_exists": "Deze ruimte is al geconfigureerd.",
+      "not_foundation_selected": "Dit apparaat staat niet in de huidige Foundation-selectie.",
+      "room_requires_av_endpoint": "Een ruimte vereist minstens één geselecteerd scherm, versterker of bron.",
+      "invalid_activity": "Kies een ondersteund activiteitstype.",
+      "screen_required": "Deze activiteit vereist een scherm.",
+      "source_required": "Kies een mediabron die in Foundation geselecteerd is.",
+      "audio_required": "Kies een versterker of mediaspeler voor muziek.",
+      "activity_required": "Voer een activiteitsnaam in.",
+      "activity_exists": "Er bestaat al een activiteit met deze naam.",
+      "route_changed": "De beschikbare ingangen van het apparaat zijn gewijzigd; kies een actuele waarde.",
+      "confirm_save": "Bevestig om op te slaan.",
+      "selection_changed": "De Foundation-selectie is gewijzigd of een bron is verdwenen. Controleer de koppelingen en probeer opnieuw.",
+      "confirm_remove_incompatible": "Bevestig de betrokken activiteiten voordat je verdergaat.",
+      "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
+      "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
+      "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt."
+    }
+  }
+}
