@@ -22,10 +22,10 @@ from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
 from .validation import validate_rooms
-from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation
+from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation, unregister_visuals_with_foundation
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.SELECT, Platform.BUTTON]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR, Platform.SELECT, Platform.BUTTON, Platform.NOTIFY]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -46,9 +46,14 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     register_with_foundation(hass)
     configured = entry.options.get(CONF_ROOMS, entry.data.get(CONF_ROOMS, {}))
     if not configured:
-        # Empty config entry is a real Foundation-first onboarding state. It has
-        # no command services, physical devices or fake runtime projections.
-        hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration"}
+        # Empty room configuration can still own an explicitly configured
+        # native Dell display that Foundation must select before room binding.
+        # No activity engine, room commands or synthetic projections exist yet.
+        dell_configured = bool(entry.options.get("dell_displays", entry.data.get("dell_displays", {})))
+        hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration",
+                             "dell_prepared": dell_configured}
+        if dell_configured:
+            await hass.config_entries.async_forward_entry_setups(entry, [Platform.MEDIA_PLAYER])
         _register_entry_listeners(hass, entry)
         return True
     rooms = validate_rooms(configured)
@@ -186,13 +191,31 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
     async def activity_result(call: ServiceCall, service: str, activity: str | None) -> dict:
         room = call.data["room"]
         response = {"room": room, "service": service, "activity": activity}
+        # Capture the exact cast *before* stop mutates runtime state.
+        # Upstream Loewe can report optimistic state while its TV has not yet
+        # independently polled. Do not turn that into a physical PASS.
+        current = rooms.get(room, {})
+        cast = (current.get("activities", {}).get(activity, {}).get("devices", [])
+                if activity is not None else
+                getattr(engine.states.get(room), "devices", set()))
+        quality_of = getattr(adapter, "native_readback_quality",
+                             lambda _device: "native_ha_state")
+        provider_optimistic = any(
+            quality_of(current["devices"][key]) == "provider_optimistic"
+            for key in cast if key in current.get("devices", {})
+        )
         try:
-            result = await adapter.with_context(call.context, engine.command(room, activity))
+            operation = (engine.command(room, activity, fix_it=True)
+                         if service == "recover_activity"
+                         else engine.command(room, activity))
+            result = await adapter.with_context(call.context, operation)
         except asyncio.CancelledError:
             if asyncio.current_task().cancelling():
                 raise
             return {**response, "result": "cancelled"}
-        return {**response, "result": "confirmed" if result["phase"] == ("active" if activity else "idle") else "failed",
+        reached = result["phase"] == ("active" if activity else "idle")
+        return {**response,
+                "result": ("submitted" if provider_optimistic else "confirmed") if reached else "failed",
                 "phase": result["phase"], "error": result["error"]}
 
     async def start(call: ServiceCall) -> dict:
@@ -206,8 +229,11 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
         if room not in engine.states:
             raise MediaError(f"Unknown room: {room}")
         activity = engine.states[room].activity
-        if not activity:
-            raise MediaError(f"{room}: no previous activity to recover")
+        if not activity and not (engine.states[room].retiring_activity and
+                                 engine.states[room].devices):
+            raise MediaError(f"{room}: no previous activity or unfinished shutdown to correct")
+        # When a CEC-dependent shutdown was incomplete, recovering is a
+        # targeted, authorized retry of the remaining STOP plan, not a restart.
         return await activity_result(call, "recover_activity", activity)
 
     async def control(call: ServiceCall) -> dict:
@@ -246,7 +272,11 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     if hass.data.get(DOMAIN, {}).get("phase") in {
         "awaiting_foundation_configuration", "legacy_foundation_review_required"
     }:
+        prepared = bool(hass.data[DOMAIN].get("dell_prepared"))
+        if prepared and not await hass.config_entries.async_unload_platforms(entry, [Platform.MEDIA_PLAYER]):
+            return False
         hass.data.pop(DOMAIN, None)
+        unregister_visuals_with_foundation(hass)
         return True
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
@@ -261,4 +291,5 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room", "control_device"):
         hass.services.async_remove(DOMAIN, name)
     hass.data.pop(DOMAIN, None)
+    unregister_visuals_with_foundation(hass)
     return True

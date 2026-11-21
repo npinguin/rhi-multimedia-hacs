@@ -1,8 +1,8 @@
-/* Robotix Home Intelligence Multimedia UX v0.1.7; canonical RHI UX Core 1.6.4 */
+/* Robotix Home Intelligence Multimedia UX v0.1.8; canonical RHI UX Core 1.6.4 */
 (()=>{
 'use strict';
 const RHI_MM_CORE_CSS=":host,.rhi-ux-root{\n  --rhi-color-primary:#1467F5;\n  --rhi-color-primary-soft:#EAF3FF;\n  --rhi-color-text:#0F172A;\n  --rhi-color-muted:#64748B;\n  --rhi-color-muted-soft:#758399;\n  --rhi-color-line:#DCE5EF;\n  --rhi-color-line-soft:#EAF0F6;\n  --rhi-color-surface:#FFFFFF;\n  --rhi-color-surface-soft:#F8FAFC;\n  --rhi-color-ok:#22C55E;\n  --rhi-color-attention:#F59E0B;\n  --rhi-color-error:#B42318;\n  --rhi-color-unknown:#94A3B8;\n\n  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);\n  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);\n  --rhi-font-display:clamp(29px,2.55vw,42px);\n  --rhi-font-section:clamp(18px,1.4vw,22px);\n  --rhi-font-card:15px;\n  --rhi-font-body:12.5px;\n  --rhi-font-small:11px;\n  --rhi-font-label:10.5px;\n  --rhi-font-value:13px;\n  --rhi-font-diagnostic:10px;\n  --rhi-weight-regular:400;\n  --rhi-weight-medium:500;\n  --rhi-weight-strong:600;\n  --rhi-line-height-tight:1.15;\n  --rhi-line-height-body:1.42;\n\n  --rhi-space-1:4px;\n  --rhi-space-2:7px;\n  --rhi-space-3:10px;\n  --rhi-space-4:14px;\n  --rhi-space-5:18px;\n  --rhi-space-6:24px;\n  --rhi-radius-sm:9px;\n  --rhi-radius-md:12px;\n  --rhi-radius-lg:16px;\n  --rhi-radius-xl:20px;\n  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);\n  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);\n  --rhi-page-max:1640px;\n  --rhi-page-pad-x:24px;\n  --rhi-page-pad-y:14px;\n  --rhi-control-h:38px;\n  --rhi-icon-action:18px;\n  --rhi-icon-status:24px;\n  --rhi-break-phone:430px;\n  --rhi-break-tablet:760px;\n  --rhi-break-desktop:1024px;\n  --rhi-domain-accent:var(--rhi-color-primary);\n\n  color:var(--rhi-color-text);\n  font-family:var(--rhi-font-family);\n  font-size:var(--rhi-font-body);\n  font-weight:var(--rhi-weight-regular);\n  line-height:var(--rhi-line-height-body);\n}\n\n.rhiUxDomainShell{\n  --rhi-nav-active-bg:var(--rhi-color-primary-soft);\n  --rhi-nav-active-border:#CFDEF1;\n  --rhi-nav-active-text:#0F4CA4;\n  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(190px,23%,280px);\n  width:100%;margin:0 0 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-xl);\n  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));box-shadow:var(--rhi-shadow-md);overflow:hidden;\n}\n.rhiUxProductArea{min-width:0;overflow:hidden}\n.rhiUxDomainShellTop{min-height:68px;display:grid;grid-template-columns:minmax(168px,.52fr) minmax(0,1.48fr);align-items:center;gap:14px;padding:10px 22px 9px}\n.rhiUxDomainIdentity{display:grid;align-content:center;gap:2px;min-width:0;min-height:48px;padding:2px 0 0 4px}\n.rhiUxDomainIdentity span{font-size:13px;line-height:1.15;font-weight:var(--rhi-weight-regular);color:#58708F;white-space:nowrap}\n.rhiUxDomainIdentity strong{font-size:21px;line-height:1.03;letter-spacing:.045em;font-weight:var(--rhi-weight-strong);color:#0B467F;white-space:nowrap}\n.rhiUxModuleTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}\n.rhiUxModuleTab,.rhiUxDomainTab{appearance:none;border:0;background:transparent;font:inherit;color:#53647D;cursor:pointer;white-space:nowrap}\n.rhiUxModuleTab{min-height:40px;border-radius:12px;padding:8px;font-size:12px;font-weight:var(--rhi-weight-medium)}\n.rhiUxModuleTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border),0 6px 16px rgba(15,23,42,.035)}\n.rhiUxDomainShellBottom{padding:5px 22px 7px;border-top:1px solid var(--rhi-color-line-soft);background:rgba(255,255,255,.52);min-height:46px;box-sizing:border-box}\n.rhiUxDomainTabs{display:flex;align-items:center;gap:10px;min-height:34px;overflow-x:auto;scrollbar-width:none}\n.rhiUxDomainTabs::-webkit-scrollbar{display:none}\n.rhiUxDomainTab{flex:0 0 auto;min-height:34px;border-radius:11px;padding:7px 12px;font-size:11.5px;font-weight:var(--rhi-weight-medium);color:#5F6D80}\n.rhiUxDomainTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border)}\n.rhiUxCompanyBrand{min-width:0;border-left:1px solid var(--rhi-color-line-soft);display:grid;place-items:center;padding:10px 16px;background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}\n.rhiUxCompanyLogo{display:block;width:min(100%,250px);max-height:116px;line-height:0;overflow:hidden}\n.rhiUxCompanyLogo svg{display:block;width:100%;height:auto;max-height:116px;object-fit:contain;object-position:center}\n\n/* Canonical page stack: visual order is invariant across domains. */\n.rhiUxPageStack{display:flex;flex-direction:column}\n.rhiUxPageStack>.rhiUxPageHero{order:1}\n.rhiUxPageStack>.rhiUxStatusGrid{order:2}\n.rhiUxPageStack>.rhiUxQuickActionBar{order:3}\n\n/* Canonical page hero: image is one background layer, never a split side panel. */\n.rhiUxPageHero{\n  position:relative;display:block;height:146px;min-height:146px;overflow:hidden;\n  border:0;border-radius:var(--rhi-radius-lg);background:#fff;box-shadow:none;margin:0;\n}\n.rhiUxPageHeroCopy{\n  position:relative;z-index:4;width:min(48%,650px);max-width:none;padding:20px 18px 18px 22px;box-sizing:border-box;\n}\n.rhiUxPageHeroCopy>small{display:none}\n.rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{\n  margin:4px 0 8px;font-size:var(--rhi-font-display);line-height:1.02;letter-spacing:-.038em;\n  color:#0B1739;font-weight:var(--rhi-weight-strong);\n}\n.rhiUxPageHeroCopy p{\n  margin:0;max-width:520px;font-size:clamp(12.5px,1.05vw,15px);line-height:var(--rhi-line-height-body);\n  color:#536781;font-weight:var(--rhi-weight-regular);\n}\n.rhiUxPageHeroArt{position:absolute;z-index:1;inset:0 0 0 28%;display:block;overflow:hidden;pointer-events:none}\n.rhiUxPageHeroArt:before{\n  content:\"\";display:block;position:absolute;z-index:2;inset:0;\n  background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.95) 8%,rgba(255,255,255,.62) 19%,rgba(255,255,255,.10) 38%,rgba(255,255,255,0) 57%);\n}\n.rhiUxPageHeroArt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;transform:none}\n\n/* One canonical page status layer. */\n.rhiUxStatusGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0 0;padding:0;border:0;background:transparent;box-shadow:none}\n.rhiUxStatusItem{\n  min-width:0;min-height:68px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;\n  padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:#fff;box-shadow:var(--rhi-shadow-md);\n}\n.rhiUxStatusIcon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#F0F5FC;color:#355D96;font-size:18px}\n.rhiUxStatusIcon ha-icon{--mdc-icon-size:var(--rhi-icon-status)}\n.rhiUxStatusCopy{min-width:0;display:block}\n.rhiUxStatusCopy small{display:block;margin:0 0 2px;color:#476487;font-size:var(--rhi-font-label);font-weight:var(--rhi-weight-medium);line-height:1.2}\n.rhiUxStatusCopy b{display:block;margin:0 0 2px;color:var(--rhi-color-text);font-size:clamp(14px,1.12vw,17px);font-weight:var(--rhi-weight-strong);line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.rhiUxStatusCopy em{display:block;margin-top:2px;color:var(--rhi-color-muted);font-size:var(--rhi-font-small);font-style:normal;font-weight:var(--rhi-weight-regular);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n\n/* Canonical page-level quick actions. */\n.rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{\n  min-height:48px;padding:5px 8px;margin:7px 0 0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;\n  font-weight:var(--rhi-weight-medium);margin-right:2px;white-space:nowrap;\n}\n.rhiUxQuickActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0}\n.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{\n  height:36px;min-height:36px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#125DB7;\n  box-shadow:none;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 12px;\n  display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxQuickAction.primary,.rhiUxQuickActionBar button:first-of-type,.rhiEnergyQuickActions .hiAction:first-of-type,.rhi-top-action.primary{\n  background:var(--rhi-color-primary);border-color:var(--rhi-color-primary);color:#fff;\n}\n.rhiUxQuickAction:disabled,.rhiEnergyQuickActions .hiAction:disabled,.rhi-top-action:disabled{opacity:.46}\n\n/* Canonical body grammar. */\n.rhiUxDomainBody{font-family:var(--rhi-font-family);color:var(--rhi-color-text);font-size:var(--rhi-font-body);line-height:var(--rhi-line-height-body)}\n.rhiUxDomainBody button,.rhiUxDomainBody select,.rhiUxDomainBody input,.rhiUxDomainBody textarea{font-family:inherit}\n.rhiUxPanel,.rhiUxDomainBody .panel,.rhiUxDomainBody .info,.rhiUxDomainBody .summary,.rhiUxDomainBody .ov-panel{\n  border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);\n}\n.rhiUxPanel{padding:14px 16px}\n.rhiUxDomainBody .panel h2,.rhiUxDomainBody .info h2,.rhiUxDomainBody .summary h2,.rhiUxDomainBody .ov-panel h2{\n  font-size:var(--rhi-font-section);font-weight:var(--rhi-weight-strong);line-height:var(--rhi-line-height-tight);letter-spacing:-.02em;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel h3,.rhiUxDomainBody .info h3,.rhiUxDomainBody .summary h3,.rhiUxDomainBody .ov-panel h3{\n  font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);line-height:1.2;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel p,.rhiUxDomainBody .info p,.rhiUxDomainBody .summary p,.rhiUxDomainBody .ov-panel p{\n  font-size:var(--rhi-font-body);font-weight:var(--rhi-weight-regular);line-height:var(--rhi-line-height-body);color:var(--rhi-color-muted);\n}\n.rhiUxDataList{display:grid;gap:6px}\n.rhiUxDataRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}\n.rhiUxState{display:grid;gap:4px;padding:14px 16px;border:1px dashed var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft);color:var(--rhi-color-muted)}\n.rhiUxState b{color:var(--rhi-color-text);font-size:13px}\n.rhiUxState[data-state=\"attention\"]{border-color:#F6D48C;background:#FFFBEB}\n.rhiUxState[data-state=\"error\"]{border-color:#F1B8B4;background:#FFF7F7}\n.rhiUxConclusion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}\n.rhiUxConclusion small{font-size:var(--rhi-font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--rhi-color-muted)}\n.rhiUxConclusion h2{font-size:var(--rhi-font-card);line-height:1.2;margin:1px 0 2px}\n.rhiUxConclusion p{font-size:var(--rhi-font-small);line-height:1.3;margin:0;color:var(--rhi-color-muted)}\n.rhiUxTechnicalFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:6px 0 0;padding:3px 2px 0;border-top:1px solid rgba(148,163,184,.20);color:#94A3B8;font-size:9px;line-height:1.2}\n.rhiUxTechnicalFooter span+span:before{content:\"·\";margin-right:9px;color:#CBD5E1}\n.rhiUxTechnicalFooter [data-severity=\"warning\"]{color:#B7791F;font-weight:var(--rhi-weight-strong)}\n.rhiUxTechnicalFooter [data-severity=\"error\"]{color:var(--rhi-color-error);font-weight:var(--rhi-weight-strong)}\n\n@media(max-width:1180px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:18px}\n  .rhiUxPageHero{height:140px;min-height:140px}\n  .rhiUxPageHeroCopy{width:51%;padding:18px 14px 16px 18px}\n  .rhiUxPageHeroArt{inset:0 0 0 30%}\n  .rhiUxStatusItem{grid-template-columns:40px minmax(0,1fr);padding:9px 10px;min-height:66px}\n  .rhiUxStatusIcon{width:37px;height:37px}\n}\n@media(max-width:760px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:10px;--rhi-page-pad-y:9px;--rhi-font-body:12px;--rhi-font-small:10.75px}\n  .rhiUxDomainShell{grid-template-columns:1fr}.rhiUxCompanyBrand{display:none}.rhiUxDomainShellTop{grid-template-columns:1fr;padding:10px 12px}.rhiUxDomainIdentity{min-height:auto}.rhiUxDomainShellBottom{padding:7px 12px 9px}\n  .rhiUxPageHero{height:128px;min-height:128px;border-radius:14px}\n  .rhiUxPageHeroCopy{width:59%;padding:18px 9px 16px 13px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:27px;letter-spacing:-.032em}\n  .rhiUxPageHeroCopy p{font-size:11px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}\n  .rhiUxPageHeroArt{inset:0 0 0 34%}\n  .rhiUxStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .rhiUxStatusItem{min-height:74px;grid-template-columns:34px minmax(0,1fr);gap:7px;padding:8px}\n  .rhiUxStatusIcon{width:32px;height:32px;border-radius:9px}.rhiUxStatusIcon ha-icon{--mdc-icon-size:20px}\n  .rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{overflow-x:auto;flex-wrap:nowrap}\n  .rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title,.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{flex:0 0 auto}\n  .rhiUxConclusion{grid-template-columns:1fr}\n}\n@media(max-width:430px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}\n  .rhiUxPageHero{height:118px;min-height:118px}\n  .rhiUxPageHeroCopy{width:64%;padding:16px 8px 14px 11px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:24px}\n  .rhiUxPageHeroCopy p{font-size:10.5px;-webkit-line-clamp:2}\n  .rhiUxPageHeroArt{inset:0 0 0 38%}\n  .rhiUxStatusGrid{grid-template-columns:1fr 1fr}\n}\n\n/* Optional body/section-scoped view and filter controls. */\n.rhiUxContextBar{\n  min-height:42px;padding:4px 7px;margin:0 0 8px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxContextBar>small{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap;\n}\n.rhiUxContextControls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}\n.rhiUxContextControl{\n  min-height:32px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#355D96;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 11px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxContextControl.active,.rhiUxContextControl[aria-pressed=\"true\"]{background:var(--rhi-color-primary-soft);border-color:#CFDEF1;color:#0F4CA4}\n.rhiUxContextControl:disabled{opacity:.46}\n@media(max-width:760px){.rhiUxContextBar{overflow-x:auto;flex-wrap:nowrap}.rhiUxContextBar>small,.rhiUxContextControls,.rhiUxContextControl{flex:0 0 auto}}\n\n/* Canonical cross-domain appearance picker. Domains own catalogs and persistence. */\n.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}\n.rhiUxVisualPickerPanel{width:min(920px,94vw);max-height:min(82vh,760px);overflow:hidden;background:#fff;border:1px solid var(--rhi-color-line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:16px;box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:10px}\n.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;min-height:0}\n.rhiUxVisualPickerHead small{font-size:var(--rhi-font-label);font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:2px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:3px 0 0;font-size:11px;color:#64748b}\n.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin:0;min-height:0}\n.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}\n.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:142px;gap:8px;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px;align-content:start}\n.rhiUxVisualChoice{height:142px;min-height:142px;max-height:142px;display:grid;grid-template-rows:86px minmax(0,1fr);gap:6px;align-items:stretch;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}\n.rhiUxVisualChoiceImage{width:100%;height:86px;min-width:0;min-height:86px;max-width:none;max-height:86px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}\n.rhiUxVisualChoiceCopy{min-width:0;align-self:end}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhiUxVisualChoiceCopy small{font-size:var(--rhi-font-label);color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:12px;margin-top:1px}.rhiUxVisualChoiceCopy em{font-size:var(--rhi-font-small);color:#64748b;font-style:normal;margin-top:1px}\n.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}.rhiUxVisualPickerRefine label span{display:block;font-size:var(--rhi-font-label);color:#64748b;margin-bottom:3px}.rhiUxVisualPickerRefine select{width:100%;height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}\n.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin:0;padding-top:9px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:34px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:var(--rhi-font-small);font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}\n@media(max-width:900px){.rhiUxVisualChoiceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:560px){.rhiUxVisualPickerBackdrop{padding:8px}.rhiUxVisualPickerPanel{width:96vw;max-height:88vh;padding:12px}.rhiUxVisualChoiceGrid{grid-template-columns:1fr;grid-auto-rows:116px}.rhiUxVisualChoice{height:116px;min-height:116px;max-height:116px;grid-template-columns:94px minmax(0,1fr);grid-template-rows:1fr}.rhiUxVisualChoiceImage{width:94px;height:86px;min-width:94px;max-width:94px}.rhiUxVisualChoiceCopy{align-self:center}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerFooter{flex-wrap:wrap}}\n\n\n/* Canonical page and asset composition primitives. */\n.rhiUxPage{display:block;width:100%;max-width:var(--rhi-page-max);margin:0 auto;padding:var(--rhi-page-pad-y) var(--rhi-page-pad-x);box-sizing:border-box}\n.rhiUxPageContent{display:grid;gap:var(--rhi-space-3);margin-top:var(--rhi-space-3)}\n.rhiUxAssetCardShell{display:grid;gap:var(--rhi-space-3);min-width:0;padding:12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm)}\n.rhiUxAssetCardIdentity,.rhiUxAssetCardFacts,.rhiUxAssetCardRelationships,.rhiUxAssetCardActions,.rhiUxAssetCardDetails,.rhiUxAssetCardFeedback{min-width:0}\n.rhiUxAssetCardRelationships{display:grid;gap:var(--rhi-space-2)}\n.rhiUxAssetCardActions{display:flex;align-items:center;gap:var(--rhi-space-2);flex-wrap:wrap}\n.rhiUxAssetCardDetails:empty,.rhiUxAssetCardFeedback:empty{display:none}\n.rhiUxAssetIdentity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;min-width:0}\n.rhiUxAssetVisual{width:72px;height:58px;display:grid;place-items:center;overflow:hidden}\n.rhiUxAssetVisual img{display:block;width:100%;height:100%;object-fit:contain}\n.rhiUxAssetIdentityCopy{min-width:0}.rhiUxAssetIdentityCopy small{display:block;color:var(--rhi-color-muted);font-size:var(--rhi-font-label);text-transform:uppercase;letter-spacing:.08em}\n.rhiUxAssetIdentityCopy h2{margin:2px 0;font-size:var(--rhi-font-section);line-height:1.12}.rhiUxAssetIdentityCopy p{margin:0;color:var(--rhi-color-muted);font-size:var(--rhi-font-body)}\n.rhiUxAssetFactGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--rhi-space-2)}\n.rhiUxAssetFact{min-width:0;padding:9px 10px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface)}\n.rhiUxAssetFact small,.rhiUxAssetFact b,.rhiUxAssetFact span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n.rhiUxAssetFact small{font-size:var(--rhi-font-label);color:var(--rhi-color-muted)}.rhiUxAssetFact b{margin-top:2px;font-size:13px}.rhiUxAssetFact span{margin-top:2px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxAssetRelationship{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft)}\n.rhiUxAssetRelationship small,.rhiUxAssetRelationship b,.rhiUxAssetRelationship span{display:block}.rhiUxAssetRelationship small,.rhiUxAssetRelationship span{color:var(--rhi-color-muted);font-size:var(--rhi-font-small)}\n.rhiUxAssetDisclosure{border-top:1px solid var(--rhi-color-line-soft);padding-top:8px}.rhiUxAssetDisclosure summary{cursor:pointer;font-weight:var(--rhi-weight-medium)}\n.rhiUxAssetDisclosure>div{padding-top:8px}\n.rhiUxWriteFeedback{margin-top:6px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}.rhiUxWriteFeedback[data-state=\"success\"]{color:#15803D}.rhiUxWriteFeedback[data-state=\"error\"]{color:var(--rhi-color-error)}\n@media(max-width:760px){.rhiUxAssetCardShell{padding:10px}.rhiUxAssetFactGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:430px){.rhiUxAssetCardShell{gap:var(--rhi-space-2);padding:9px}.rhiUxAssetFactGrid{grid-template-columns:1fr 1fr}}\n\n\n/* Compact asset grammar. Opt-in: existing page heroes, navigation and panels are unchanged.\n   Domains own asset facts and relationships; Core only lays out their presentation. */\n.rhiUxAssetRow{\n  display:grid;grid-template-columns:52px minmax(0,1fr) minmax(76px,max-content) auto;\n  align-items:center;gap:10px;min-width:0;padding:8px 10px;\n  border-bottom:1px solid var(--rhi-color-line-soft);\n}\n.rhiUxAssetRow:last-child{border-bottom:0}\n.rhiUxAssetImage{\n  display:flex;align-items:center;justify-content:center;width:52px;height:52px;\n  border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft);overflow:hidden;\n}\n.rhiUxAssetImage img{display:block;width:100%;height:100%;object-fit:contain}\n.rhiUxAssetRowIdentity{display:grid;gap:3px;min-width:0}\n.rhiUxAssetName{font-weight:var(--rhi-weight-strong);overflow-wrap:anywhere}\n.rhiUxAssetContext,.rhiUxAssetRowRelationship{font-size:var(--rhi-font-small);color:var(--rhi-color-muted);line-height:1.25}\n.rhiUxAssetRowRelationship .rhiUxAssetRelationshipLink{color:var(--rhi-color-primary);text-decoration:underline;text-underline-offset:2px}\n.rhiUxAssetRowRelationship .rhiUxAssetRelationshipLink:focus-visible{outline:2px solid var(--rhi-color-primary);outline-offset:3px}\n.rhiUxAssetLive{display:grid;justify-items:end;gap:3px;text-align:right;min-width:76px}\n.rhiUxAssetPower{font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);font-variant-numeric:tabular-nums;white-space:nowrap}\n.rhiUxAssetState{font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxAssetExpand{display:flex;align-items:center;justify-content:center;min-width:32px;min-height:36px}\n@media(max-width:430px){\n  .rhiUxAssetRow{grid-template-columns:42px minmax(0,1fr) minmax(64px,max-content) auto;gap:7px;padding:7px 5px}\n  .rhiUxAssetImage{width:42px;height:42px}\n  .rhiUxAssetLive{min-width:64px}\n}\n\n/* Opt-in time-series presentation: preserve domain-owned data, periods and charts. */\n.rhiUxChartPanel{min-width:0;padding:12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface)}\n.rhiUxChartHeader{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px}\n.rhiUxChartLegend{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxChartViewport{width:100%;min-width:0;overflow-x:auto}\n.rhiUxChartViewport svg,.rhiUxChartViewport canvas{display:block;max-width:100%}\n.rhiUxChartEmpty{padding:20px 12px;text-align:center;color:var(--rhi-color-muted);font-size:var(--rhi-font-small)}\n@media(max-width:760px){.rhiUxChartPanel{padding:9px}.rhiUxChartHeader{align-items:flex-start}}\n";
-const RHI_MM_DOMAIN_CSS=":host{display:block;min-width:0;background:#f5f7fb;color:var(--rhi-color-text);font-family:var(--rhi-font-family)}\nha-card{background:transparent;border:0;box-shadow:none;overflow:visible}\n.mm-shell{max-width:1290px;margin:auto;padding:12px 16px 20px}\n.mm-page{gap:0}.mm-page .rhiUxPageContent{margin-top:9px}\n.mm-shell .rhiUxDomainShell{margin-bottom:10px}\n.mm-shell .rhiUxPageHero{border-radius:17px}\n.mm-shell .rhiUxPageHeroArt:before{background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.94) 9%,rgba(255,255,255,.62) 28%,transparent 66%)}\n.mm-shell .rhiUxTechnicalFooter{margin:12px 0 0;opacity:.8}\n.mm-section{border:1px solid var(--rhi-color-line);border-radius:15px;padding:14px 15px;background:#fff;box-shadow:var(--rhi-shadow-md)}\n.mm-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}.mm-heading h2{font-size:20px;margin:0 0 2px;font-weight:650}.mm-heading p{font-size:11px;margin:0;color:var(--rhi-color-muted)}\n.mm-room-grid,.mm-activities,.mm-diag-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\n.mm-room-card,.mm-surface{min-width:0;background:#fff;border:1px solid #dce6f0;border-radius:14px;padding:14px;box-shadow:0 3px 10px rgba(15,35,80,.028)}\n.mm-room-head{display:flex;align-items:center;gap:10px}.mm-room-head>div{flex:1;min-width:0}.mm-room-head small,.mm-room-current small{display:block;color:#7084a1;font-weight:650;font-size:10px;letter-spacing:.08em}.mm-room-head h3{font-size:17px;margin:1px 0;font-weight:650}.mm-room-glyph,.mm-role{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#ecf4ff;color:#2266c3}.mm-room-glyph ha-icon{--mdc-icon-size:23px}\n.mm-phase{display:inline-flex;align-items:center;justify-content:center;font-size:10px;padding:6px 8px;white-space:nowrap;border-radius:100px;background:#f2f5f9;color:#58718d}.mm-phase-good{background:#edfaf2;color:#16864d}.mm-phase-warn{background:#fff3e8;color:#a76120}.mm-phase-idle{background:#f3f6fa;color:#68798e}\n.mm-room-current{margin:11px 0 9px;padding:10px 11px;background:#f7faff;border:1px solid #edf1f7;border-radius:9px;display:grid;gap:2px}.mm-room-current>b{font-size:15px;font-weight:650}.mm-room-current>span{color:#667891;font-size:11px}\n.mm-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}.mm-activity,.mm-room-foot button,.mm-room-picker button,.mm-link{display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid #d9e4f2;color:#145bb1;border-radius:8px;min-height:33px;padding:5px 9px;cursor:pointer;font:inherit;font-size:11px;font-weight:600;line-height:1.25}.mm-activity ha-icon,.mm-room-foot ha-icon,.mm-link ha-icon{--mdc-icon-size:16px}.mm-activity.active,.mm-room-picker button.active{background:#eaf3ff;border-color:#b4d5ff;color:#1253a5}.mm-activity:not(:disabled):hover,.mm-link:hover,.mm-room-picker button:hover{background:#ecf4ff}.mm-activity:disabled,.mm-room-foot button:disabled{opacity:.40;cursor:not-allowed}.mm-room-foot{display:flex;gap:7px;align-items:center;margin-top:12px;border-top:1px solid #edf1f6;padding-top:11px}.mm-room-foot .mm-link{margin-left:auto}\n.mm-room-error{color:#a6352a;background:#fff5f3;border:1px solid #f4d8d3;border-radius:8px;padding:8px;font-size:11px;margin:8px 0 0;overflow-wrap:anywhere}.mm-nowplaying{display:flex;gap:7px;color:#516e91;font-size:11px;align-items:center}.mm-nowplaying ha-icon{--mdc-icon-size:17px}\n.mm-link{border:0;color:#1467f5;background:none}.mm-room-picker{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.mm-detail-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:10px}.mm-detail-grid>div{min-width:0;display:flex;flex-direction:column;gap:10px}\n.mm-surface h3{font-size:16px;margin:0 0 13px;color:#10213d}.mm-surface>p{margin-top:9px}.mm-media-detail{display:flex;gap:12px;align-items:center}.mm-media-detail img{width:75px;height:70px;object-fit:cover;border-radius:9px}.mm-media-detail b{font-size:13px}.mm-media-detail p,.mm-media-detail small{color:#687d92;font-size:11px;margin:2px 0}.mm-audio-readback{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:9px;border-top:1px solid #edf1f5;color:#516e91;font-size:12px}\n.mm-device-list{display:grid;gap:6px}.mm-device-row{display:flex;gap:10px;align-items:center;border:1px solid #edf2f8;padding:8px;border-radius:9px}.mm-device-row>div{flex:1;min-width:0}.mm-device-row b{font-size:12px;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.mm-device-row small{font-size:10px;color:#6d829a;display:block}.mm-device-row button{border:0;background:none;color:#1467f5;cursor:pointer}.mm-device-row button ha-icon{--mdc-icon-size:17px}\n.mm-route{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #eaf0f8;padding:8px 0;font-size:11px}.mm-route span{color:#5d7591}.mm-device-table{display:grid;gap:0}.mm-table-head,.mm-table-row{display:grid;grid-template-columns:1.7fr 1.2fr 1fr .8fr;gap:12px;align-items:center;padding:11px 12px;border-bottom:1px solid #e8eff7}.mm-table-head{font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:#f7faff;color:#627c9c}.mm-table-row{font-size:12px}.mm-table-row span{overflow-wrap:anywhere}\n.mm-diag-grid{align-items:start}.mm-diag-status{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eef3f9;font-size:11px}.mm-diag-status span{color:#5e718b}.mm-tech{font-size:10px;color:#65758b;overflow-wrap:anywhere}.mm-tech p{margin:5px 0}.mm-surface details{margin-top:11px;font-size:11px}.mm-surface summary{cursor:pointer;color:#1467f5;font-weight:600}\n.mm-callout{display:flex;align-items:flex-start;gap:12px;border:1px solid #d9e4f1;border-radius:12px;background:#fff;padding:18px}.mm-callout>ha-icon{color:#467bb8;--mdc-icon-size:28px}.mm-callout b{font-size:16px}.mm-callout p{font-size:12px;color:#61758e;margin:7px 0 0;line-height:1.5}.mm-attention{border-color:#ebd5af;background:#fffdf9}.mm-muted{color:#6e829b;font-size:11px}\n.mm-shell .rhiUxWriteFeedback{margin:0 0 11px}\n@media(max-width:1000px){.mm-room-grid,.mm-activities,.mm-diag-grid{grid-template-columns:1fr}.mm-detail-grid{grid-template-columns:1fr}}\n@media(max-width:760px){.mm-shell{padding:8px}.mm-section{padding:11px}.mm-shell .rhiUxPageHeroCopy{width:78%}.mm-room-head h3{font-size:15px}.mm-table-head,.mm-table-row{grid-template-columns:1.2fr 1fr .7fr}.mm-table-head span:last-child,.mm-table-row span:last-child{display:none}}\n@media(max-width:430px){.mm-shell .rhiUxPageHeroCopy{width:95%;padding-right:10px}.mm-activity,.mm-room-foot button{min-height:36px}.mm-room-foot{flex-wrap:wrap}.mm-room-foot .mm-link{margin-left:0}.mm-device-row .mm-phase{display:none}}\n\n.mm-native-controls{display:grid;gap:10px}.mm-native-device{display:grid;gap:8px;min-width:0;border-top:1px solid var(--rhi-color-line);padding-top:10px}.mm-native-device small{color:var(--rhi-color-muted)}.mm-native-buttons{display:flex;flex-wrap:wrap;gap:6px}.mm-native-buttons button,.mm-native-device select{min-height:36px;border:1px solid var(--rhi-color-line);border-radius:8px;background:var(--card-background-color,#fff);color:inherit;padding:6px 10px;font:inherit;max-width:100%}.mm-native-buttons button:disabled,.mm-native-device select:disabled{opacity:.5;cursor:not-allowed}.mm-native-device label{display:grid;gap:4px;font-size:12px}.mm-native-device input{max-width:100%;width:100%}.mm-native-device details{min-width:0}.mm-native-device summary{cursor:pointer;padding:6px 0}\n\n.mm-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 12px}.mm-title h2{font-size:20px;margin:0}.mm-title a{text-decoration:none}.mm-quick-controls{display:grid;gap:5px;margin-top:8px}.mm-quick-controls .mm-native-device{gap:5px}.mm-context{margin-top:10px}.mm-context-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}.mm-context-item{border:1px solid var(--rhi-color-line);padding:8px;border-radius:8px;min-width:0}.mm-context-item button{min-height:44px;width:100%;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;font:inherit;font-weight:600;cursor:pointer}.mm-context-item button[aria-expanded=true]{background:#eaf3ff;color:#1253a5}.mm-context-item [data-mm-summary]{min-height:24px;overflow-wrap:anywhere;font-size:12px}.mm-context [data-mm-expanded]{margin-top:8px}.mm-room-card button,.mm-native-buttons button,.mm-native-device select,.mm-room-picker button{min-height:44px}.mm-shell button:focus-visible,.mm-shell a:focus-visible,.mm-shell input:focus-visible,.mm-shell select:focus-visible{outline:2px solid #1267be;outline-offset:2px}.mm-native-device label{font-size:13px}.mm-device-row button{min-width:44px;min-height:44px}.mm-native-device input[type=range]{min-height:44px}.mm-room-head h3,.mm-device-row b{overflow-wrap:anywhere;white-space:normal}.mm-phase{white-space:normal;text-align:center}\n\n.mm-remote{padding:2px 0}.mm-remote-navigation{display:grid;grid-template-columns:repeat(3,minmax(44px,60px));grid-template-rows:repeat(3,minmax(44px,auto));gap:6px;justify-content:center;margin:10px 0}.mm-remote-key{display:flex;min-width:0}.mm-remote-key button{width:100%;min-height:44px}.mm-remote-key-up{grid-area:1 / 2}.mm-remote-key-left{grid-area:2 / 1}.mm-remote-key-ok{grid-area:2 / 2}.mm-remote-key-right{grid-area:2 / 3}.mm-remote-key-down{grid-area:3 / 2}.mm-remote-key-extra{grid-column:span 3;justify-self:center;width:auto}.mm-remote>details{margin:5px 0 0;padding:4px 8px;background:var(--card-background-color,#fff);border:1px solid var(--rhi-color-line);border-radius:8px}.mm-remote>details summary{min-height:44px;display:flex;align-items:center}.mm-remote>details .mm-native-buttons{padding:6px 0}.mm-remote-key button:focus-visible,.mm-remote>details summary:focus-visible{outline:2px solid #1267be;outline-offset:2px}\n";
+const RHI_MM_DOMAIN_CSS=":host{display:block;min-width:0;background:#f5f7fb;color:var(--rhi-color-text);font-family:var(--rhi-font-family)}\nha-card{background:transparent;border:0;box-shadow:none;overflow:visible}\n.mm-shell{max-width:1290px;margin:auto;padding:12px 16px 20px}\n.mm-page{gap:0}.mm-page .rhiUxPageContent{margin-top:9px}\n.mm-shell .rhiUxDomainShell{margin-bottom:10px}\n.mm-shell .rhiUxPageHero{border-radius:17px}\n.mm-shell .rhiUxPageHeroArt:before{background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.94) 9%,rgba(255,255,255,.62) 28%,transparent 66%)}\n.mm-hero-frame{position:relative;min-width:0}\n.mm-hero-actions{position:absolute;z-index:5;right:16px;bottom:12px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;max-width:95%}\n.mm-hero-settings{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:6px 9px;border-radius:9px;background:rgba(255,255,255,.94);border:1px solid #dce7f4;color:#155ca6;font-size:12px;font-weight:650;text-decoration:none;cursor:pointer;font-family:inherit}\n.mm-hero-settings ha-icon{--mdc-icon-size:17px}\n.mm-hero-settings:focus-visible{outline:2px solid #1267be;outline-offset:2px}\n@media(max-width:430px){.mm-hero-actions{right:7px;bottom:5px;gap:4px}.mm-hero-settings{min-height:30px;padding:4px 6px;font-size:10px}.mm-shell .rhiUxPageHeroCopy{padding-bottom:48px}}\n.mm-shell .rhiUxTechnicalFooter{margin:12px 0 0;opacity:.8}\n.mm-section{border:1px solid var(--rhi-color-line);border-radius:15px;padding:14px 15px;background:#fff;box-shadow:var(--rhi-shadow-md)}\n.mm-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}.mm-heading h2{font-size:20px;margin:0 0 2px;font-weight:650}.mm-heading p{font-size:11px;margin:0;color:var(--rhi-color-muted)}\n.mm-room-grid,.mm-activities,.mm-diag-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\n.mm-room-card,.mm-surface{min-width:0;background:#fff;border:1px solid #dce6f0;border-radius:14px;padding:14px;box-shadow:0 3px 10px rgba(15,35,80,.028)}\n.mm-room-head{display:flex;align-items:center;gap:10px}.mm-room-head>div{flex:1;min-width:0}.mm-room-head small,.mm-room-current small{display:block;color:#7084a1;font-weight:650;font-size:10px;letter-spacing:.08em}.mm-room-head h3{font-size:17px;margin:1px 0;font-weight:650}.mm-room-glyph,.mm-role{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#ecf4ff;color:#2266c3}.mm-room-glyph ha-icon{--mdc-icon-size:23px}\n.mm-phase{display:inline-flex;align-items:center;justify-content:center;font-size:10px;padding:6px 8px;white-space:nowrap;border-radius:100px;background:#f2f5f9;color:#58718d}.mm-phase-good{background:#edfaf2;color:#16864d}.mm-phase-warn{background:#fff3e8;color:#a76120}.mm-phase-idle{background:#f3f6fa;color:#68798e}\n.mm-room-current{margin:11px 0 9px;padding:10px 11px;background:#f7faff;border:1px solid #edf1f7;border-radius:9px;display:grid;gap:2px}.mm-room-current>b{font-size:15px;font-weight:650}.mm-room-current>span{color:#667891;font-size:11px}\n.mm-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}.mm-activity,.mm-room-foot button,.mm-room-picker button,.mm-link{display:inline-flex;align-items:center;gap:5px;background:white;border:1px solid #d9e4f2;color:#145bb1;border-radius:8px;min-height:33px;padding:5px 9px;cursor:pointer;font:inherit;font-size:11px;font-weight:600;line-height:1.25}.mm-activity ha-icon,.mm-room-foot ha-icon,.mm-link ha-icon{--mdc-icon-size:16px}.mm-activity.active,.mm-room-picker button.active{background:#eaf3ff;border-color:#b4d5ff;color:#1253a5}.mm-activity:not(:disabled):hover,.mm-link:hover,.mm-room-picker button:hover{background:#ecf4ff}.mm-activity:disabled,.mm-room-foot button:disabled{opacity:.40;cursor:not-allowed}.mm-room-foot{display:flex;gap:7px;align-items:center;margin-top:12px;border-top:1px solid #edf1f6;padding-top:11px}.mm-room-foot .mm-link{margin-left:auto}\n.mm-room-error{color:#a6352a;background:#fff5f3;border:1px solid #f4d8d3;border-radius:8px;padding:8px;font-size:11px;margin:8px 0 0;overflow-wrap:anywhere}.mm-nowplaying{display:flex;gap:7px;color:#516e91;font-size:11px;align-items:center}.mm-nowplaying ha-icon{--mdc-icon-size:17px}\n.mm-link{border:0;color:#1467f5;background:none}.mm-room-picker{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.mm-detail-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:10px}.mm-detail-grid>div{min-width:0;display:flex;flex-direction:column;gap:10px}\n.mm-surface h3{font-size:16px;margin:0 0 13px;color:#10213d}.mm-surface>p{margin-top:9px}.mm-media-detail{display:flex;gap:12px;align-items:center}.mm-media-detail img{width:75px;height:70px;object-fit:cover;border-radius:9px}.mm-media-detail b{font-size:13px}.mm-media-detail p,.mm-media-detail small{color:#687d92;font-size:11px;margin:2px 0}.mm-audio-readback{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:9px;border-top:1px solid #edf1f5;color:#516e91;font-size:12px}\n.mm-device-list{display:grid;gap:6px}.mm-device-row{display:flex;gap:10px;align-items:center;border:1px solid #edf2f8;padding:8px;border-radius:9px}.mm-device-row>div{flex:1;min-width:0}.mm-device-row b{font-size:12px;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.mm-device-row small{font-size:10px;color:#6d829a;display:block}.mm-device-row button{border:0;background:none;color:#1467f5;cursor:pointer}.mm-device-row button ha-icon{--mdc-icon-size:17px}\n.mm-route{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #eaf0f8;padding:8px 0;font-size:11px}.mm-route span{color:#5d7591}.mm-device-table{display:grid;gap:0}.mm-table-head,.mm-table-row{display:grid;grid-template-columns:1.7fr 1.2fr 1fr .8fr;gap:12px;align-items:center;padding:11px 12px;border-bottom:1px solid #e8eff7}.mm-table-head{font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:#f7faff;color:#627c9c}.mm-table-row{font-size:12px}.mm-table-row span{overflow-wrap:anywhere}\n.mm-diag-grid{align-items:start}.mm-diag-status{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #eef3f9;font-size:11px}.mm-diag-status span{color:#5e718b}.mm-tech{font-size:10px;color:#65758b;overflow-wrap:anywhere}.mm-tech p{margin:5px 0}.mm-surface details{margin-top:11px;font-size:11px}.mm-surface summary{cursor:pointer;color:#1467f5;font-weight:600}\n.mm-callout{display:flex;align-items:flex-start;gap:12px;border:1px solid #d9e4f1;border-radius:12px;background:#fff;padding:18px}.mm-callout>ha-icon{color:#467bb8;--mdc-icon-size:28px}.mm-callout b{font-size:16px}.mm-callout p{font-size:12px;color:#61758e;margin:7px 0 0;line-height:1.5}.mm-attention{border-color:#ebd5af;background:#fffdf9}.mm-muted{color:#6e829b;font-size:11px}\n.mm-shell .rhiUxWriteFeedback{margin:0 0 11px}\n@media(max-width:1000px){.mm-room-grid,.mm-activities,.mm-diag-grid{grid-template-columns:1fr}.mm-detail-grid{grid-template-columns:1fr}}\n@media(max-width:760px){.mm-shell{padding:8px}.mm-section{padding:11px}.mm-shell .rhiUxPageHeroCopy{width:78%}.mm-room-head h3{font-size:15px}.mm-table-head,.mm-table-row{grid-template-columns:1.2fr 1fr .7fr}.mm-table-head span:last-child,.mm-table-row span:last-child{display:none}}\n@media(max-width:430px){.mm-shell .rhiUxPageHeroCopy{width:95%;padding-right:10px}.mm-activity,.mm-room-foot button{min-height:36px}.mm-room-foot{flex-wrap:wrap}.mm-room-foot .mm-link{margin-left:0}.mm-device-row .mm-phase{display:none}}\n\n.mm-native-controls{display:grid;gap:10px}.mm-native-device{display:grid;gap:8px;min-width:0;border-top:1px solid var(--rhi-color-line);padding-top:10px}.mm-native-device small{color:var(--rhi-color-muted)}.mm-native-buttons{display:flex;flex-wrap:wrap;gap:6px}.mm-native-buttons button,.mm-native-device select{min-height:36px;border:1px solid var(--rhi-color-line);border-radius:8px;background:var(--card-background-color,#fff);color:inherit;padding:6px 10px;font:inherit;max-width:100%}.mm-native-buttons button:disabled,.mm-native-device select:disabled{opacity:.5;cursor:not-allowed}.mm-native-device label{display:grid;gap:4px;font-size:12px}.mm-native-device input{max-width:100%;width:100%}.mm-native-device details{min-width:0}.mm-native-device summary{cursor:pointer;padding:6px 0}\n\n.mm-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 12px}.mm-title h2{font-size:20px;margin:0}.mm-title a{text-decoration:none}.mm-quick-controls{display:grid;gap:5px;margin-top:8px}.mm-quick-controls .mm-native-device{gap:5px}.mm-context{margin-top:10px}.mm-context-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}.mm-context-item{border:1px solid var(--rhi-color-line);padding:8px;border-radius:8px;min-width:0}.mm-context-item button{min-height:44px;width:100%;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;font:inherit;font-weight:600;cursor:pointer}.mm-context-item button[aria-expanded=true]{background:#eaf3ff;color:#1253a5}.mm-context-item [data-mm-summary]{min-height:24px;overflow-wrap:anywhere;font-size:12px}.mm-context [data-mm-expanded]{margin-top:8px}.mm-room-card button,.mm-native-buttons button,.mm-native-device select,.mm-room-picker button{min-height:44px}.mm-shell button:focus-visible,.mm-shell a:focus-visible,.mm-shell input:focus-visible,.mm-shell select:focus-visible{outline:2px solid #1267be;outline-offset:2px}.mm-native-device label{font-size:13px}.mm-device-row button{min-width:44px;min-height:44px}.mm-native-device input[type=range]{min-height:44px}.mm-room-head h3,.mm-device-row b{overflow-wrap:anywhere;white-space:normal}.mm-phase{white-space:normal;text-align:center}\n\n.mm-remote{padding:2px 0}.mm-remote-navigation{display:grid;grid-template-columns:repeat(3,minmax(44px,60px));grid-template-rows:repeat(3,minmax(44px,auto));gap:6px;justify-content:center;margin:10px 0}.mm-remote-key{display:flex;min-width:0}.mm-remote-key button{width:100%;min-height:44px}.mm-remote-key-up{grid-area:1 / 2}.mm-remote-key-left{grid-area:2 / 1}.mm-remote-key-ok{grid-area:2 / 2}.mm-remote-key-right{grid-area:2 / 3}.mm-remote-key-down{grid-area:3 / 2}.mm-remote-key-extra{grid-column:span 3;justify-self:center;width:auto}.mm-remote>details{margin:5px 0 0;padding:4px 8px;background:var(--card-background-color,#fff);border:1px solid var(--rhi-color-line);border-radius:8px}.mm-remote>details summary{min-height:44px;display:flex;align-items:center}.mm-remote>details .mm-native-buttons{padding:6px 0}.mm-remote-key button:focus-visible,.mm-remote>details summary:focus-visible{outline:2px solid #1267be;outline-offset:2px}\n\n\n/* Compact room-first Premium overview. Actual room health/readback comes from\n   the backend; fold state is presentation-only and never changes commands. */\n.mm-floor-nav{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 14px}\n.mm-floor-nav button{display:inline-flex;gap:6px;align-items:center;min-height:42px;padding:7px 12px;border-radius:10px;background:#fff;color:#274d79;border:1px solid #dce6f2;font:inherit;font-size:12px;font-weight:650;cursor:pointer}\n.mm-floor-nav button.active{background:#e8f2ff;border-color:#9fc5f1;color:#135baa}\n.mm-floor-nav ha-icon{--mdc-icon-size:17px}\n.mm-room-stack{display:grid;grid-template-columns:1fr;gap:9px}\n.mm-compact-room{min-width:0;border:1px solid #dce6f0;border-radius:15px;background:#fff;box-shadow:0 3px 11px rgba(26,52,88,.04);overflow:hidden}\n.mm-compact-room[open]{border-color:#acc9ed;box-shadow:0 5px 19px rgba(21,73,125,.075)}\n.mm-room-needs-attention{border-color:#ecd2ad}\n.mm-compact-room>summary{list-style:none;cursor:pointer}\n.mm-compact-room>summary::-webkit-details-marker{display:none}\n.mm-compact-summary{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto 18px;gap:10px;align-items:center;min-height:76px;padding:11px 14px}\n.mm-compact-identity{display:grid;min-width:0;gap:3px}\n.mm-compact-identity>b{font-size:15px;line-height:1.2;color:#152c48;overflow-wrap:anywhere}\n.mm-compact-identity>small{font-size:11px;color:#68809e;overflow-wrap:anywhere}\n.mm-compact-current{font-size:12px;font-weight:600;color:#315b88;overflow-wrap:anywhere}\n.mm-compact-count{display:inline-flex;align-items:center;gap:5px;color:#6b8199;font-size:11px;white-space:nowrap}\n.mm-compact-count ha-icon{--mdc-icon-size:17px}\n.mm-expand-icon{--mdc-icon-size:18px;color:#436e99;transition:transform .15s ease}\n.mm-compact-room[open]>.mm-compact-summary>.mm-expand-icon{transform:rotate(180deg)}\n.mm-compact-expanded{border-top:1px solid #edf1f7;padding:6px 14px 12px}\n.mm-compact-expanded .mm-controls{margin:7px 0 11px}\n.mm-compact-expanded .mm-room-foot{margin-top:10px;padding-top:9px}\n.mm-compact-devices{display:flex;flex-wrap:wrap;gap:7px}\n.mm-compact-device{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:5px 8px;border-radius:9px;background:#f4f8fc;border:1px solid #e7edf6;color:#34516e;font-size:11px;font-weight:600}\n.mm-compact-device ha-icon{--mdc-icon-size:16px;color:#338e80}\n.mm-compact-device small{font-size:10px;font-weight:400;color:#687c93}\n.mm-compact-device-warn{background:#fff7ef;border-color:#f1d9b7}\n.mm-compact-device-warn ha-icon{color:#b46d24}\n.mm-compact-error{margin-top:8px}.mm-compact-error summary{font-size:11px;color:#a55232}\n.mm-room-location{color:#647d98;font-size:12px;margin:0 0 13px}\n.mm-native-fold,.mm-routes-fold{padding:12px 14px}\n.mm-native-fold>summary,.mm-routes-fold>summary{font-size:14px;font-weight:650;color:#164e91;cursor:pointer;min-height:28px}\n.mm-native-fold[open]>.mm-native-controls,.mm-routes-fold[open]>.mm-device-list{margin-top:12px}\n.mm-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}\n.mm-setup-room{min-width:0;border:1px solid #dce6f2;background:#fff;padding:13px;border-radius:14px}\n.mm-setup-head{display:flex;gap:9px;align-items:center;justify-content:space-between}\n.mm-setup-head h3{font-size:15px;margin:0 0 4px;color:#122f50}\n.mm-setup-caption{font-size:11px;color:#68819a}\n.mm-setup-activities{display:grid;gap:7px;margin:12px 0}\n.mm-setup-activity{display:grid;gap:4px;padding:9px 11px;border-radius:10px;border:1px solid #edf1f7;background:#f9fbfe}\n.mm-setup-activity b{font-size:12px;color:#193d65}\n.mm-setup-activity small{font-size:10px;color:#6e8197}\n.mm-setup-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:10px}\n.mm-setup-actions a{display:inline-flex;align-items:center;min-height:40px;gap:6px;border:1px solid #d4e3f3;border-radius:9px;padding:7px 10px;color:#1759a5;font-size:12px;text-decoration:none;font-weight:650}\n.mm-setup-actions a ha-icon{--mdc-icon-size:16px}\n.mm-setup-actions button{min-height:40px}\n.mm-overview .mm-heading{margin-bottom:11px}\n.mm-overview .mm-room-card{min-width:0}\n.mm-floor-nav button:focus-visible,.mm-compact-room>summary:focus-visible,.mm-setup-actions a:focus-visible{outline:2px solid #1267be;outline-offset:2px}\n@media(max-width:760px){.mm-setup-grid{grid-template-columns:1fr}.mm-compact-summary{grid-template-columns:35px minmax(0,1fr) auto 18px;gap:8px;padding:9px 10px}.mm-compact-count{display:none}.mm-compact-expanded{padding:6px 10px 11px}}\n@media(max-width:430px){.mm-floor-nav button{padding:6px 9px;font-size:11px}.mm-compact-summary{grid-template-columns:30px minmax(0,1fr) auto 14px;gap:6px}.mm-compact-summary .mm-room-glyph{width:30px;height:30px}.mm-compact-identity>b{font-size:13px}.mm-compact-current{font-size:11px}.mm-compact-summary .mm-phase{max-width:94px;font-size:9px;padding:5px 7px}.mm-compact-identity>small{font-size:10px}}\n\n/* Keep backend-confirmed attention visible on collapsed room cards. */\n.mm-compact-warning{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:#9d5429;font-size:11px;line-height:1.35;overflow-wrap:anywhere}\n\n/* Explain only native source/route readback; collapse secondary detail. */\n.mm-setup-devices{margin-top:7px;border-top:1px solid #edf1f7;padding-top:7px}\n.mm-setup-devices>summary{cursor:pointer;color:#506f8e;font-size:12px;min-height:32px;padding-top:5px}\n.mm-setup-device-list{display:flex;gap:6px;flex-wrap:wrap;padding:7px 0}\n.mm-setup-device{font-size:11px;background:#f3f7fc;color:#365574;padding:5px 8px;border-radius:8px}\n.mm-setup-device b{font-size:10px;text-transform:capitalize}\n.mm-setup-device small{color:#637993}\n.mm-setup-device-warn,.mm-diag-route-review{background:#fff7ee;color:#985d2d}\n.mm-diag-explain{margin:11px 0;padding:9px;border-radius:9px;border:1px solid #e4ecf5}\n.mm-diag-explain h4{font-size:12px;margin:0 0 7px}\n.mm-diag-explain>summary{cursor:pointer;font-weight:600;color:#24588b;min-height:30px}\n.mm-diag-routes{margin-top:8px}\n.mm-diag-route{display:grid;gap:3px;min-width:0;border-bottom:1px solid #ecf1f8;padding:7px;font-size:11px;overflow-wrap:anywhere}\n.mm-diag-route b{font-size:12px}.mm-diag-route small{color:#677f9a}\n.mm-recover{margin-top:11px;border:1px solid #d4e2f2}\n\n/* Server-owned Options Flow forms: one transient editor, no persisted UI config. */\n.mm-options-editor{margin:10px 0 15px;border-color:#b8d3f1;background:#fcfdff}\n.mm-options-editor h3{margin:0 0 8px}\n.mm-options-description{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;color:#4c637b;max-height:260px;overflow:auto}\n.mm-option-fields{display:grid;gap:12px;margin:14px 0}\n.mm-option-field{display:grid;gap:5px;font-size:12px;font-weight:600;color:#34506d;min-width:0}\n.mm-option-field input:not([type=checkbox]),.mm-option-field select,.mm-option-field textarea{min-height:44px;max-width:100%;width:100%;padding:8px 10px;border-radius:9px;border:1px solid #c8d8e9;background:#fff;color:#183654;font:inherit}\n.mm-option-field textarea.mm-option-yaml{min-height:210px;max-height:560px;resize:vertical;white-space:pre;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.5}\n.mm-option-field{max-width:100%}.mm-table-asset{min-width:0;overflow-wrap:anywhere}\n.mm-device-detail{margin-top:8px}.mm-device-detail>summary{cursor:pointer;font-size:11px;color:#406486;min-height:28px;padding:5px 0}\n.mm-device-detail-content{display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));align-items:center;padding:8px;border-radius:12px;background:#faf7f3;border:1px solid #eee5dd;max-width:440px}\n.mm-device-detail-content .mm-device-art{width:min(100%,192px);height:auto;aspect-ratio:1/1;border-radius:12px}\n.mm-device-detail-content .mm-device-art img{width:100%;height:100%;object-fit:contain}\n.mm-device-detail-content strong{font-size:12px;overflow-wrap:anywhere}\n.mm-device-detail-content small{display:block;font-size:11px;color:#637993;margin-top:4px}\n.mm-device-identity{display:flex;align-items:center;gap:9px;min-width:0}.mm-device-identity ha-icon{--mdc-icon-size:27px;color:#547ca4;flex:none}.mm-device-identity>div{min-width:0;display:grid;gap:2px}.mm-device-identity small{display:block;font-size:10px;color:var(--rhi-color-muted);overflow-wrap:anywhere}\n.mm-device-art{display:inline-flex;align-items:center;justify-content:center;flex:none;width:58px;height:58px;overflow:hidden;border-radius:12px;background:#f3eee8;border:1px solid #e9e2d9}\n.mm-device-art img{display:block;width:100%;height:100%;object-fit:cover}\n.mm-device-art-neutral{background:#f1f5fa;color:#547ca4;border-color:#e1e9f3}\n.mm-device-art-neutral ha-icon{--mdc-icon-size:27px}\n.mm-device-identity>.mm-device-art{flex:none}\n.mm-activity-identity{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}\n.mm-activity-identity>div:first-child{min-width:0}\n.mm-activity-identity small{display:block;overflow-wrap:anywhere}\n.mm-activity-visuals{display:flex;gap:4px;flex:none;max-width:46%;overflow:hidden}\n.mm-activity-visuals>.mm-device-art{width:38px;height:38px;border-radius:9px}\n.mm-activity-visuals>.mm-device-art-neutral ha-icon{--mdc-icon-size:20px}\n.mm-setup-device>.mm-device-art{width:30px;height:30px;vertical-align:middle;border-radius:7px;margin-right:6px}\n.mm-setup-device>.mm-device-art-neutral ha-icon{--mdc-icon-size:18px}\n@media(max-width:430px){.mm-device-art{width:44px;height:44px}.mm-activity-visuals{max-width:42%}.mm-activity-visuals>.mm-device-art{width:30px;height:30px}}\n\n.mm-option-field input[type=checkbox]{width:19px;height:19px}\n.mm-option-multiple{display:flex;flex-wrap:wrap;gap:7px;border:1px solid #dae5f1;border-radius:10px;padding:9px}\n.mm-option-multiple legend{font-size:12px;font-weight:650}\n.mm-option-multiple label{display:flex;align-items:center;gap:7px;padding:7px;border:1px solid #e4edf5;border-radius:8px;font-size:12px}\n.mm-options-editor .mm-setup-actions button,.mm-setup-activity .mm-setup-actions button,.mm-setup-room .mm-setup-actions button{min-height:40px;border:1px solid #c9dbef;border-radius:9px;padding:7px 10px;color:#205c99;background:#f8fbff;font:inherit;font-size:12px;cursor:pointer}\n.mm-options-editor .mm-setup-actions button:disabled{opacity:.45;cursor:not-allowed}\n.mm-setup-advanced{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}\n.mm-setup-advanced summary{min-height:40px;display:flex;align-items:center;color:#43678c;font-size:12px;cursor:pointer;padding:7px}\n.mm-setup-advanced[open]{width:100%}\n.mm-options-editor textarea:focus-visible,.mm-options-editor button:focus-visible,.mm-options-editor input:focus-visible,.mm-options-editor select:focus-visible{outline:2px solid #1267be;outline-offset:2px}\n@media(max-width:430px){.mm-setup-actions{gap:4px}.mm-options-editor{padding:9px}.mm-options-description{max-height:190px}}\n\n/* Room picker and active remote are content-only, not shared shell overrides. */\n.mm-room-picker>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:44px}\n.mm-room-picker>button small{font-size:10px;font-weight:400;opacity:.8}\n.mm-focused-remote{margin:10px 0}.mm-focused-remote .mm-native-device{padding:12px}\n.mm-focused-remote .mm-native-buttons button{min-height:44px;min-width:44px}\n.mm-focused-remote .mm-remote-navigation{max-width:270px;margin:10px auto}\n.mm-context-settings{margin:10px 0}\n.mm-context-settings>summary{cursor:pointer;padding:8px 0;min-height:36px}\n@media(max-width:760px){.mm-room-picker{flex-wrap:wrap}.mm-focused-remote .mm-native-buttons{flex-wrap:wrap}}\n\n/* Contextual content only; keep the established shared shell. */\n.mm-room-operate{align-self:flex-start;margin:0 8px 10px;min-height:36px}.mm-compact-summary>.mm-device-art{width:38px;height:38px}.mm-focused-remote .mm-native-buttons{gap:6px}\n";
 // RHI UX Core 1.6.3 — build-time presentation primitives only.
 // No domain semantics or Home Assistant contract/entity knowledge belongs here.
 const RHI_UX_CORE_VERSION = "1.6.4";
@@ -406,9 +406,134 @@ function rhiMmSiteDateTime(hass,at){
   }catch{return '—';}
 }
 
+// Official Home Assistant Options Flow is the only configuration transaction
+// authority. No local store or device discovery: this is a thin typed route to
+// the existing integration wizard (the same backend as Configure).
+const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
+  'add_room','rename_room','edit_room','remove_room',
+  'guided_activity','add_activity','quick_edit_activity','edit_activity','remove_activity',
+  'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml'
+]));
+async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''}){
+  if(hass?.user?.is_admin!==true||typeof hass.callWS!=='function'||
+     typeof hass.callApi!=='function'||!RHI_MM_OPTION_ACTIONS.has(action))
+    throw new Error('Multimedia configuration is not authorized');
+  const entries=await hass.callWS({type:'config_entries/get',domain:'rhi_multimedia'});
+  const matched=Array.isArray(entries)?entries.filter(e=>
+    e?.domain==='rhi_multimedia'&&e.supports_options===true&&
+    typeof e.entry_id==='string'&&e.entry_id):[];
+  if(matched.length!==1)throw new Error('Multimedia Options Flow unavailable');
+  let step=await hass.callApi('POST','config/config_entries/options/flow',
+    {handler:matched[0].entry_id});
+  const advance=async(expected,data)=>{
+    if(step?.type!=='form'||step.step_id!==expected||typeof step.flow_id!=='string')
+      throw new Error('Unexpected Multimedia Options Flow step');
+    step=await hass.callApi('POST',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`,data);
+  };
+  // Server evaluates every step and may return the same form with errors.
+  // In that case expose the exact server form, never skip its validation.
+  try{
+    // HA validates the current form's schema. Route contextual card actions
+    // through the existing Assisted selector while retaining two entry choices.
+    if(action==='yaml')await advance('init',{action:'yaml'});
+    else{
+      await advance('init',{action:'assisted'});
+      await advance('assisted',{task:action});
+    }
+    if(action==='expert_yaml'){
+      if(!['room','device','activity'].includes(scope)||typeof room!=='string'||!room||
+         (scope==='room'&&id)||(scope!=='room'&&(!id||typeof id!=='string')))
+        throw new Error('Expert YAML requires a specific configured object');
+      await advance('expert_target',{scope,room,id});
+    }
+    if(room&&step?.step_id==='existing_room')await advance('existing_room',{room});
+    if(activity&&step?.step_id==='existing_activity')await advance('existing_activity',{activity});
+  }catch(err){
+    // A started server flow must be removed after a transport/shape failure.
+    if(typeof step?.flow_id==='string'){
+      try{await hass.callApi('DELETE',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`);}catch(_){}
+    }
+    throw err;
+  }
+  return step;
+}
+async function rhiMmOptionsAdvance(hass,step,data){
+  if(hass?.user?.is_admin!==true||step?.type!=='form'||
+     typeof step.flow_id!=='string'||typeof hass.callApi!=='function')
+    throw new Error('Multimedia configuration cannot be submitted');
+  return hass.callApi('POST',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`,data);
+}
+async function rhiMmOptionsCancel(hass,step){
+  if(!step?.flow_id||typeof hass?.callApi!=='function')return;
+  await hass.callApi('DELETE',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`);
+}
+
 
 const RHI_MM_TEXT = {
   "en": {
+    "role_display": "Screen",
+    "role_receiver": "Audio zone",
+    "role_amplifier": "Audio zone",
+    "role_player": "Media player",
+    "role_source": "Media source",
+    "role_remote": "Remote control",
+    "state_paused": "Paused",
+    "state_standby": "Standby",
+    "state_buffering": "Buffering",
+    "room_attention_detail": "Check this room’s devices or activity.",
+    "product_specs": "Product specifications",
+    "spec_screen_inches": "Screen (inches)",
+    "spec_panel": "Panel",
+    "spec_resolution": "Resolution",
+    "spec_amplified_channels": "Amplified channels",
+    "spec_subwoofer_outputs": "Subwoofer outputs",
+    "spec_hdmi_inputs": "HDMI inputs",
+    "spec_hdmi_outputs": "HDMI outputs",
+    "spec_touch_points": "Touch points",
+    "available_room_controls": "Available in this room",
+    "product_details": "Product details",
+    "setup_editor": "Configure Multimedia",
+    "setup_continue": "Continue / review",
+    "setup_cancel": "Cancel",
+    "setup_saved": "Multimedia configuration saved; await native device status refresh",
+    "setup_flow_failed": "Configuration flow unavailable or interrupted; use native Home Assistant settings",
+    "setup_field_unsupported": "Field requires native Home Assistant configuration",
+    "setup_edit_activity": "Quick edit",
+    "setup_expert_yaml": "Expert · YAML",
+    "illustrative_device_art": "Illustrative product image",
+    "product_image_details": "View device image",
+    "setup_expert_yaml_all": "Expert YAML · All Multimedia",
+    "setup_more_actions": "More settings",
+    "setup_edit_cast": "Full edit",
+    "setup_remove_activity": "Delete activity",
+    "setup_add_activity": "Add activity",
+    "setup_guided_activity": "Create an experience",
+    "setup_edit_location": "Room / floor",
+    "setup_edit_devices": "Devices / roles",
+    "setup_remove_room": "Delete room",
+    "setup_add_room": "Add room",
+    "diag_actual": "Actual native readback",
+    "diag_device_unavailable": "Native endpoint unavailable",
+    "diag_not_selected": "Foundation selection no longer valid",
+    "diag_devices_attention": "Device attention",
+    "recommend_recover": "Recommended action: Recover activity",
+    "recommend_review_foundation": "Recommended action: Review Foundation device selection",
+    "recommend_inspect_sources": "Recommended action: Check unavailable devices",
+    "diag_asset_id": "Logical asset",
+    "diag_source": "Native HA source",
+    "diag_provider": "Source integration",
+    "diag_command_allowed": "Permitted",
+    "diag_command_blocked": "Blocked",
+    "verified_model": "Native-verified model",
+    "last_attempt": "Last activity attempt",
+    "last_control": "Last direct command",
+    "native_features": "Native HA feature bitmask",
+    "native_readback_at": "Native readback at",
+    "readback_quality": "Native readback evidence",
+    "readback_provider_optimistic": "Provider-reported; independent physical confirmation unavailable",
+    "readback_native_ha_state": "Home Assistant source state",
+    "readback_unapproved": "Source selection is not approved",
+    "setup_native_route_only": "TV/receiver input routing — no separate native player assigned",
     "remote_navigation": "Navigation",
     "remote_media": "Channels and playback",
     "remote_numbers": "Number keypad",
@@ -427,6 +552,14 @@ const RHI_MM_TEXT = {
     "devices": "Devices",
     "diagnostics": "Diagnostics",
     "overview_title": "Multimedia Overview",
+    "hero_overview": "Your multimedia rooms and activities, all in one place.",
+    "hero_rooms": "Choose a room to see its activity, availability and controls.",
+    "hero_activities": "Arrange activities, devices and source routes by room.",
+    "hero_devices": "See which selected devices are available and where they belong.",
+    "hero_diagnostics": "Understand readback, connection issues and recovery needs.",
+    "hero_art_multimedia": "Bright contemporary living room with a home cinema", 
+    "hero_art_activities": "Illustrated screen, receiver and media source routing",
+    "hero_art_insights": "Illustrated AV diagnostics and connection health",
     "room": "ROOM",
     "activity": "ACTIVITY",
     "settings": "Settings",
@@ -456,6 +589,19 @@ const RHI_MM_TEXT = {
     "review_rooms": "Rooms requiring review",
     "partial_rooms": "Some room statuses are unavailable or ambiguous.",
     "rooms_activities": "Rooms & activities",
+    "floor_navigation": "Filter rooms by floor",
+    "all_floors": "All floors",
+    "compact_room_help": "Choose a floor, then open only the room you need. Actual status stays visible.",
+    "no_floor_rooms": "No rooms on this floor",
+    "choose_other_floor": "Select another floor or all floors.",
+    "error_detail": "Technical error details",
+    "device_unavailable": "Device unavailable",
+    "setup_rooms": "Room, devices & activities",
+    "setup_help_short": "Review existing links and activity routes. Make changes through the native Multimedia configuration.",
+    "setup_devices": "Connected devices",
+    "setup_activity": "Activity configuration",
+    "setup_manage": "Manage configuration",
+    "setup_room_details": "Room and controls",
     "active_first": "Active rooms first. Switch activities without choosing individual HDMI devices.",
     "all_rooms": "All rooms",
     "no_rooms": "No rooms configured",
@@ -463,7 +609,20 @@ const RHI_MM_TEXT = {
     "no_activity": "No activity",
     "no_activities": "No activities configured",
     "stop_activity": "Stop activity",
-    "recover": "Recover",
+    "recover": "Fix It / Recover",
+    "cec_device": "HDMI-CEC enabled (device setting)",
+    "cec_activity": "Verified HDMI-CEC link",
+    "cec_skips": "Automated by HDMI-CEC",
+    "target_state": "Desired state vs native readback",
+    "target_expected": "Expected",
+    "target_actual": "Observed",
+    "target_attention": "Needs correction",
+    "target_observed": "Observed in HA (not physical proof)",
+    "setup_cec_devices": "Configure HDMI-CEC devices",
+    "setup_tv_wake": "TV Wake-on-LAN",
+    "setup_harmony_owner": "Harmony / Premium ownership",
+    "setup_speech_endpoint": "Speaker notifications",
+    "setup_cec_activity": "Configure HDMI-CEC activity link",
     "details": "Details",
     "room_control": "Room control",
     "room_ownership": "Rooms are configured in Multimedia; source devices remain owned by their HA integrations.",
@@ -494,6 +653,8 @@ const RHI_MM_TEXT = {
     "select": "Select",
     "remote_keys": "Remote keys",
     "shared_source": "Shared source",
+    "native_area": "Registered HA area",
+    "used_in": "Used in",
     "grouped": "Grouped",
     "players": "players",
     "device_controls": "Device controls",
@@ -539,6 +700,69 @@ const RHI_MM_TEXT = {
     "result_unknown": "No matching command result returned. Check actual device state."
   },
   "nl": {
+    "role_display": "Scherm",
+    "role_receiver": "Audiozone",
+    "role_amplifier": "Audiozone",
+    "role_player": "Mediaspeler",
+    "role_source": "Mediabron",
+    "role_remote": "Afstandsbediening",
+    "state_paused": "Gepauzeerd",
+    "state_standby": "Stand-by",
+    "state_buffering": "Bufferen",
+    "room_attention_detail": "Controleer de apparaten of activiteit van deze ruimte.",
+    "product_specs": "Productspecificaties",
+    "spec_screen_inches": "Scherm (inch)",
+    "spec_panel": "Paneel",
+    "spec_resolution": "Resolutie",
+    "spec_amplified_channels": "Versterkte kanalen",
+    "spec_subwoofer_outputs": "Subwooferuitgangen",
+    "spec_hdmi_inputs": "HDMI-ingangen",
+    "spec_hdmi_outputs": "HDMI-uitgangen",
+    "spec_touch_points": "Aanraakpunten",
+    "available_room_controls": "Beschikbaar in deze ruimte",
+    "product_details": "Productdetails",
+    "setup_editor": "Multimedia configureren",
+    "setup_continue": "Verder / controleren",
+    "setup_cancel": "Annuleren",
+    "setup_saved": "Multimedia-configuratie opgeslagen; wacht op native statusvernieuwing",
+    "setup_flow_failed": "Configuratiestroom niet beschikbaar of onderbroken; gebruik de native Home Assistant-instellingen",
+    "setup_field_unsupported": "Veld vereist native Home Assistant-configuratie",
+    "setup_edit_activity": "Snel aanpassen",
+    "setup_expert_yaml": "Expert · YAML",
+    "illustrative_device_art": "Illustratieve productafbeelding",
+    "product_image_details": "Apparaatafbeelding bekijken",
+    "setup_expert_yaml_all": "Expert YAML · Heel Multimedia",
+    "setup_more_actions": "Meer instellingen",
+    "setup_edit_cast": "Volledig aanpassen",
+    "setup_remove_activity": "Activiteit verwijderen",
+    "setup_add_activity": "Activiteit toevoegen",
+    "setup_guided_activity": "Activiteit instellen",
+    "setup_edit_location": "Ruimte / verdieping",
+    "setup_edit_devices": "Apparaten / rollen",
+    "setup_remove_room": "Ruimte verwijderen",
+    "setup_add_room": "Ruimte toevoegen",
+    "diag_actual": "Werkelijke native status",
+    "diag_device_unavailable": "Native apparaat niet beschikbaar",
+    "diag_not_selected": "Foundation-selectie niet meer geldig",
+    "diag_devices_attention": "Apparaten die aandacht vragen",
+    "recommend_recover": "Aanbevolen actie: Activiteit herstellen",
+    "recommend_review_foundation": "Aanbevolen actie: Apparaatselectie in Foundation nakijken",
+    "recommend_inspect_sources": "Aanbevolen actie: Niet-beschikbare apparaten controleren",
+    "diag_asset_id": "Logische asset",
+    "diag_source": "Native HA-bron",
+    "diag_provider": "Bronintegratie",
+    "diag_command_allowed": "Toegestaan",
+    "diag_command_blocked": "Geblokkeerd",
+    "verified_model": "Native geverifieerd model",
+    "last_attempt": "Laatste activiteitspoging",
+    "last_control": "Laatste directe opdracht",
+    "native_features": "Native HA-featurebits",
+    "native_readback_at": "Native terugmelding om",
+    "readback_quality": "Bewijs voor native terugmelding",
+    "readback_provider_optimistic": "Status van provider; fysieke bevestiging ontbreekt",
+    "readback_native_ha_state": "Status van Home Assistant-bron",
+    "readback_unapproved": "Bronselectie niet goedgekeurd",
+    "setup_native_route_only": "TV-/receiverbronroute — geen afzonderlijke native speler toegewezen",
     "remote_navigation": "Navigatie",
     "remote_media": "Kanalen en afspelen",
     "remote_numbers": "Cijfertoetsen",
@@ -557,6 +781,14 @@ const RHI_MM_TEXT = {
     "devices": "Apparaten",
     "diagnostics": "Diagnostiek",
     "overview_title": "Multimediaoverzicht",
+    "hero_overview": "Al je multimedia-ruimtes en activiteiten in één overzicht.",
+    "hero_rooms": "Kies een ruimte voor de activiteit, beschikbaarheid en bediening.",
+    "hero_activities": "Beheer activiteiten, apparaten en bronroutes per ruimte.",
+    "hero_devices": "Bekijk de geselecteerde apparaten, beschikbaarheid en ruimtes.",
+    "hero_diagnostics": "Bekijk terugmelding, verbindingsproblemen en herstel.",
+    "hero_art_multimedia": "Lichte moderne woonkamer met thuisbioscoop", 
+    "hero_art_activities": "Illustratie van scherm, receiver en mediabronnen",
+    "hero_art_insights": "Illustratie van audiovisuele diagnose en verbindingen",
     "room": "RUIMTE",
     "activity": "ACTIVITEIT",
     "settings": "Instellingen",
@@ -586,6 +818,19 @@ const RHI_MM_TEXT = {
     "review_rooms": "Ruimtes die aandacht vragen",
     "partial_rooms": "Sommige ruimtestatussen zijn niet beschikbaar of dubbelzinnig.",
     "rooms_activities": "Ruimtes en activiteiten",
+    "floor_navigation": "Ruimtes filteren op verdieping",
+    "all_floors": "Alle verdiepingen",
+    "compact_room_help": "Kies een verdieping en open alleen de ruimte die je nodig hebt. De status blijft zichtbaar.",
+    "no_floor_rooms": "Geen ruimtes op deze verdieping",
+    "choose_other_floor": "Kies een andere verdieping of alle verdiepingen.",
+    "error_detail": "Technische foutdetails",
+    "device_unavailable": "Apparaat niet beschikbaar",
+    "setup_rooms": "Ruimte, apparaten en activiteiten",
+    "setup_help_short": "Bekijk de huidige verbindingen en routes. Wijzig ze via de bestaande Multimedia-configuratie.",
+    "setup_devices": "Gekoppelde apparaten",
+    "setup_activity": "Activiteit configureren",
+    "setup_manage": "Configuratie beheren",
+    "setup_room_details": "Ruimte en bediening",
     "active_first": "Actieve ruimtes eerst. Wissel van activiteit zonder afzonderlijke HDMI-apparaten te kiezen.",
     "all_rooms": "Alle ruimtes",
     "no_rooms": "Geen ruimtes geconfigureerd",
@@ -593,7 +838,20 @@ const RHI_MM_TEXT = {
     "no_activity": "Geen activiteit",
     "no_activities": "Geen activiteiten geconfigureerd",
     "stop_activity": "Stop activiteit",
-    "recover": "Herstellen",
+    "recover": "Fix It / Herstellen",
+    "cec_device": "HDMI-CEC ingeschakeld (apparaat)",
+    "cec_activity": "Geverifieerde HDMI-CEC-verbinding",
+    "cec_skips": "Automatisch via HDMI-CEC",
+    "target_state": "Doelstatus tegenover native terugmelding",
+    "target_expected": "Verwacht",
+    "target_actual": "Waargenomen",
+    "target_attention": "Correctie nodig",
+    "target_observed": "In HA waargenomen (geen fysiek bewijs)",
+    "setup_cec_devices": "HDMI-CEC-apparaten configureren",
+    "setup_tv_wake": "TV Wake-on-LAN",
+    "setup_harmony_owner": "Harmony / Premium-bediening",
+    "setup_speech_endpoint": "Luidsprekermeldingen",
+    "setup_cec_activity": "HDMI-CEC-activiteit configureren",
     "details": "Details",
     "room_control": "Ruimtebediening",
     "room_ownership": "Ruimtes worden in Multimedia geconfigureerd; de bronapparaten blijven eigendom van hun HA-integraties.",
@@ -624,6 +882,8 @@ const RHI_MM_TEXT = {
     "select": "Kies",
     "remote_keys": "Afstandsbediening",
     "shared_source": "Gedeelde bron",
+    "native_area": "Geregistreerde HA-ruimte",
+    "used_in": "Gebruikt in",
     "grouped": "Gegroepeerd",
     "players": "spelers",
     "device_controls": "Apparaatbediening",
@@ -669,6 +929,69 @@ const RHI_MM_TEXT = {
     "result_unknown": "Geen passend opdrachtresultaat ontvangen. Controleer de apparaatstatus."
   },
   "fr": {
+    "role_display": "Écran",
+    "role_receiver": "Zone audio",
+    "role_amplifier": "Zone audio",
+    "role_player": "Lecteur multimédia",
+    "role_source": "Source multimédia",
+    "role_remote": "Télécommande",
+    "state_paused": "En pause",
+    "state_standby": "Veille",
+    "state_buffering": "Mise en mémoire tampon",
+    "room_attention_detail": "Vérifiez les appareils ou l’activité de cette pièce.",
+    "product_specs": "Caractéristiques du produit",
+    "spec_screen_inches": "Écran (pouces)",
+    "spec_panel": "Dalle",
+    "spec_resolution": "Résolution",
+    "spec_amplified_channels": "Canaux amplifiés",
+    "spec_subwoofer_outputs": "Sorties caisson de basses",
+    "spec_hdmi_inputs": "Entrées HDMI",
+    "spec_hdmi_outputs": "Sorties HDMI",
+    "spec_touch_points": "Points tactiles",
+    "available_room_controls": "Disponible dans cette pièce",
+    "product_details": "Détails du produit",
+    "setup_editor": "Configurer Multimedia",
+    "setup_continue": "Continuer / vérifier",
+    "setup_cancel": "Annuler",
+    "setup_saved": "Configuration Multimedia enregistrée ; attendre la mise à jour des états natifs",
+    "setup_flow_failed": "Assistant de configuration indisponible ou interrompu ; utilisez les paramètres natifs de Home Assistant",
+    "setup_field_unsupported": "Ce champ nécessite la configuration native Home Assistant",
+    "setup_edit_activity": "Modifier rapidement",
+    "setup_expert_yaml": "Expert · YAML",
+    "illustrative_device_art": "Image produit illustrative",
+    "product_image_details": "Voir l'image de l'appareil",
+    "setup_expert_yaml_all": "Expert YAML · Tout Multimédia",
+    "setup_more_actions": "Plus de réglages",
+    "setup_edit_cast": "Modification complète",
+    "setup_remove_activity": "Supprimer l’activité",
+    "setup_add_activity": "Ajouter une activité",
+    "setup_guided_activity": "Configurer une activité",
+    "setup_edit_location": "Pièce / étage",
+    "setup_edit_devices": "Appareils / rôles",
+    "setup_remove_room": "Supprimer la pièce",
+    "setup_add_room": "Ajouter une pièce",
+    "diag_actual": "Retour d’état natif réel",
+    "diag_device_unavailable": "Appareil natif indisponible",
+    "diag_not_selected": "Sélection Foundation non valide",
+    "diag_devices_attention": "Appareils nécessitant une intervention",
+    "recommend_recover": "Action recommandée : Rétablir l’activité",
+    "recommend_review_foundation": "Action recommandée : Vérifier la sélection dans Foundation",
+    "recommend_inspect_sources": "Action recommandée : Vérifier les appareils indisponibles",
+    "diag_asset_id": "Équipement logique",
+    "diag_source": "Source HA native",
+    "diag_provider": "Intégration source",
+    "diag_command_allowed": "Autorisé",
+    "diag_command_blocked": "Bloqué",
+    "verified_model": "Modèle vérifié par la source native",
+    "last_attempt": "Dernière tentative d’activité",
+    "last_control": "Dernière commande directe",
+    "native_features": "Masque des fonctions HA natives",
+    "native_readback_at": "Dernier retour d’état natif",
+    "readback_quality": "Preuve de retour d’état natif",
+    "readback_provider_optimistic": "État déclaré par l’intégration, non confirmé physiquement",
+    "readback_native_ha_state": "État de la source Home Assistant",
+    "readback_unapproved": "Source non approuvée",
+    "setup_native_route_only": "Routage des entrées TV/ampli — aucun lecteur natif distinct assigné",
     "remote_navigation": "Navigation",
     "remote_media": "Chaînes et lecture",
     "remote_numbers": "Clavier numérique",
@@ -687,6 +1010,14 @@ const RHI_MM_TEXT = {
     "devices": "Appareils",
     "diagnostics": "Diagnostic",
     "overview_title": "Vue d’ensemble multimédia",
+    "hero_overview": "Vos pièces et activités multimédias en un coup d’œil.",
+    "hero_rooms": "Choisissez une pièce pour voir son état et ses commandes.",
+    "hero_activities": "Configurez les activités, appareils et sources de chaque pièce.",
+    "hero_devices": "Consultez les appareils sélectionnés et leur disponibilité.",
+    "hero_diagnostics": "Vérifiez les retours d’état, les connexions et la reprise.",
+    "hero_art_multimedia": "Salon contemporain lumineux avec installation home cinéma", 
+    "hero_art_activities": "Illustration d’un écran, amplificateur et sources multimédias",
+    "hero_art_insights": "Illustration du diagnostic audiovisuel et des connexions",
     "room": "PIÈCE",
     "activity": "ACTIVITÉ",
     "settings": "Paramètres",
@@ -716,6 +1047,19 @@ const RHI_MM_TEXT = {
     "review_rooms": "Pièces à vérifier",
     "partial_rooms": "Certains états de pièce sont indisponibles ou ambigus.",
     "rooms_activities": "Pièces et activités",
+    "floor_navigation": "Filtrer les pièces par étage",
+    "all_floors": "Tous les étages",
+    "compact_room_help": "Choisissez l’étage, puis ouvrez uniquement la pièce voulue. Son état reste visible.",
+    "no_floor_rooms": "Aucune pièce à cet étage",
+    "choose_other_floor": "Choisissez un autre étage ou tous les étages.",
+    "error_detail": "Détails techniques de l’erreur",
+    "device_unavailable": "Appareil indisponible",
+    "setup_rooms": "Pièce, appareils et activités",
+    "setup_help_short": "Consultez les appareils et routes. Modifiez-les dans la configuration Multimedia native.",
+    "setup_devices": "Appareils associés",
+    "setup_activity": "Configurer l’activité",
+    "setup_manage": "Gérer la configuration",
+    "setup_room_details": "Pièce et commandes",
     "active_first": "Pièces actives en premier. Changez d’activité sans sélectionner les appareils HDMI individuellement.",
     "all_rooms": "Toutes les pièces",
     "no_rooms": "Aucune pièce configurée",
@@ -723,7 +1067,20 @@ const RHI_MM_TEXT = {
     "no_activity": "Aucune activité",
     "no_activities": "Aucune activité configurée",
     "stop_activity": "Arrêter l’activité",
-    "recover": "Rétablir",
+    "recover": "Fix It / Rétablir",
+    "cec_device": "HDMI-CEC activé (appareil)",
+    "cec_activity": "Lien HDMI-CEC vérifié",
+    "cec_skips": "Automatisé par HDMI-CEC",
+    "target_state": "État souhaité et retour natif",
+    "target_expected": "Attendu",
+    "target_actual": "Observé",
+    "target_attention": "Correction nécessaire",
+    "target_observed": "Observé dans HA (pas preuve physique)",
+    "setup_cec_devices": "Configurer les appareils HDMI-CEC",
+    "setup_tv_wake": "Réveil TV Wake-on-LAN",
+    "setup_harmony_owner": "Commande Harmony / Premium",
+    "setup_speech_endpoint": "Notifications vocales",
+    "setup_cec_activity": "Configurer un lien HDMI-CEC",
     "details": "Détails",
     "room_control": "Commande de la pièce",
     "room_ownership": "Les pièces sont configurées dans Multimedia ; les appareils sources restent gérés par leurs intégrations HA.",
@@ -754,6 +1111,8 @@ const RHI_MM_TEXT = {
     "select": "Sélectionner",
     "remote_keys": "Télécommande",
     "shared_source": "Source partagée",
+    "native_area": "Pièce enregistrée dans HA",
+    "used_in": "Utilisée dans",
     "grouped": "Groupé",
     "players": "lecteurs",
     "device_controls": "Commandes des appareils",
@@ -816,6 +1175,7 @@ function rhiMmPresentation(contract) {
 }
 
 function rhiMmRoomStatus(room,hass) {
+  if(room?.attention&&['idle','active'].includes(room.phase))return rhiMmText(hass,'attention');
   if(room?.phase==='idle'&&room.native_status)return rhiMmText(hass,(['playing','on','idle','off','unknown'].includes(room.native_status)?room.native_status:'unknown'));
   const phases = {
     idle:'unknown', starting:'starting', stopping:'stopping', active:'ready',
@@ -840,10 +1200,53 @@ function rhiMmMediaSubtitle(room,hass) {
 }
 
 
+function rhiMmRoleLabel(hass,role){
+  return ['display','receiver','amplifier','player','source','remote'].includes(role)
+    ?rhiMmText(hass,'role_'+role):rhiMmText(hass,'device');
+}
+function rhiMmStateLabel(hass,state){
+  if(['on','off','idle','playing','unknown','unavailable'].includes(state))return rhiMmText(hass,state);
+  if(['paused','standby','buffering'].includes(state))return rhiMmText(hass,'state_'+state);
+  return rhiMmText(hass,'unknown');
+}
+
+
 // RHI Multimedia Premium: one-card native Home Assistant dashboard.
 // Core owns look/feel; backend owns meaning and all physical writers.
-const RHI_MM_UX_VERSION = '0.1.7';
-const RHI_MM_HERO = `/rhi_multimedia/frontend/assets/heroes/multimedia-overview.svg?v=${encodeURIComponent(RHI_MM_UX_VERSION)}`;
+const RHI_MM_UX_VERSION = '0.1.8';
+const RHI_MM_HERO_ASSETS = Object.freeze({
+  multimedia: 'multimedia-overview.svg',
+  activities: 'multimedia-activities.svg',
+  insights: 'multimedia-insights.svg',
+});
+function rhiMmHeroAsset(group){
+  return `/rhi_multimedia/frontend/assets/heroes/${RHI_MM_HERO_ASSETS[group]}?v=${encodeURIComponent(RHI_MM_UX_VERSION)}`;
+}
+
+function rhiMmDeviceArt(device,illustrationLabel,variant='thumbnail'){
+  // Consume only a producer-published ref + Foundation-validated package
+  // locator. No UI-side product/model catalog, remote hotlink or fake image.
+  const kind=device?.role==='display'?'mdi:television':
+    ['amplifier','receiver'].includes(device?.role)?'mdi:amplifier':'mdi:play-box-outline';
+  const fallback=`<span class="mm-device-art mm-device-art-neutral"><ha-icon icon="${kind}"></ha-icon></span>`;
+  const visual=device?.visual,presentation=visual?.presentation;
+  const path=['thumbnail','card','detail'].includes(variant)?
+    presentation?.variants?.[variant]:null;
+  if(device?.foundation_approved!==true||
+     device?.product_profile?.identity_evidence!=='exact_native_ha_device_registry'||
+     typeof device?.visual_ref!=='string'||visual?.visual_ref!==device.visual_ref||
+     !device.visual_ref.startsWith('rhi_multimedia.')||
+     visual?.kind!=='illustrative_generated'||
+     presentation?.package_id!=='rhi_multimedia'||
+     typeof path!=='string'||!/^assets\/devices\/[a-z0-9_-]+\.svg$/.test(path))
+    return fallback;
+  const alt=rhiUxEscape((device?.name||'')+' · '+illustrationLabel);
+  const url=`/rhi_multimedia/frontend/${path}?v=${encodeURIComponent(RHI_MM_UX_VERSION)}`;
+  return `<span class="mm-device-art" data-visual-ref="${rhiUxEscape(device.visual_ref)}" data-visual-variant="${variant}">
+    <img src="${rhiUxEscape(url)}" alt="${alt}" loading="lazy" decoding="async" width="64" height="64">
+  </span>`;
+}
+
 const MM_MODULES = [
   {id:'multimedia',label:'Multimedia',items:[{id:'overview',label:'Overview'},{id:'rooms',label:'Rooms'}]},
   {id:'activities',label:'Activities',items:[{id:'activities',label:'Activities'}]},
@@ -857,13 +1260,48 @@ function rhiMmRemoteGroups(options){
   const take=(name,wanted)=>{const selected=wanted.flatMap(k=>keys.filter(x=>x===k&&!used.has(x)));
     for(const k of selected)used.add(k);return {name,keys:selected};};
   const groups=[
-    take('navigation',['HOME','home','MENU','menu','top_menu','BACK','back','INFO','info','EXIT','exit','UP','up','LEFT','left','ENTER','select','RIGHT','right','DOWN','down']),
-    take('media',['CHANNELUP','CHANNELDOWN','GUIDE','VOLUMEUP','VOLUMEDOWN','PLAY','play','PAUSE','pause','MUTE','mute']),
+    take('navigation',['HOME','home','MENU','menu','top_menu','BACK','back','INFO','info','EXIT','exit','UP','up','DPAD_UP','LEFT','left','DPAD_LEFT','ENTER','select','ok','DPAD_CENTER','RIGHT','right','DPAD_RIGHT','DOWN','down','DPAD_DOWN']),
+    take('media',['CHANNELUP','CHANNELDOWN','GUIDE','VOLUMEUP','VOLUMEDOWN','VOLUME_UP','VOLUME_DOWN','PLAY','play','MEDIA_PLAY','PAUSE','pause','MEDIA_PAUSE','MEDIA_PLAY_PAUSE','MEDIA_STOP','MUTE','mute']),
     take('numbers',Array.from({length:10},(_,i)=>String(i))),
     take('apps',['NETFLIX','AMAZON','RED','GREEN','BLUE','YELLOW']),
   ];
   const other=keys.filter(k=>!used.has(k));if(other.length)groups.push({name:'more',keys:other});
   return groups.filter(group=>group.keys.length);
+}
+
+// A transient view of server-returned HA Options Flow schema. The HA backend
+// alone validates and saves; unknown field types cannot be submitted.
+function rhiMmOptionPairs(field){
+  const raw=field?.type==='selector'?field.selector?.select?.options:field?.options;
+  if(!Array.isArray(raw))return [];
+  return raw.map(o=>Array.isArray(o)?[o[0],o[1]??o[0]]:
+    o&&typeof o==='object'?[o.value,o.label??o.value]:[o,o])
+    .filter(([v])=>typeof v==='string');
+}
+function rhiMmOptionSupported(field){
+  if(!field||typeof field.name!=='string')return false;
+  if(['string','boolean','integer','float'].includes(field.type))return true;
+  if(field.type==='select')return rhiMmOptionPairs(field).length>0;
+  return field.type==='selector'&&(
+    (!!field.selector?.select&&rhiMmOptionPairs(field).length>0)||
+    !!field.selector?.text);
+}
+function rhiMmOptionDefaults(step){
+  const values={};
+  for(const field of step?.data_schema||[]){
+    const suggestion=field?.description?.suggested_value;
+    if(suggestion!==undefined&&suggestion!==null)values[field.name]=suggestion;
+    else if(Object.prototype.hasOwnProperty.call(field,'default'))values[field.name]=field.default;
+    else if(!field.required)continue; // No implicit write to optional native fields.
+    else if(field.type==='boolean')values[field.name]=false;
+    else if(field.type==='string')values[field.name]='';
+    else if(field.type==='integer')values[field.name]=Number.isInteger(field.valueMin)?field.valueMin:0;
+    else if(field.type==='float')values[field.name]=0;
+    else if(field.type==='select')values[field.name]=rhiMmOptionPairs(field)[0]?.[0];
+    else if(field.type==='selector'&&field.selector?.select?.multiple)values[field.name]=[];
+    else if(field.type==='selector'&&field.selector?.select)values[field.name]=rhiMmOptionPairs(field)[0]?.[0];
+  }
+  return values;
 }
 class HomeBrainMultimediaCard extends HTMLElement {
   static getStubConfig() { return {type:'custom:homebrain-multimedia-card'}; }
@@ -871,16 +1309,32 @@ class HomeBrainMultimediaCard extends HTMLElement {
     super(); this.attachShadow({mode:'open'});
     this.config={}; this._hass=null; this._view=''; this._room='';
     this._lastSignature=''; this._feedback=new Map();
-    this._expanded=new Set();this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
-    this._onLocation=()=>{this._lastSignature='';this.render();};
+    this._expanded=new Set();this._remoteSelections=new Map();this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
+    this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
+    this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;
+    this._onLocation=()=>{
+      if(!['activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
+        void this.cancelOptions();
+      }else{this._lastSignature='';this.render();}
+    };
     this.shadowRoot.addEventListener('click',event=>this.onClick(event));
-    this.shadowRoot.addEventListener('change',event=>this.onControlChange(event));
+    this.shadowRoot.addEventListener('change',event=>{this.onControlChange(event);this.onOptionValue(event);});
+    this.shadowRoot.addEventListener('input',event=>this.onOptionValue(event));
     this.shadowRoot.addEventListener('toggle',event=>this.onToggle(event),true);
   }
   setConfig(config={}) { this.config={...(config||{})}; this._lastSignature=''; this.render(); }
   connectedCallback() {window.addEventListener('popstate',this._onLocation);window.addEventListener('location-changed',this._onLocation);this.render();}
-  disconnectedCallback() {window.removeEventListener('popstate',this._onLocation);window.removeEventListener('location-changed',this._onLocation);}
-  set hass(hass) {this._hass=hass;this.render();}
+  disconnectedCallback() {
+    window.removeEventListener('popstate',this._onLocation);
+    window.removeEventListener('location-changed',this._onLocation);
+    if(this._optionsStep||this._optionsBusy)void this.cancelOptions();
+  }
+  set hass(hass) {
+    this._hass=hass;
+    if(!hass?.user?.is_admin&&(this._optionsStep||this._optionsBusy)){
+      void this.cancelOptions();
+    }else this.render();
+  }
   t(key){return rhiMmText(this._hass,key);}
   getCardSize() {return 12;}
   getGridOptions() {return {columns:12,rows:12,min_rows:5};}
@@ -888,14 +1342,20 @@ class HomeBrainMultimediaCard extends HTMLElement {
     try {
       const url=new URL(window.location.href);
       return {view:RHI_MM_VIEWS.includes(url.searchParams.get('multimedia_view'))?url.searchParams.get('multimedia_view'):(this.config.default_view||'overview'),
-        room:url.searchParams.get('multimedia_room')||''};
-    } catch (_) {return {view:this.config.default_view||'overview',room:''};}
+        room:url.searchParams.get('multimedia_room')||'',
+        floor:url.searchParams.get('multimedia_floor')||''};
+    } catch (_) {return {view:this.config.default_view||'overview',room:'',floor:''};}
   }
-  navigate(view,room='') {
+  navigate(view,room='',floor) {
     if (!RHI_MM_VIEWS.includes(view)) return;
+    this._destinationSelection=null;
     const url=new URL(window.location.href);
     url.searchParams.set('multimedia_view',view);
     if(room)url.searchParams.set('multimedia_room',room);else url.searchParams.delete('multimedia_room');
+    if (floor !== undefined) {
+      if(floor)url.searchParams.set('multimedia_floor',floor);
+      else url.searchParams.delete('multimedia_floor');
+    }
     window.history.pushState(null,'',url.pathname+url.search+url.hash);
     this._lastSignature='';this.render();
   }
@@ -905,8 +1365,40 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(context){const value=context.getAttribute('data-context-tab');this._contextSelections.set(this._contextScope,value);this._contextKey='';this._lastSignature='';this.render();return;}
     const refresh=event.target?.closest?.('[data-context-refresh]');
     if(refresh){this._planSummary=null;this._planRequest++;this._planPending=false;this._planToken=null;this.render();return;}
+    const destination=event.target?.closest?.('[data-notification-destination]');
+    if(destination){
+      const endpoint=destination.getAttribute('data-notification-destination');
+      this._destinationSelection=endpoint||null;
+      this._contextKey='';this.render();
+      return;
+    }
+    const focus=event.target?.closest?.('[data-remote-focus]');
+    if(focus){
+      const id=focus.getAttribute('data-room'),key=focus.getAttribute('data-remote-focus');
+      const route=this.currentRoute(),room=rhiMmRooms(this._hass).rooms?.find(r=>r.id===id);
+      if(route.view==='rooms'&&room&&(!route.room||route.room===room.id)&&room.devices.some(d=>d.key===key)){
+        const active=room.activities.find(a=>a.id===room.activity_id&&a.active);
+        this._remoteSelections.set(room.id+':'+(active?.id||'manual'),key);
+        this._lastSignature='';this.render();
+      }
+      return;
+    }
+    const floor=event.target?.closest?.('[data-floor]');
+    if(floor){event.preventDefault();this.navigate('overview','',floor.getAttribute('data-floor')||'');return;}
+    const option=event.target?.closest?.('[data-mm-option-action]');
+    if(option){event.preventDefault();if(!option.disabled)await this.openOptions({
+      action:option.getAttribute('data-mm-option-action'),
+      room:option.getAttribute('data-mm-option-room')||'',
+      activity:option.getAttribute('data-mm-option-activity')||'',
+      scope:option.getAttribute('data-mm-option-scope')||'',
+      id:option.getAttribute('data-mm-option-id')||''});return;}
+    const submitOption=event.target?.closest?.('[data-mm-option-submit]');
+    if(submitOption){event.preventDefault();await this.submitOptions();return;}
+    const cancelOption=event.target?.closest?.('[data-mm-option-cancel]');
+    if(cancelOption){event.preventDefault();await this.cancelOptions();return;}
     const nav=event.target?.closest?.('[data-nav]');
-    if(nav){event.preventDefault();this.navigate(nav.getAttribute('data-nav'),nav.getAttribute('data-room')||'');return;}
+    if(nav){event.preventDefault();if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
+      this.navigate(nav.getAttribute('data-nav'),nav.getAttribute('data-room')||'');return;}
     const more=event.target?.closest?.('[data-more-info]');
     if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');if(entityId)this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));return;}
     const direct=event.target?.closest?.('[data-device-action]');
@@ -923,6 +1415,160 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(!input||input.disabled||input.value==='')return;
     const action=input.getAttribute('data-device-input');
     await this.executeDevice(input.getAttribute('data-room'),input.getAttribute('data-device'),action,action==='volume'?Number(input.value):input.value);
+  }
+  onOptionValue(event){
+    const el=event.target?.closest?.('[data-mm-option-field]');
+    if(!el||!this._optionsStep||this._optionsBusy)return;
+    const key=el.getAttribute('data-mm-option-field');
+    if(!key)return;
+    if(el.hasAttribute('data-mm-option-choice')){
+      const wanted=el.getAttribute('data-mm-option-choice');
+      const values=new Set(Array.isArray(this._optionsData[key])?this._optionsData[key]:[]);
+      if(el.checked)values.add(wanted);else values.delete(wanted);
+      this._optionsData[key]=[...values];
+    }else if(el.type==='checkbox')this._optionsData[key]=!!el.checked;
+    else if(el.type==='number')this._optionsData[key]=el.value===''?'':Number(el.value);
+    else this._optionsData[key]=el.value;
+  }
+  _optionRefresh(){this._optionsRevision++;this._lastSignature='';this.render();}
+  async openOptions({action,room='',activity='',scope='',id=''}) {
+    if(!this._hass?.user?.is_admin||this._optionsBusy)return;
+    const oldStep=this._optionsStep;
+    const epoch=++this._optionsEpoch;
+    this._optionsStep=null;this._optionsData={};this._optionsError='';
+    this._optionsNotice='';this._optionsBusy=true;this._optionRefresh();
+    try{
+      if(oldStep)await rhiMmOptionsCancel(this._hass,oldStep);
+      if(epoch!==this._optionsEpoch)return;
+      // Reuse HA's installed integration translations. Fail safely to generic
+      // field labels on old/offline frontend clients.
+      if(typeof this._hass.loadBackendTranslation==='function'){
+        try{await this._hass.loadBackendTranslation('options','rhi_multimedia');}catch(_){}
+      }
+      if(epoch!==this._optionsEpoch)return;
+      const step=await rhiMmOptionsBegin(this._hass,{action,room,activity,scope,id});
+      if(epoch!==this._optionsEpoch){
+        await rhiMmOptionsCancel(this._hass,step);
+        return;
+      }
+      if(step?.type!=='form'){
+        await rhiMmOptionsCancel(this._hass,step);
+        throw new Error('Invalid configuration response');
+      }
+      this._optionsStep=step;this._optionsData=rhiMmOptionDefaults(step);
+    }catch(_){
+      if(epoch===this._optionsEpoch)this._optionsError=this.t('setup_flow_failed');
+    }finally{
+      if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
+    }
+  }
+  async submitOptions(){
+    const step=this._optionsStep;
+    if(!step||this._optionsBusy||!this._hass?.user?.is_admin)return;
+    if(!(step.data_schema||[]).every(rhiMmOptionSupported)){
+      this._optionsError=this.t('setup_field_unsupported');this._optionRefresh();return;
+    }
+    const epoch=++this._optionsEpoch;
+    this._optionsBusy=true;this._optionsError='';this._optionRefresh();
+    try{
+      const response=await rhiMmOptionsAdvance(this._hass,step,{...this._optionsData});
+      if(epoch!==this._optionsEpoch)return;
+      if(response?.type==='create_entry'){
+        this._optionsStep=null;this._optionsData={};
+        this._optionsNotice=this.t('setup_saved');
+      }else if(response?.type==='form'){
+        this._optionsStep=response;
+        if(response.step_id!==step.step_id)this._optionsData=rhiMmOptionDefaults(response);
+      }else{
+        this._optionsStep=null;this._optionsData={};
+        this._optionsError=this.t('setup_flow_failed');
+      }
+    }catch(_){
+      if(epoch===this._optionsEpoch)this._optionsError=this.t('setup_flow_failed');
+    }finally{
+      if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
+    }
+  }
+  async cancelOptions(){
+    const step=this._optionsStep;
+    ++this._optionsEpoch;
+    this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
+    this._optionsError='';this._optionsNotice='';this._optionRefresh();
+    if(step){try{await rhiMmOptionsCancel(this._hass,step);}catch(_){}}
+  }
+  optionError(step,code){
+    if(!code)return '';
+    return this._hass?.localize?.(`component.rhi_multimedia.options.error.${code}`,
+      step?.description_placeholders||{})||String(code).replaceAll('_',' ');
+  }
+  optionLabel(step,field){
+    const key=`component.rhi_multimedia.options.step.${step.step_id}.data.${field.name}`;
+    const localized=this._hass?.localize?.(key,step.description_placeholders||{});
+    if(localized)return localized;
+    if(field.name.startsWith('route_'))return this.t('routes')+': '+field.name.slice(6).replaceAll('_',' ');
+    return field.name.replaceAll('_',' ');
+  }
+  optionInput(step,field){
+    const escape=rhiUxEscape;
+    const key=field.name,value=this._optionsData[key],disabled=this._optionsBusy?'disabled':'';
+    const label=escape(this.optionLabel(step,field));
+    const attr=`data-mm-option-field="${escape(key)}" ${disabled}`;
+    const pairs=rhiMmOptionPairs(field);
+    const multiple=field.type==='selector'&&field.selector?.select?.multiple===true;
+    const error=step.errors?.[key]?escape(this.optionError(step,step.errors[key])):'';
+    if(!rhiMmOptionSupported(field))return `<p class="mm-room-error">${label}: ${this.t('setup_field_unsupported')}</p>`;
+    let control;
+    if(multiple){
+      const selected=new Set(Array.isArray(value)?value:[]);
+      control=`<fieldset class="mm-option-multiple"><legend>${label}</legend>
+        ${pairs.map(([item,title])=>`<label><input type="checkbox" ${attr}
+          data-mm-option-choice="${escape(item)}" ${selected.has(item)?'checked':''}/>
+          ${escape(title)}</label>`).join('')}</fieldset>`;
+      return `<div class="mm-option-field">${control}${error?`<small class="mm-room-error">${error}</small>`:''}</div>`;
+    }
+    if(field.type==='selector'&&field.selector?.text){
+      control=`<textarea ${attr} rows="12" spellcheck="false"
+        class="mm-option-yaml" aria-label="${label}">${escape(value??'')}</textarea>`;
+    }else if(field.type==='select'||field.type==='selector'){
+      control=`<select ${attr}>${pairs.map(([item,title])=>
+        `<option value="${escape(item)}" ${value===item?'selected':''}>${escape(title)}</option>`).join('')}</select>`;
+    }else if(field.type==='boolean'){
+      control=`<input type="checkbox" ${attr} ${value===true?'checked':''}/>`;
+    }else{
+      control=`<input type="${['integer','float'].includes(field.type)?'number':'text'}" ${attr}
+        ${field.type==='integer'?'step="1"':field.type==='float'?'step="any"':''}
+        value="${escape(value??'')}"/>`;
+    }
+    return `<label class="mm-option-field">${label}${control}${error?`<small class="mm-room-error">${error}</small>`:''}</label>`;
+  }
+  renderOptionsEditor(){
+    // HA's actual administrator permission remains authoritative on every
+    // render. Never expose an in-flight form after role revocation.
+    if(!this._hass?.user?.is_admin)return '';
+    const escape=rhiUxEscape,step=this._optionsStep;
+    if(!step&&!this._optionsBusy&&!this._optionsError&&!this._optionsNotice)return '';
+    const errors=step?.errors||{};
+    const base=errors.base?this.optionError(step,errors.base):this._optionsError;
+    const label=step?.step_id?
+      this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.title`,
+        step.description_placeholders||{}):null;
+    const description=step?.step_id?
+      this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.description`,
+        step.description_placeholders||{}):null;
+    const unsupported=!!step&&!(step.data_schema||[]).every(rhiMmOptionSupported);
+    return `<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
+      <h3>${escape(label||this.t('setup_editor'))}</h3>
+      ${description?`<p class="mm-options-description">${escape(description)}</p>`:''}
+      ${step?.description_placeholders?.note?`<p class="mm-options-description">${escape(step.description_placeholders.note)}</p>`:''}
+      ${base?`<p role="alert" class="mm-room-error">${escape(base)}</p>`:''}
+      ${this._optionsNotice?`<p role="status">${escape(this._optionsNotice)}</p>`:''}
+      ${step?.type==='form'?`<div class="mm-option-fields">
+        ${(step.data_schema||[]).map(field=>this.optionInput(step,field)).join('')}</div>`:''}
+      <div class="mm-setup-actions">
+        ${step?`<button type="button" data-mm-option-submit ${this._optionsBusy||unsupported?'disabled':''}>${this.t('setup_continue')}</button>`:''}
+        ${step?`<button type="button" data-mm-option-cancel>${this.t('setup_cancel')}</button>`:''}
+        <a href="/config/integrations/integration/rhi_multimedia">${this.t('setup_manage')}</a>
+      </div></section>`;
   }
   async executeDevice(roomId,key,action,value){
     const contract=rhiMmRooms(this._hass);
@@ -958,10 +1604,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   render() {
     if(!this.shadowRoot||!this._hass)return;
-    const route=this.currentRoute();this._view=route.view;this._room=route.room;
+    const route=this.currentRoute();this._view=route.view;this._room=route.room;this._floor=route.floor||'';
     const contract=rhiMmRooms(this._hass);
     const model=rhiMmPresentation(contract);
-    const fingerprint=JSON.stringify([model.ready,model.rooms,model.unavailable,model.backendVersion,route.view,route.room,[...this._feedback],this._hass.user?.id,this._hass.user?.is_admin,this._hass.locale?.language||this._hass.language]);
+    const editing=!!this._optionsStep;
+    const fingerprint=JSON.stringify([editing?'editing':model.ready,editing?null:model.rooms,
+      editing?null:model.unavailable,editing?null:model.backendVersion,
+      route.view,route.room,route.floor,[...this._feedback],
+      this._optionsRevision,this._hass.user?.id,this._hass.user?.is_admin,this._hass.locale?.language||this._hass.language]);
     // Keep independently mounted Core cards connected when media state changes.
     // Only replace the domain page, not the shared contextual editor.
     if(this._lastSignature!==fingerprint){
@@ -981,12 +1631,33 @@ class HomeBrainMultimediaCard extends HTMLElement {
     // Use the exact same Core scope on Overview and Activities. A room
     // drill-down narrows it; Devices/Diagnostics carry no implicit context.
     const ids=model.ready&&['overview','activities'].includes(route.view)?model.rooms.map(r=>r.id):
-      model.ready&&route.view==='rooms'&&model.rooms.length?[model.rooms.find(r=>r.id===route.room)?.id||model.rooms[0].id]:[];
+      model.ready&&route.view==='rooms'&&model.rooms.length?(route.room?model.rooms.filter(r=>r.id===route.room).map(r=>r.id):[model.rooms[0].id]):[];
     this.renderContext(ids);
   }
   renderContext(ids){
     const host=this.shadowRoot.querySelector?.('[data-mm-context]');
     if(!host)return;
+    const roomRows=rhiMmRooms(this._hass).rooms||[];
+    const current=this.currentRoute();
+    const scopedRows=current.view==='devices'?roomRows:roomRows.filter(r=>ids.includes(r.id));
+    const allowedDestinations=scopedRows.flatMap(r=>r.devices)
+      .filter(d=>d.foundation_approved)
+      .flatMap(d=>d.notification_destinations||[]);
+    const destination=allowedDestinations.find(d=>d.endpoint_id===this._destinationSelection);
+    if(this._destinationSelection&&!destination)this._destinationSelection=null;
+    if(destination&&this._hass.user?.is_admin&&this._hass.services?.rhi_notifications?.get_rules){
+      const key=JSON.stringify(['destination',destination.endpoint_id,this._hass.user.id,this._hass.locale?.language||this._hass.language]);
+      if(this._contextKey!==key){
+        this._contextKey=key;this._contextIdentity=key;this._contextCards=[];
+        host.innerHTML=`<section class="mm-surface mm-context"><h3>${this.t('notifications')} · ${rhiUxEscape(destination.name)}</h3>
+          <button type="button" class="mm-link" data-notification-destination="">${this.t('collapse')}</button>
+          <div data-mm-destination></div></section>`;
+        this.mountCoreCard(host.querySelector('[data-mm-destination]'),{
+          tag:'rhi-notifications-card',config:{destination_endpoint_id:destination.endpoint_id,embedded:true}},{});
+      }
+      for(const card of this._contextCards)card.hass=this._hass;
+      return;
+    }
     const specs=rhiMmContextSpecs(this._hass,ids);
     const scope=JSON.stringify([...ids].sort());
     const selected=this._contextSelections.get(scope)||'';
@@ -1034,11 +1705,36 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this.renderContext(spec.config.asset_ids);
     });
   }
-  hero(view){const title=this.t(view==='overview'?'overview_title':view);return `<header class="mm-title"><h2>${rhiUxEscape(title)}</h2>${this._hass.user?.is_admin?`<a href="/config/integrations/integration/rhi_multimedia" class="mm-link" title="${this.t('manage')}">${this.t('settings')} <ha-icon icon="mdi:cog-outline"></ha-icon></a>`:''}</header>`;}
+  hero(view){
+    const group=view==='overview'||view==='rooms'?'multimedia':view==='activities'?'activities':'insights';
+    const hero=rhiUxPageHero({
+      title:this.t(view==='overview'?'overview_title':view),
+      description:this.t('hero_'+view),
+      image:rhiMmHeroAsset(group),
+      imageAlt:this.t('hero_art_'+group),
+    });
+    const manage=this._hass.user?.is_admin?
+      `<div class="mm-hero-actions">
+        <button type="button" class="mm-hero-settings" data-mm-option-action="yaml"
+          title="${rhiUxEscape(this.t('setup_expert_yaml_all'))}">${rhiUxEscape(this.t('setup_expert_yaml_all'))}
+          <ha-icon icon="mdi:code-tags"></ha-icon></button>
+        <a href="/config/integrations/integration/rhi_multimedia" class="mm-hero-settings"
+          title="${rhiUxEscape(this.t('manage'))}">${rhiUxEscape(this.t('settings'))}
+          <ha-icon icon="mdi:cog-outline"></ha-icon></a></div>`:'';
+    return `<div class="mm-hero-frame">${hero}${manage}</div>`;
+  }
   unavailable(model){return `<section class="mm-callout mm-attention"><ha-icon icon="mdi:connection"></ha-icon><div><b>${this.t('not_ready')}</b><p>${rhiUxEscape(model.reason)}</p><p>${this.t('setup_help')}</p></div></section>`;}
   feedback(roomId){const feedback=this._feedback.get(roomId);return feedback?rhiUxWriteFeedback(feedback):'';}
   renderPage(model,view,roomId) {
-    const hero=this.hero(view);if(!model.ready)return rhiUxPageTemplate({hero,content:this.unavailable(model)});
+    const hero=this.hero(view);
+    if(!model.ready){
+      // A first-time installer must be able to reach the authoritative
+      // Options Flow even before any room sensor exists.
+      const firstSetup=view==='activities'&&this._hass?.user?.is_admin?
+        this.activities({rooms:[]}):'';
+      const editor=!['activities','devices'].includes(view)?this.renderOptionsEditor():'';
+      return rhiUxPageTemplate({hero,content:editor+this.unavailable(model)+firstSetup});
+    }
     const status=view==='overview'?rhiUxStatusGrid([
       {icon:'mdi:home-outline',label:this.t('rooms'),value:model.summary.room_count,detail:this.t('configured_rooms')},
       {icon:'mdi:play-circle-outline',label:this.t('active'),value:model.summary.active_rooms,detail:this.t('activity_state')},
@@ -1049,31 +1745,174 @@ class HomeBrainMultimediaCard extends HTMLElement {
       overview:()=>this.overview(model),rooms:()=>this.rooms(model,roomId),activities:()=>this.activities(model),
       devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model),
     }[view]||(()=>this.overview(model));
-    return rhiUxPageTemplate({hero,status,content:(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
+    const editor=!['activities','devices'].includes(view)?this.renderOptionsEditor():'';
+    return rhiUxPageTemplate({hero,status,content:editor+(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
   }
-  overview(model){return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('rooms_activities')}</h2><p>${this.t('active_first')}</p></div><button class="mm-link" data-nav="rooms">${this.t('all_rooms')} <ha-icon icon="mdi:chevron-right"></ha-icon></button></div>${model.rooms.length?`<div class="mm-room-grid">${model.rooms.map(room=>this.roomCard(room,true)).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('create_room')})}</section>`;}
+  overview(model){
+    // Floors are published by the Multimedia backend from HA registries, not
+    // guessed from room names or frontend entity scans. Missing means unassigned.
+    const floors=[...new Map(model.rooms.filter(r=>r.floor_id&&r.floor_name)
+      .map(r=>[r.floor_id,r.floor_name])).entries()]
+      .sort((a,b)=>a[1].localeCompare(b[1]));
+    const selected=floors.some(([id])=>id===this._floor)?this._floor:'';
+    const visible=selected?model.rooms.filter(r=>r.floor_id===selected):model.rooms;
+    const buttons=floors.length?
+      `<nav class="mm-floor-nav" aria-label="${rhiUxEscape(this.t('floor_navigation'))}">
+      <button type="button" data-floor="" aria-pressed="${!selected}" class="${!selected?'active':''}">${rhiUxEscape(this.t('all_floors'))}</button>
+      ${floors.map(([id,name])=>`<button type="button" data-floor="${rhiUxEscape(id)}" aria-pressed="${selected===id}" class="${selected===id?'active':''}"><ha-icon icon="mdi:layers-outline"></ha-icon>${rhiUxEscape(name)}</button>`).join('')}</nav>`:'';
+    return `<section class="mm-section mm-overview"><div class="mm-heading">
+      <div><h2>${this.t('rooms_activities')}</h2><p>${this.t('compact_room_help')}</p></div>
+      <button class="mm-link" data-nav="rooms">${this.t('all_rooms')} <ha-icon icon="mdi:chevron-right"></ha-icon></button>
+      </div>${buttons}${model.rooms.length?`<div class="mm-room-stack">${visible.length?
+        visible.map(room=>this.roomCard(room,true)).join(''):
+        rhiUxState({state:'empty',title:this.t('no_floor_rooms'),detail:this.t('choose_other_floor')})}</div>`:
+        rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('create_room')})}</section>`;
+  }
+
+  compactRoomCard(room){
+    const escape=rhiUxEscape;
+    const delegated=room.control_owner==='harmony';
+    const devices=room.devices||[];
+    const online=devices.filter(d=>d.available&&d.foundation_approved).length;
+    const total=devices.length;
+    const degraded=online<total;
+    const status=room.attention||degraded?'warn':room.phase==='active'?'good':room.phase==='idle'?'idle':'neutral';
+    const key='room:'+room.id;
+    const current=delegated?(room.harmony_activity||this.t('harmony_unavailable')):
+      (room.activity_name||this.t('no_activity'));
+    const location=[room.floor_name,room.area_name].filter(Boolean).join(' · ');
+    const warning=room.attention?this.t('room_attention_detail'):
+      degraded?this.t('device_unavailable'):'';
+    const recommendation=room.attention&&room.recommended_action?
+      this.t('recommend_'+room.recommended_action):'';
+    const actions=(delegated?[]:room.activities).map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}"
+      data-action="start_activity" data-room="${escape(room.id)}" data-activity="${escape(a.id)}"
+      aria-pressed="${!!a.active}" ${!rhiMmCanRun(room,'start_activity',a.id)?'disabled':''}
+      title="${escape(a.disabled_reason||'')}"><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${escape(a.name)}</button>`).join('');
+    const devicePreview=devices.map(d=>`<span class="mm-compact-device ${d.available&&d.foundation_approved?'':'mm-compact-device-warn'}"
+        title="${escape(d.name+': '+rhiMmStateLabel(this._hass,d.state))}"><ha-icon icon="${d.role==='display'?'mdi:television':d.role==='receiver'?'mdi:audio-video':'mdi:play-circle-outline'}"></ha-icon>${escape(d.name)} <small>${escape(rhiMmStateLabel(this._hass,d.state))}</small></span>`).join('');
+    const foot=`<div class="mm-room-foot">
+       ${!delegated&&(room.activities.length||rhiMmCanRun(room,'stop_activity'))?
+         `<button data-action="stop_activity" data-room="${escape(room.id)}" ${!rhiMmCanRun(room,'stop_activity')?'disabled':''}><ha-icon icon="mdi:stop-circle-outline"></ha-icon>${this.t('stop_activity')}</button>`:''}
+       ${rhiMmCanRun(room,'recover_activity')?
+         `<button data-action="recover_activity" data-room="${escape(room.id)}"><ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:''}
+       <button class="mm-link" data-nav="rooms" data-room="${escape(room.id)}">${this.t('details')} <ha-icon icon="mdi:chevron-right"></ha-icon></button></div>`;
+    const media=room.now_playing?.title?`<div class="mm-nowplaying"><ha-icon icon="mdi:music-note"></ha-icon>
+      <span>${escape(rhiMmMediaSubtitle(room,this._hass))}</span></div>`:'';
+    const controls=delegated?`<p class="mm-muted">${this.t('harmony_scope')}</p>`:
+      `<div class="mm-controls">${actions||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div>`;
+    return `<details data-persist="${escape(key)}" class="mm-compact-room ${room.attention?'mm-room-needs-attention':''}" ${this._expanded.has(key)?'open':''}>
+      <summary class="mm-compact-summary">
+        ${rhiMmDeviceArt(devices.find(d=>d.role==='display')||devices.find(d=>d.role==='receiver')||devices[0],this.t('illustrative_device_art'),'card')}
+        <span class="mm-compact-identity"><b>${escape(room.name)}</b>
+          <small>${escape(location||this.t('room'))}</small>
+          <span class="mm-compact-current">${escape(current)}</span>
+          ${warning?`<span class="mm-compact-warning" role="status">${escape(warning)}</span>`:''}
+          ${recommendation?`<small class="mm-compact-recommendation">${escape(recommendation)}</small>`:''}</span>
+        <span class="mm-phase mm-phase-${status}">${escape(!room.attention&&degraded?this.t('device_unavailable'):rhiMmRoomStatus(room,this._hass))}</span>
+        <span class="mm-compact-count">${online}/${total} <ha-icon icon="mdi:devices"></ha-icon></span>
+        <ha-icon class="mm-expand-icon" icon="mdi:chevron-down"></ha-icon>
+      </summary>
+      <div class="mm-compact-expanded">
+        ${media}${controls}
+        <div class="mm-compact-devices">${devicePreview}</div>
+        ${foot}${this.feedback(room.id)}
+        ${(room.error||room.warnings?.length)?`<details class="mm-compact-error"><summary>${escape(this.t('error_detail'))}</summary>
+          <p class="mm-room-error">${escape([room.error,...(room.warnings||[])].filter(Boolean).join(' · '))}</p></details>`:''}
+      </div>
+    </details>
+    <button class="mm-link mm-room-operate" type="button" data-nav="rooms" data-room="${escape(room.id)}">${this.t('room_control')} · ${escape(room.name)} <ha-icon icon="mdi:chevron-right"></ha-icon></button>`;
+  }
+
   roomCard(room,quick=false){
+    if(quick)return this.compactRoomCard(room);
     const delegated=room.control_owner==='harmony';
     const buttons=(delegated?[]:room.activities).map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}" aria-pressed="${!!a.active}" data-action="start_activity" data-room="${rhiUxEscape(room.id)}" data-activity="${rhiUxEscape(a.id)}" ${!rhiMmCanRun(room,'start_activity',a.id)?'disabled':''} title="${rhiUxEscape(a.disabled_reason||'')}"><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${rhiUxEscape(a.name)}</button>`).join('');
     const media=room.now_playing?`<div class="mm-nowplaying"><ha-icon icon="mdi:music-note"></ha-icon><span>${rhiUxEscape(rhiMmMediaSubtitle(room,this._hass))}</span></div>`:'';
     const status=room.attention?'warn':room.phase==='active'?'good':room.phase==='idle'?'idle':'neutral';
     return `<article class="mm-room-card"><header class="mm-room-head"><span class="mm-room-glyph"><ha-icon icon="mdi:television-classic"></ha-icon></span><div><small>${this.t('room')}</small><h3>${rhiUxEscape(room.name)}</h3></div><span class="mm-phase mm-phase-${status}">${rhiUxEscape(rhiMmRoomStatus(room,this._hass))}</span></header>
-      <div class="mm-room-current"><small>${this.t('activity')}</small><b>${rhiUxEscape(delegated?(room.harmony_activity||this.t('harmony_unavailable')):(room.activity_name||this.t('no_activity')))}</b>${room.progress?`<span>${rhiUxEscape(room.progress)}</span>`:''}</div>${media}
+      <div class="mm-room-current"><small>${this.t('activity')}</small><b>${rhiUxEscape(delegated?(room.harmony_activity||this.t('harmony_unavailable')):(room.activity_name||this.t('no_activity')))}</b>${room.progress?`<span>${rhiUxEscape(rhiMmRoomStatus(room,this._hass))}</span>`:''}</div>${media}
       <div class="mm-controls">${delegated?`<span class="mm-muted">${this.t('harmony_scope')}</span>`:buttons||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div><div class="mm-room-foot">
       ${!delegated&&(room.activities.length||rhiMmCanRun(room,'stop_activity'))?`<button data-action="stop_activity" data-room="${rhiUxEscape(room.id)}" ${!rhiMmCanRun(room,'stop_activity')?'disabled':''}><ha-icon icon="mdi:power"></ha-icon> ${this.t('stop_activity')}</button>`:''}
       ${rhiMmCanRun(room,'recover_activity')?`<button data-action="recover_activity" data-room="${rhiUxEscape(room.id)}"><ha-icon icon="mdi:restore"></ha-icon> ${this.t('recover')}</button>`:''}
       <button class="mm-link" data-nav="rooms" data-room="${rhiUxEscape(room.id)}">${this.t('details')} <ha-icon icon="mdi:chevron-right"></ha-icon></button>
-      </div>${quick?this.roomManualControls(room,true):''}${this.feedback(room.id)}${room.error?`<p class="mm-room-error">${rhiUxEscape(room.error)}</p>`:''}</article>`;
+      </div>${quick?this.roomManualControls(room,true):''}${this.feedback(room.id)}${room.attention?`<p class="mm-room-error">${this.t('room_attention_detail')}</p>`:''}${(room.error||room.warnings?.length)?`<details><summary>${this.t('error_detail')}</summary>${rhiUxEscape([room.error,...(room.warnings||[])].filter(Boolean).join(' · '))}</details>`:''}</article>`;
   }
   rooms(model,roomId){
     if(!model.rooms.length)return rhiUxState({title:this.t('no_rooms'),detail:this.t('configure_room')});
-    const selected=model.rooms.find(r=>r.id===roomId)||model.rooms[0];
-    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('room_control')}</h2><p>${this.t('room_ownership')}</p></div></div>
-      <div class="mm-room-picker">${model.rooms.map(r=>`<button aria-pressed="${r.id===selected.id}" class="${r.id===selected.id?'active':''}" data-nav="rooms" data-room="${rhiUxEscape(r.id)}">${rhiUxEscape(r.name)}</button>`).join('')}</div>
-      <div class="mm-detail-grid"><div>${this.roomCard(selected)}${this.roomManualControls(selected)}${this.roomNowPlaying(selected)}</div><div>${this.roomDeviceDetails(selected)}${this.roomRoutes(selected)}</div></div></section>`;
+    const selected=roomId?model.rooms.find(r=>r.id===roomId):model.rooms[0];
+    const escape=rhiUxEscape;
+    const picker=`<div class="mm-room-picker" role="group" aria-label="${this.t('room')}">${model.rooms.map(r=>`<button type="button" aria-pressed="${r.id===selected?.id}" class="${r.id===selected?.id?'active':''}" data-nav="rooms" data-room="${escape(r.id)}">${escape(r.name)}<small>${escape(rhiMmRoomStatus(r,this._hass))}</small></button>`).join('')}</div>`;
+    if(!selected)return `<section class="mm-section">${picker}${rhiUxState({state:'unavailable',title:this.t('unavailable'),detail:this.t('configure_room')})}</section>`;
+    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('room_control')}</h2></div></div>
+      ${picker}
+      <div class="mm-room-location">${escape([selected.floor_name,selected.area_name].filter(Boolean).join(' · '))}</div>
+      ${this.roomCard(selected)}
+      ${this.roomFocusedRemote(selected)}
+      ${this.roomNowPlaying(selected)}
+      ${this.roomContextConfiguration(selected)}
+      <details class="mm-surface" data-persist="${escape(selected.id+':devices')}" ${this._expanded.has(selected.id+':devices')?'open':''}>
+        <summary>${this.t('connected_devices')}</summary>
+        ${this.roomDeviceDetails(selected)}${this.roomManualControls(selected)}${this.roomRoutes(selected)}
+      </details>
+      </section>`;
+  }
+  roomContextConfiguration(room){
+    if(!this._hass?.user?.is_admin)return '';
+    const e=rhiUxEscape,attr=`data-mm-option-room="${e(room.id)}"`;
+    const active=room.activities.find(a=>a.id===room.activity_id);
+    return `<details class="mm-surface mm-context-settings" data-persist="${e(room.id+':settings')}" ${this._expanded.has(room.id+':settings')?'open':''}>
+      <summary>${this.t('settings')} · ${e(room.name)}</summary>
+      <div class="mm-setup-actions">
+        <button type="button" ${attr} data-mm-option-action="edit_room">${this.t('setup_edit_devices')}</button>
+        <button type="button" ${attr} data-mm-option-action="add_activity">${this.t('setup_add_activity')}</button>
+        ${active?`<button type="button" ${attr} data-mm-option-action="quick_edit_activity" data-mm-option-activity="${e(active.id)}">${this.t('setup_edit_activity')}</button>`:''}
+        <button type="button" ${attr} data-mm-option-action="rename_room">${this.t('setup_edit_location')}</button>
+        <button type="button" ${attr} data-mm-option-action="cec_device">${this.t('setup_cec_devices')}</button>
+        <button type="button" ${attr} data-mm-option-action="tv_wake">${this.t('setup_tv_wake')}</button>
+        <button type="button" ${attr} data-mm-option-action="harmony_owner">${this.t('setup_harmony_owner')}</button>
+        <button type="button" ${attr} data-mm-option-action="speech_endpoint">${this.t('setup_speech_endpoint')}</button>
+        ${active?`<button type="button" ${attr} data-mm-option-action="edit_activity" data-mm-option-activity="${e(active.id)}">${this.t('setup_edit_cast')}</button>
+          <button type="button" ${attr} data-mm-option-action="cec_activity" data-mm-option-activity="${e(active.id)}">${this.t('setup_cec_activity')}</button>`:''}
+        <button type="button" ${attr} data-mm-option-action="expert_yaml" data-mm-option-scope="room">${this.t('setup_expert_yaml')}</button>
+        ${active?`<button type="button" ${attr} data-mm-option-action="expert_yaml" data-mm-option-scope="activity" data-mm-option-id="${e(active.id)}">${e(active.name)} · ${this.t('setup_expert_yaml')}</button>`:''}
+        ${room.devices.map(d=>`<button type="button" ${attr} data-mm-option-action="expert_yaml" data-mm-option-scope="device" data-mm-option-id="${e(d.key)}">${e(d.name)} · ${this.t('setup_expert_yaml')}</button>`).join('')}
+      </div></details>`;
+  }
+  roomFocusedRemote(room){
+    // Presentation only: choose within the published activity cast. Multiple
+    // equally applicable endpoints require explicit resident selection.
+    const active=room.activities.find(a=>a.id===room.activity_id&&a.active);
+    const cast=active?new Set(active.device_keys||[]):null;
+    const devices=room.devices.filter(d=>d.foundation_approved&&
+      Object.keys(d.controls||{}).length&&
+      (room.control_owner==='harmony'?d.key===room.harmony_controller:
+        !d.external_owner&&(!cast||cast.has(d.key))));
+    const navigation=devices.filter(d=>d.controls.remote_key?.enabled);
+    const players=navigation.filter(d=>d.role==='player');
+    const candidates=players.length?players:navigation.length?navigation:
+      devices.filter(d=>Object.entries(d.controls).some(([action,cap])=>cap.enabled&&['play','pause','previous','next','harmony_activity','power_on','power_off'].includes(action)));
+    const selectionKey=room.id+':'+(active?.id||'manual');
+    const requested=this._remoteSelections.get(selectionKey);
+    const target=candidates.find(d=>d.key===requested)||(candidates.length===1?candidates[0]:null);
+    const audio=devices.filter(d=>d.controls.volume?.enabled||d.controls.volume_up?.enabled||d.controls.volume_down?.enabled||d.controls.mute?.enabled);
+    const receivers=audio.filter(d=>d.role==='receiver');
+    const audioChoices=receivers.length?receivers:audio;
+    const audioTarget=audioChoices.length===1?audioChoices[0]:null;
+    const e=rhiUxEscape;
+    const buttons=candidates.length>1?`<div class="mm-room-picker" role="group" aria-label="${this.t('remote_keys')}">${candidates.map(d=>`<button type="button" data-remote-focus="${e(d.key)}" data-room="${e(room.id)}" aria-pressed="${target?.key===d.key}">${e(d.name)}</button>`).join('')}</div>`:'';
+    const primary=target?this.roomManualControls({...room,devices:[target]},true,true,
+      audioTarget&&audioTarget.key!==target.key?'primary':'all'):'';
+    const audioPanel=audioTarget&&audioTarget.key!==target?.key?
+      this.roomManualControls({...room,devices:[audioTarget]},true,true,'audio'):'';
+    const missing=!primary&&!audioPanel?rhiUxState({state:'unavailable',title:this.t('device_controls'),detail:this.t('select')}):'';
+    return `<article class="mm-surface mm-focused-remote" data-remote-room="${e(room.id)}">
+      <div class="mm-heading"><h3>${this.t('remote_keys')} · ${e(room.name)}</h3></div>
+      ${buttons}${primary}${audioPanel}${missing}
+      </article>`;
   }
   roomNowPlaying(room){const media=room.now_playing;return `<article class="mm-surface"><h3>${this.t('now_playing')}</h3>${media?`<div class="mm-media-detail">${media.picture?`<img alt="${this.t('media_artwork')}" src="${rhiUxEscape(media.picture)}">`:''}<div><b>${rhiUxEscape(media.title||this.t('playing'))}</b><p>${rhiUxEscape(media.artist||this.t('artist_unknown'))}</p><small>${rhiUxEscape(media.album||'')}</small></div></div>`:rhiUxState({state:'unavailable',title:this.t('no_playback'),detail:this.t('playback_help')})}${room.audio?`<div class="mm-audio-readback"><ha-icon icon="mdi:volume-high"></ha-icon><span>${rhiUxEscape(room.audio.name)}: ${room.audio.volume_level===null?this.t('volume_unknown'):`${Math.round(room.audio.volume_level*100)}%`}</span></div>`:''}</article>`;}
-  roomManualControls(room,quick=false){
+  roomManualControls(room,quick=false,focused=false,part='all'){
     const labels=Object.fromEntries(Object.entries({power_on:'on',power_off:'off',volume_down:'volume_down',volume_up:'volume_up',play:'play',pause:'pause',stop:'stop',previous:'previous',next:'next',source:'input',sound_mode:'sound_mode',volume:'volume',mute:'mute',join_group:'add_player',unjoin_group:'leave_group',harmony_activity:'harmony_activity'}).map(([action,key])=>[action,this.t(key)]));
     const escape=rhiUxEscape;
     const devices=room.devices.filter(d=>Object.keys(d.controls||{}).length&&
@@ -1081,36 +1920,288 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const quickKeys=new Set([room.harmony_controller,room.audio?.device_key,room.now_playing?.device_key,devices.find(d=>d.role==='display')?.key,devices.find(d=>d.role==='player')?.key]);
     if(quick&&!room.activities.length&&devices.length&&!devices.some(d=>quickKeys.has(d.key)))quickKeys.add(devices[0].key);
     if(!devices.length)return '';
-    const body=devices.filter(d=>!quick||quickKeys.has(d.key)).map(d=>{
+    const body=devices.filter(d=>focused||!quick||quickKeys.has(d.key)).map(d=>{
       const c=d.controls, attrs=`data-room="${escape(room.id)}" data-device="${escape(d.key)}"`;
       const disabled=cap=>cap.enabled?'':`disabled title="${escape(cap.reason||this.t('unavailable'))}"`;
       const button=(action,label,value)=>c[action]?`<button type="button" ${attrs} data-device-action="${action}" ${value===undefined?'':`data-value="${escape(JSON.stringify(value))}"`} ${disabled(c[action])}>${escape(label)}</button>`:'';
       const options=(action,current)=>c[action]?`<label>${labels[action]}<select ${attrs} data-device-input="${action}" ${disabled(c[action])}><option value="">${escape(current||this.t('select'))}</option>${c[action].options.map(v=>`<option value="${escape(v)}" ${v===current?'selected':''}>${escape(c[action].option_labels?.[v]||v)}</option>`).join('')}</select></label>`:'';
-      const buttons=(quick?['power_on','power_off','play','pause',...(!c.volume?['volume_down','volume_up']:[])]:['power_on','power_off','volume_down','volume_up','previous','play','pause','stop','next']).map(action=>button(action,labels[action])).join('');
-      const volume=c.volume&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
-      const mute=typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
-      const remote=c.remote_key?(()=>{
+      const actions=focused?(part==='audio'?['volume_down','volume_up']:['power_on','power_off','previous','play','pause','stop','next',...(part==='all'?['volume_down','volume_up']:[])]):
+        quick?['power_on','power_off','play','pause',...(!c.volume?['volume_down','volume_up']:[])]:['power_on','power_off','volume_down','volume_up','previous','play','pause','stop','next'];
+      const buttons=actions.map(action=>button(action,labels[action])).join('');
+      const volume=part!=='primary'&&c.volume&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
+      const mute=part!=='primary'&&typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
+      const remote=part!=='audio'&&c.remote_key?(()=>{
         const sections=rhiMmRemoteGroups(c.remote_key.options);
         const key=room.id+':'+d.key+':remote';
-        const renderKey=k=>button('remote_key',k==='ENTER'||k==='select'?'OK':k,k);
+        const renderKey=k=>button('remote_key',
+            k==='ENTER'||k==='select'||k==='ok'||k==='DPAD_CENTER'?'OK':k.startsWith('DPAD_')?k.slice(5):k,k);
         const main=sections.find(s=>s.name==='navigation');
-        const navigation=main?`<div class="mm-remote-navigation" role="group" aria-label="${this.t('remote_navigation')}">${main.keys.map(k=>`<span class="mm-remote-key mm-remote-key-${escape(['UP','up','DOWN','down','LEFT','left','RIGHT','right'].includes(k)?k.toLowerCase():k==='ENTER'||k==='select'?'ok':'extra')}">${renderKey(k)}</span>`).join('')}</div>`:'';
+        const position=k=>{
+          const name=(k.startsWith('DPAD_')?k.slice(5):k).toLowerCase();
+          return ['up','down','left','right'].includes(name)?name:
+            ['enter','select','ok','center'].includes(name)?'ok':'extra';
+        };
+        const navigation=main?`<div class="mm-remote-navigation" role="group" aria-label="${this.t('remote_navigation')}">${main.keys.map(k=>`<span class="mm-remote-key mm-remote-key-${escape(position(k))}">${renderKey(k)}</span>`).join('')}</div>`:'';
         const extra=sections.filter(s=>s.name!=='navigation').map(section=>{
           const persist=key+':'+section.name;
           return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}><summary>${this.t('remote_'+section.name)}</summary><div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
         }).join('');
+        if(focused){
+          const direct=sections.find(section=>section.name==='media');
+          const advanced=sections.filter(section=>section.name!=='navigation'&&section.name!=='media').map(section=>{
+            const persist=key+':'+section.name;
+            return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}><summary>${this.t('remote_'+section.name)}</summary><div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
+          }).join('');
+          return `${navigation}${direct?`<div class="mm-native-buttons" role="group" aria-label="${this.t('remote_media')}">${direct.keys.map(renderKey).join('')}</div>`:''}${advanced}`;
+        }
         return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}</details>`;
       })():'';
-      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(d.state)}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${options('harmony_activity',d.current_activity)}${quick?(room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
+      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
     }).join('');
     if(!body)return '';
-    return quick?`<div class="mm-quick-controls">${body}</div>`:`<article class="mm-surface mm-native-controls"><h3>${this.t('device_controls')}</h3>${body}</article>`;
+    return quick?`<div class="mm-quick-controls">${body}</div>`:
+      `<details class="mm-surface mm-native-fold" data-persist="${escape(room.id+':controls')}"
+        ${this._expanded.has(room.id+':controls')?'open':''}>
+        <summary>${this.t('device_controls')}</summary>
+        <div class="mm-native-controls">${body}</div>
+      </details>`;
   }
-  roomDeviceDetails(room){return `<article class="mm-surface"><h3>${this.t('connected_devices')}</h3><div class="mm-device-list">${room.devices.map(d=>`<div class="mm-device-row"><span class="mm-role"><ha-icon icon="${d.role==='display'?'mdi:television':d.role==='receiver'?'mdi:audio-video':'mdi:play-box'}"></ha-icon></span><div><b>${rhiUxEscape(d.name)}</b><small>${rhiUxEscape(d.role)} · ${rhiUxEscape(d.source||d.state)}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small></div><span class="mm-phase ${d.available&&d.foundation_approved?'mm-phase-good':'mm-phase-warn'}">${d.available&&d.foundation_approved?this.t('connected'):this.t('attention')}</span>${d.external_owner?'':`<button title="${this.t('native_device')}" data-more-info="${rhiUxEscape(d.entity_id)}"><ha-icon icon="mdi:open-in-new"></ha-icon></button>`}</div>`).join('')}</div></article>`;}
-  roomRoutes(room){const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length?`<div class="mm-device-list">${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
-  activities(model){return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('activities')}</h2><p>${this.t('activities_help')}</p></div></div><div class="mm-activities">${model.rooms.map(r=>`<article class="mm-surface"><h3>${rhiUxEscape(r.name)}</h3><div class="mm-controls">${r.activities.map(a=>`<button class="mm-activity ${a.active?'active':''}" data-action="start_activity" data-room="${rhiUxEscape(r.id)}" data-activity="${rhiUxEscape(a.id)}" ${!rhiMmCanRun(r,'start_activity',a.id)?'disabled':''}><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${rhiUxEscape(a.name)}</button>`).join('')}</div><p class="mm-muted">${rhiUxEscape(rhiMmRoomStatus(r,this._hass))} · ${rhiUxEscape(r.activity_name||this.t('no_active_activity'))}</p>${this.feedback(r.id)}</article>`).join('')}</div></section>`;}
-  devices(model){const rows=model.rooms.flatMap(r=>r.devices.map(d=>({...d,room:r.name})));return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('devices_roles')}</h2><p>${this.t('device_help')}</p></div></div>${rows.length?`<div class="mm-device-table"><div class="mm-table-head"><span>${this.t('device')}</span><span>${this.t('role_room')}</span><span>${this.t('native_state')}</span><span>Foundation</span></div>${rows.map(d=>`<div class="mm-table-row"><span><b>${rhiUxEscape(d.name)}</b></span><span>${rhiUxEscape(d.role)} · ${rhiUxEscape(d.room)}</span><span>${rhiUxEscape(d.state)}</span><span>${d.foundation_approved?this.t('approved'):this.t('review')}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_devices'),detail:this.t('no_bound')})}</section>`;}
-  diagnostics(model){return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div></div><div class="mm-diag-grid">${model.rooms.map(r=>`<article class="mm-surface"><h3>${rhiUxEscape(r.name)}</h3><div class="mm-diag-status"><span>${this.t('phase')}</span><b>${rhiUxEscape(r.phase)}</b></div><div class="mm-diag-status"><span>${this.t('approvals')}</span><b>${r.foundation_approved?this.t('valid'):this.t('review')}</b></div><div class="mm-diag-status"><span>${this.t('confirmed_playback')}</span><b>${r.playing?this.t('playing'):this.t('not_confirmed')}</b></div>${r.error?`<p class="mm-room-error">${rhiUxEscape(r.error)}</p>`:''}${r.warnings?.length?`<p class="mm-room-error">${r.warnings.map(rhiUxEscape).join('; ')}</p>`:''}<details data-persist="${rhiUxEscape(r.id)}:technical" ${this._expanded.has(r.id+':technical')?'open':''}><summary>${this.t('technical')}</summary><div class="mm-tech">${r.devices.map(d=>`<p>${rhiUxEscape(d.entity_id)} · ${rhiUxEscape(d.physical_id)}</p>`).join('')}</div></details></article>`).join('')}</div></section>`;}
+  productSpecifications(device){
+    if(device.foundation_approved!==true||device.product_profile?.identity_evidence!=='exact_native_ha_device_registry')return '';
+    const specs=device.product_profile.characteristics||{};
+    const keys=['screen_inches','panel','resolution','amplified_channels','subwoofer_outputs','hdmi_inputs','hdmi_outputs','touch_points'];
+    const rows=keys.filter(k=>typeof specs[k]==='string'||Number.isFinite(specs[k]));
+    if(!rows.length)return '';
+    return `<div class="mm-product-specs"><small><b>${this.t('product_specs')}</b></small>${rows.map(k=>`<small>${this.t('spec_'+k)}: ${rhiUxEscape(typeof specs[k]==='number'?new Intl.NumberFormat(this._hass?.locale?.language||'en').format(specs[k]):specs[k])}</small>`).join('')}</div>`;
+  }
+  roomAvailableControls(device){
+    const labels={power_on:'on',power_off:'off',source:'input',volume:'volume',volume_up:'volume_up',volume_down:'volume_down',mute:'mute',play:'play',pause:'pause',stop:'stop',next:'next',previous:'previous',remote_key:'remote_keys',sound_mode:'sound_mode',join_group:'add_player',unjoin_group:'leave_group',harmony_activity:'harmony_activity'};
+    const capabilities=Object.entries(device.controls||{}).filter(([key,value])=>device.foundation_approved&&value?.enabled&&labels[key]).map(([key])=>this.t(labels[key]));
+    return capabilities.length?`<small>${this.t('available_room_controls')}: ${rhiUxEscape(capabilities.join(' · '))}</small>`:'';
+  }
+  deviceNotificationActions(device){
+    if(!this._hass?.user?.is_admin||!this._hass?.services?.rhi_notifications?.get_rules||
+       !device.foundation_approved)return '';
+    return (device.notification_destinations||[]).filter(d=>typeof d.endpoint_id==='string'&&d.endpoint_id.startsWith('ha_notify:'))
+      .map(d=>`<button class="mm-link" type="button" data-notification-destination="${rhiUxEscape(d.endpoint_id)}">${this.t('notifications')} · ${rhiUxEscape(d.name)}${d.available?'':' · '+this.t('unavailable')}</button>`).join('');
+  }
+  roomDeviceDetails(room){return `<article class="mm-surface"><h3>${this.t('connected_devices')}</h3><div class="mm-device-list">${room.devices.map(d=>`<div class="mm-device-row">${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}<div><b>${rhiUxEscape(d.name)}</b>${d.product_profile?`<small>${this.t('verified_model')}: ${rhiUxEscape(d.product_profile.manufacturer)} ${rhiUxEscape(d.product_profile.model)}</small>`:''}<small>${rhiUxEscape(rhiMmRoleLabel(this._hass,d.role))} · ${rhiUxEscape(d.source||rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small>${d.registered_location?.area_id?`<small>${this.t('native_area')}: ${rhiUxEscape(d.registered_location.area_name||d.registered_location.area_id)}${d.registered_location.area_id!==room.area_id?` · ${this.t('used_in')}: ${rhiUxEscape(room.name)}`:''}</small>`:''}${this.roomAvailableControls(d)}${this.deviceNotificationActions(d)}</div><span class="mm-phase ${d.available&&d.foundation_approved?'mm-phase-good':'mm-phase-warn'}">${d.available&&d.foundation_approved?this.t('connected'):this.t('attention')}</span>${d.external_owner?'':`<button title="${this.t('native_device')}" data-more-info="${rhiUxEscape(d.entity_id)}"><ha-icon icon="mdi:open-in-new"></ha-icon></button>`}</div>`).join('')}</div></article>`;}
+  roomRoutes(room){
+    const cec=room.activities.flatMap(activity=>(activity.cec_links||[]).map(link=>{
+      const source=room.devices.find(d=>d.key===link.source)?.name||link.source;
+      const target=room.devices.find(d=>d.key===link.target)?.name||link.target;
+      return `<div class="mm-route"><b>${rhiUxEscape(activity.name)} · ${this.t('cec_activity')}</b>
+        <span>${rhiUxEscape(source)} → ${rhiUxEscape(target)} · ${this.t('cec_skips')}:
+        ${rhiUxEscape(link.skipped.join(', '))}</span></div>`;
+    }));
+    const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length||cec.length?`<div class="mm-device-list">${cec.join('')}${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
+  activities(model){
+    // This is a configuration map, never a second activity executor. The
+    // native Multimedia Options Flow remains the sole atomic config writer.
+    const manage=this._hass.user?.is_admin;
+    const cards=model.rooms.map(room=>{
+      const devices=room.devices||[];
+      const activities=room.activities||[];
+      const location=[room.floor_name,room.area_name].filter(Boolean).join(' · ');
+      const deviceSummary=`${devices.length} ${this.t('setup_devices').toLowerCase()}`;
+      const items=activities.map(activity=>{
+        const cast=(activity.device_keys||[]).map(key=>devices.find(d=>d.key===key)?.name||key);
+        const routes=(activity.routes||[]).map(route=>{
+          const device=devices.find(d=>d.key===route.device_key);
+          return `${device?.name||route.device_key}: ${route.selected||this.t('not_published')}${route.status&&route.status!=='confirmed'?' ('+route.status+')':''}`;
+        });
+        const images=(activity.device_keys||[]).map(key=>devices.find(d=>d.key===key))
+          .filter(Boolean).slice(0,4).map(device=>rhiMmDeviceArt(device,this.t('illustrative_device_art'))).join('');
+        return `<div class="mm-setup-activity">
+            <div class="mm-activity-identity"><div><b>${rhiUxEscape(activity.name)}</b>
+            <small>${rhiUxEscape(cast.join(' · ')||this.t('setup_devices'))}</small></div>
+            ${images?`<div class="mm-activity-visuals">${images}</div>`:''}</div>
+            ${activity.device_keys?.length&&!activity.device_keys.some(key=>devices.find(d=>d.key===key)?.role==='player')?
+              `<small>${this.t('setup_native_route_only')}</small>`:''}
+            ${routes.length?`<small>${rhiUxEscape(routes.join(' · '))}</small>`:''}
+            ${activity.cec_links?.length?`<small>${this.t('cec_activity')}:
+              ${rhiUxEscape(activity.cec_links.map(link=>link.source+' → '+link.target+' ('+link.skipped.join(', ')+')').join(' · '))}</small>`:''}
+            ${!activity.available?`<small class="mm-setup-review">${rhiUxEscape(activity.disabled_reason||this.t('review'))}</small>`:''}
+            ${manage?`<div class="mm-setup-actions">
+              <button type="button" data-mm-option-action="quick_edit_activity" data-mm-option-room="${rhiUxEscape(room.id)}"
+                data-mm-option-activity="${rhiUxEscape(activity.id)}">${this.t('setup_edit_activity')}</button>
+              <details class="mm-setup-advanced"><summary>${this.t('setup_more_actions')}</summary>
+                <button type="button" data-mm-option-action="edit_activity" data-mm-option-room="${rhiUxEscape(room.id)}"
+                  data-mm-option-activity="${rhiUxEscape(activity.id)}">${this.t('setup_edit_cast')}</button>
+                <button type="button" data-mm-option-action="cec_activity" data-mm-option-room="${rhiUxEscape(room.id)}"
+                  data-mm-option-activity="${rhiUxEscape(activity.id)}">${this.t('setup_cec_activity')}</button>
+                <button type="button" data-mm-option-action="expert_yaml" data-mm-option-scope="activity"
+                  data-mm-option-room="${rhiUxEscape(room.id)}" data-mm-option-id="${rhiUxEscape(activity.id)}">${this.t('setup_expert_yaml')}</button>
+                <button type="button" data-mm-option-action="remove_activity" data-mm-option-room="${rhiUxEscape(room.id)}"
+                  data-mm-option-activity="${rhiUxEscape(activity.id)}">${this.t('setup_remove_activity')}</button>
+              </details></div>`:''}
+          </div>`;
+      }).join('');
+      return `<article class="mm-setup-room"><div class="mm-setup-head">
+          <div><h3>${rhiUxEscape(room.name)}</h3>
+            <small class="mm-setup-caption">${rhiUxEscape(location||deviceSummary)}</small></div>
+          <span class="mm-phase mm-phase-${room.attention?'warn':'idle'}">${rhiUxEscape(rhiMmRoomStatus(room,this._hass))}</span>
+        </div><div class="mm-setup-activities">${items||
+          `<span class="mm-muted">${this.t('no_activities')}</span>`}</div>
+        <details class="mm-setup-devices"><summary>${rhiUxEscape(deviceSummary)}</summary>
+          <div class="mm-setup-device-list">${devices.map(d=>`<span class="mm-setup-device ${!d.available||!d.foundation_approved?'mm-setup-device-warn':''}">
+            ${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}
+            <b>${rhiUxEscape(rhiMmRoleLabel(this._hass,d.role))}</b> ${rhiUxEscape(d.name)} <small>${rhiUxEscape(rhiMmStateLabel(this._hass,d.state))}</small>
+            ${manage?`<button type="button" data-mm-option-action="expert_yaml"
+              data-mm-option-scope="device" data-mm-option-room="${rhiUxEscape(room.id)}"
+              data-mm-option-id="${rhiUxEscape(d.key)}">${this.t('setup_expert_yaml')}</button>`:''}</span>`).join('')}</div>
+        </details>
+        <div class="mm-setup-actions">
+          ${manage?`<button type="button" data-mm-option-action="add_activity" data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_add_activity')}</button>
+            <button type="button" data-mm-option-action="rename_room" data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_edit_location')}</button>
+            <button type="button" data-mm-option-action="edit_room" data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_edit_devices')}</button>
+            <details class="mm-setup-advanced"><summary>${this.t('setup_more_actions')}</summary>
+              <button type="button" data-mm-option-action="cec_device" data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_cec_devices')}</button>
+              <button type="button" data-mm-option-action="expert_yaml" data-mm-option-scope="room"
+                data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_expert_yaml')}</button>
+              <button type="button" data-mm-option-action="remove_room" data-mm-option-room="${rhiUxEscape(room.id)}">${this.t('setup_remove_room')}</button>
+            </details>`:''}
+          <button class="mm-link" type="button" data-nav="rooms" data-room="${rhiUxEscape(room.id)}">${this.t('setup_room_details')} <ha-icon icon="mdi:chevron-right"></ha-icon></button>
+          ${manage?`<a href="/config/integrations/integration/rhi_multimedia">${this.t('setup_manage')} <ha-icon icon="mdi:cog-outline"></ha-icon></a>`:''}
+        </div></article>`;
+    }).join('');
+    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('setup_rooms')}</h2>
+      <p>${this.t('setup_help_short')}</p></div>
+      ${manage?`<div class="mm-setup-actions"><button type="button" class="mm-link" data-mm-option-action="guided_activity">${this.t('setup_guided_activity')}</button>
+        <button type="button" class="mm-link" data-mm-option-action="add_room">${this.t('setup_add_room')}</button></div>`:''}</div>
+      ${this.renderOptionsEditor()}
+      ${model.rooms.length?`<div class="mm-setup-grid">${cards}</div>`:
+        rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('create_room')})}
+      </section>`;
+  }
+  devices(model){
+    // One visual asset row may serve several rooms. Expert edits must always
+    // target an exact room + role key, never an ambiguous inferred source.
+    const manage=this._hass?.user?.is_admin===true;
+    const byAsset=new Map();
+    for(const room of model.rooms)for(const device of room.devices){
+      const id=(device.owner_domain||'rhi_multimedia')+':'+(device.asset_id||device.physical_id||device.entity_id);
+      const existing=byAsset.get(id);
+      const binding={room:room.id,key:device.key,location:room.name};
+      if(existing){
+        existing.rooms.add(room.name);existing.roles.add(device.role);
+        existing.bindings.push(binding);
+      }else byAsset.set(id,{...device,rooms:new Set([room.name]),
+        roles:new Set([device.role]),bindings:[binding]});
+    }
+    const rows=[...byAsset.values()].map(device=>({...device,
+      room:[...device.rooms].join(', '),role_label:[...device.roles].map(role=>rhiMmRoleLabel(this._hass,role)).join(', ') }));
+    return `<section class="mm-section"><div class="mm-heading">
+      <div><h2>${this.t('devices_roles')}</h2><p>${this.t('device_help')}</p></div>
+      ${manage?`<div class="mm-setup-actions"><button type="button" class="mm-link" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>
+        ${model.rooms.length?`<button type="button" class="mm-link" data-mm-option-action="edit_room">${this.t('setup_edit_devices')}</button>`:''}</div>`:''}</div>
+      ${manage?this.renderOptionsEditor():''}
+      ${rows.length?`<div class="mm-device-table"><div class="mm-table-head">
+        <span>${this.t('device')}</span><span>${this.t('role_room')}</span>
+        <span>${this.t('native_state')}</span><span>Foundation</span></div>
+        ${rows.map(d=>`<div class="mm-table-row">
+          <div class="mm-table-asset">
+            <div class="mm-device-identity">
+              ${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}
+              <div><b>${rhiUxEscape(d.name)}</b>
+                ${d.foundation_approved&&d.product_profile?.identity_evidence==='exact_native_ha_device_registry'
+                  ?`<small>${rhiUxEscape(d.product_profile.manufacturer)} · ${rhiUxEscape(d.product_profile.model)}</small>`:''}
+              </div>
+            </div>
+            ${(d.visual_ref&&d.visual?.presentation?.variants?.detail)||this.productSpecifications(d)?`
+              <details class="mm-device-detail">
+                <summary>${this.t('product_details')}</summary>
+                <div class="mm-device-detail-content">
+                  ${rhiMmDeviceArt(d,this.t('illustrative_device_art'),'detail')}
+                  <div><strong>${rhiUxEscape(d.product_profile?.manufacturer||'')}
+                    ${rhiUxEscape(d.product_profile?.model||'')}</strong>
+                  ${d.visual_ref&&d.visual?.presentation?.variants?.detail?`<small>${this.t('illustrative_device_art')}</small>`:''}${this.productSpecifications(d)}</div>
+                </div>
+              </details>`:''}
+            ${manage?`<details class="mm-setup-advanced">
+              <summary>${this.t('setup_expert_yaml')}</summary>
+              ${d.bindings.map(b=>`<button type="button" data-mm-option-action="expert_yaml"
+                data-mm-option-scope="device" data-mm-option-room="${rhiUxEscape(b.room)}"
+                data-mm-option-id="${rhiUxEscape(b.key)}">
+                ${rhiUxEscape(b.location)} · ${rhiUxEscape(b.key)}</button>`).join('')}
+              </details>`:''}${this.deviceNotificationActions(d)}</div>
+          <span>${rhiUxEscape(d.role_label)} · ${rhiUxEscape(d.room)}</span>
+          <span>${rhiUxEscape(rhiMmStateLabel(this._hass,d.state))}</span>
+          <span>${d.foundation_approved?this.t('approved'):this.t('review')}</span>
+        </div>`).join('')}</div>`:
+        rhiUxState({state:'empty',title:this.t('no_devices'),detail:this.t('no_bound')})}
+      </section>`;
+  }
+  diagnostics(model){
+    // Insights projects real runtime facts only: no synthetic availability,
+    // historical averages, latency or counters. Expose route readback and
+    // actionable recovery using the existing typed backend command.
+    const escape=rhiUxEscape;
+    const cards=model.rooms.map(room=>{
+      const devices=room.devices||[];
+      const offline=devices.filter(d=>!d.available||!d.foundation_approved);
+      const routes=(room.activities||[]).flatMap(activity=>
+        (activity.routes||[]).map(route=>({activity:activity.name,route})));
+      const routeRows=routes.map(({activity,route})=>{
+        const device=devices.find(d=>d.key===route.device_key);
+        const state=route.status||'unknown';
+        const unclear=state!=='confirmed';
+        return `<div class="mm-diag-route ${unclear?'mm-diag-route-review':''}">
+          <b>${escape(activity)}</b><span>${escape(device?.name||route.device_key||this.t('unavailable'))} · ${escape(route.type)}:
+          ${escape(route.target||route.selected||this.t('not_published'))}</span>
+          <small>${escape(state)}${route.actual!=null?' · '+this.t('diag_actual')+': '+escape(route.actual):''}</small>
+        </div>`;
+      }).join('');
+      const health=offline.map(d=>`<div class="mm-diag-route mm-diag-route-review">
+        <b>${escape(d.name)}</b><span>${d.foundation_approved?this.t('diag_device_unavailable'):this.t('diag_not_selected')}</span>
+        <small>${escape(d.state)}</small></div>`).join('');
+      return `<article class="mm-surface">
+        <h3>${escape(room.name)}</h3>
+        <div class="mm-diag-status"><span>${this.t('phase')}</span><b>${escape(rhiMmRoomStatus(room,this._hass))}</b></div>
+        <div class="mm-diag-status"><span>${this.t('approvals')}</span><b>${room.foundation_approved?this.t('valid'):this.t('review')}</b></div>
+        <div class="mm-diag-status"><span>${this.t('confirmed_playback')}</span><b>${room.playing?this.t('playing'):this.t('not_confirmed')}</b></div>
+        ${room.target_state?.targets?.length?`<details class="mm-diag-explain" data-persist="${escape(room.id+':target')}" ${this._expanded.has(room.id+':target')?'open':''}>
+          <summary>${this.t('target_state')} · ${escape(room.target_state.status)}</summary>
+          <div class="mm-diag-routes">${room.target_state.targets.map(t=>{
+            const device=devices.find(d=>d.key===t.device_key);
+            return `<div class="mm-diag-route ${t.status!=='observed'?'mm-diag-route-review':''}">
+              <b>${escape(device?.name||t.device_key)}</b>
+              <span>${escape(t.type)} · ${this.t('target_expected')}: ${escape(Array.isArray(t.expected)?t.expected.join(', '):t.expected)}</span>
+              <small>${this.t('target_actual')}: ${escape(t.actual??this.t('not_published'))}
+                · ${this.t(t.status==='observed'?'target_observed':'target_attention')}</small>
+            </div>`;
+          }).join('')}</div></details>`:''}
+        ${room.last_attempt?`<div class="mm-diag-status"><span>${this.t('last_attempt')}</span><b>${escape(room.last_attempt.kind)} · ${escape(room.last_attempt.result)}</b></div>`:''}
+        ${room.last_control?`<div class="mm-diag-status"><span>${this.t('last_control')}</span><b>${escape(room.last_control.action)} · ${escape(room.last_control.result)}</b></div>`:''}
+        ${room.error?`<p class="mm-room-error">${escape(room.error)}</p>`:''}
+        ${room.warnings?.length?`<p class="mm-room-error">${room.warnings.map(escape).join('; ')}</p>`:''}
+        ${health?`<section class="mm-diag-explain"><h4>${this.t('diag_devices_attention')}</h4>${health}</section>`:''}
+        ${routes.length?`<details class="mm-diag-explain" data-persist="${escape(room.id+':routes')}" ${this._expanded.has(room.id+':routes')?'open':''}>
+          <summary>${this.t('routes')} (${routes.length})</summary>
+          <div class="mm-diag-routes">${routeRows}</div></details>`:''}
+        ${rhiMmCanRun(room,'recover_activity')?`<button type="button" class="mm-link mm-recover" data-room="${escape(room.id)}" data-action="recover_activity"><ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:''}
+        ${this.feedback(room.id)}
+        <details data-persist="${escape(room.id)}:technical" ${this._expanded.has(room.id+':technical')?'open':''}>
+          <summary>${this.t('technical')}</summary>
+          <div class="mm-tech">${devices.map(d=>`<p><b>${escape(d.name)}</b>
+              <small>${this.t('diag_asset_id')}: ${escape(d.asset_id||d.physical_id||this.t('not_published'))}</small>
+              <small>visual_ref: ${escape(d.visual_ref||this.t('not_published'))}</small>
+              <small>${this.t('cec_device')}: ${d.hdmi_cec_enabled?this.t('enabled'):this.t('not_confirmed')}</small>
+              ${d.product_profile?`<small>${this.t('verified_model')}: ${escape(d.product_profile.profile_id)} · ${escape(d.product_profile.identity_evidence)}</small>`:''}
+              <small>${this.t('diag_source')}: ${escape(d.entity_id)} · ${escape(d.native_device_id||this.t('not_published'))}</small>
+              <small>${this.t('diag_provider')}: ${escape(d.source_integration||this.t('not_published'))}</small>
+              <small>${this.t('native_features')}: ${escape(d.native_supported_features??this.t('not_published'))}</small>
+              <small>${this.t('native_readback_at')}: ${escape(d.native_readback_at||this.t('not_published'))}</small>
+              <small>${this.t('readback_quality')}: ${escape(this.t('readback_'+(d.native_readback_quality||'unapproved')))}</small>
+              ${Object.entries(d.controls||{}).map(([action,cap])=>`<small>${escape(action)}:
+                ${cap.enabled?this.t('diag_command_allowed'):this.t('diag_command_blocked')}
+                ${cap.reason?' · '+escape(cap.reason):''}</small>`).join('')}</p>`).join('')}</div>
+        </details>
+      </article>`;
+    }).join('');
+    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div></div>
+      <div class="mm-diag-grid">${cards}</div></section>`;
+  }
 }
 
 if(!customElements.get('homebrain-multimedia-card'))customElements.define('homebrain-multimedia-card',HomeBrainMultimediaCard);

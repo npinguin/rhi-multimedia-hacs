@@ -97,9 +97,9 @@
     "step": {
       "init": {
         "title": "Multimedia beheren",
-        "description": "Foundation blijft verantwoordelijk voor integraties en apparaatselectie. Bewerk hier ruimtes en activiteiten.",
+        "description": "Kies Assisted om ruimtes, toestellen en activiteiten begeleid te beheren, of YAML voor gecontroleerde configuratie via scripts. Foundation blijft eigenaar van de fysieke toestelkeuze.",
         "data": {
-          "action": "Wat wil je doen?"
+          "action": "Configuratiemethode"
         }
       },
       "existing_room": {
@@ -171,7 +171,8 @@
         "title": "Controleren en opslaan",
         "description": "Controleer hieronder de geselecteerde apparaten en ingangsroutes. Uitgesteld betekent dat het apparaat ingeschakeld moet zijn voor verificatie. Ongewijzigde onbeschikbare koppelingen blijven behouden. Er worden geen fysieke opdrachten verstuurd.\n\n{summary}",
         "data": {
-          "confirm": "Multimedia-configuratie opslaan"
+          "confirm": "Multimedia-configuratie opslaan",
+          "confirm_remove": "Ik bevestig het verwijderen van de vermelde ruimtes"
         }
       },
       "validate_room_update": {
@@ -206,6 +207,105 @@
           "controller": "Eigenaar ruimtebediening",
           "confirm": "Ik bevestig het volledige betrokken bereik en de overdracht naar één eigenaar"
         }
+      },
+      "tv_wake": {
+        "title": "TV inschakelen via Wake-on-LAN",
+        "description": "Stel de bestaande native inschakelactie van de geselecteerde LG webOS-tv in. Alleen MAC-adressen van het gekozen Home Assistant-apparaat zijn toegestaan.",
+        "data": {
+          "mode": "Inschakelactie",
+          "mac": "MAC-adres van geselecteerde tv",
+          "broadcast_address": "Bestemmings-IP (IPv4)",
+          "broadcast_port": "UDP-poort"
+        }
+      },
+      "quick_edit_activity": {
+        "title": "Activiteit snel aanpassen",
+        "description": "Wijzig de naam, de deelnemende native mediaspeler uit Foundation en de exacte TV-/receiveringangen. Voor HDMI-bronnen is geen native speler nodig. Het verwijderen van bijbehorende opdrachten vereist een bevestiging; stop actieve activiteiten vóór opslaan.",
+        "data": {
+          "activity_name": "Naam van de activiteit",
+          "primary_source": "Deelnemende native mediaspeler (optioneel)",
+          "confirm_source_steps": "Bevestig verwijdering van opdrachten voor de ontkoppelde speler"
+        }
+      },
+      "existing_dell": {
+        "title": "Dell LAN-scherm kiezen",
+        "data": {
+          "display": "Geconfigureerd scherm"
+        }
+      },
+      "dell_display": {
+        "title": "Dell C8621QT via LAN",
+        "description": "Configureer het werkelijke scherm via een privé-LAN-adres. Er ontstaat één native Home Assistant-scherm; selecteer dit vervolgens in Foundation voordat je het aan een ruimte koppelt. Geen Wake-on-LAN of volledige uitschakeling.",
+        "data": {
+          "name": "Naam van scherm",
+          "host": "Privé IPv4-adres op LAN"
+        }
+      },
+      "dell_remove": {
+        "title": "Dell-scherm verwijderen",
+        "description": "Alleen een Dell-scherm zonder koppeling aan een Multimedia-ruimte kan worden verwijderd.",
+        "data": {
+          "confirm": "Geselecteerd Dell-scherm verwijderen"
+        }
+      },
+      "guided_activity": {
+        "title": "Wat wil je doen?",
+        "description": "Kies eerst een activiteit. Selecteer daarna de echte ruimte en alleen ondersteunde native bronroutes. Tijdens configuratie wordt niets bediend.",
+        "data": {
+          "activity_type": "Wat wil je doen?"
+        }
+      },
+      "guided_room": {
+        "title": "In welke ruimte?",
+        "description": "Kies eerst een activiteit. Selecteer daarna de echte ruimte en alleen ondersteunde native bronroutes. Tijdens configuratie wordt niets bediend.",
+        "data": {
+          "room": "In welke ruimte?"
+        }
+      },
+      "cec_device": {
+        "title": "Native HDMI-CEC per apparaat",
+        "description": "Schakel dit alleen in wanneer HDMI-CEC echt actief is op het geselecteerde HA-apparaat. Hiermee worden op zichzelf geen commando's overgeslagen.",
+        "data": {
+          "device": "Apparaat",
+          "enabled": "HDMI-CEC ingeschakeld op dit apparaat"
+        }
+      },
+      "cec_activity": {
+        "title": "Geverifieerde HDMI-CEC-verbinding",
+        "description": "Bevestig de fysieke HDMI-verbinding tussen beide apparaten met actieve CEC. Kies welke acties automatisch verlopen. De gekozen doel-ingang blijft verplicht controleerbaar. Bij een afwijking kan de bewoner Fix It gebruiken; configuratie verstuurt geen fysieke commando's.",
+        "data": {
+          "target": "Doelscherm / receiver",
+          "source": "Aansturende speler / receiver",
+          "verified_link": "Fysieke HDMI-verbinding en CEC op beide apparaten gecontroleerd",
+          "skip_power_on": "CEC schakelt doel in (native inschakelen overslaan)",
+          "skip_power_off": "CEC schakelt doel uit (native uitschakelen overslaan)",
+          "skip_source": "CEC kiest de geconfigureerde ingang (native bronkeuze overslaan)",
+          "remove_link": "Deze activiteitsverbinding verwijderen"
+        }
+      },
+      "assisted": {
+        "title": "Begeleide configuratie",
+        "description": "Kies wat je wilt instellen: ruimtes, toestellen of activiteiten. Bestaande koppelingen blijven behouden.",
+        "data": {
+          "task": "Configureren"
+        }
+      },
+      "yaml": {
+        "title": "YAML-import (geavanceerd)",
+        "description": "{note}",
+        "data": {
+          "mode": "Wijzigingsmodus",
+          "yaml_text": "Multimedia rooms.yaml (volledige ruimtedefinities)"
+        }
+      },
+      "speech_endpoint": {
+        "title": "Gesproken luidsprekermeldingen",
+        "description": "Kies een goedgekeurde Cast-speler en native TTS-provider. Er ontstaat één native meldingsbestemming voor alle koppelingen van dit apparaat. Spraak wordt alleen verzonden als de speler al idle is; wekken of onderbreken van playback is uitgesloten. Core Notifications beheert toestemming en regels.",
+        "data": {
+          "player": "Luidspreker",
+          "tts": "Spraakprovider",
+          "confirm": "Bevestig het apparaat en alle gekoppelde ruimtes"
+        }
       }
     },
     "error": {
@@ -225,7 +325,21 @@
       "confirm_remove_incompatible": "Bevestig de betrokken activiteiten voordat je verdergaat.",
       "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
       "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
-      "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt."
+      "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt.",
+      "wake_unavailable": "Selecteer in Foundation een LG webOS-tv met een bevestigd native MAC-adres.",
+      "wake_invalid_target": "Het MAC-adres, bestemmings-IP of de UDP-poort is ongeldig voor deze tv.",
+      "dell_invalid_host": "Vul een geldig privé-IPv4-adres in. Publieke IP-adressen, URL's en localhost zijn niet toegestaan.",
+      "dell_duplicate_host": "Een ander Dell-scherm gebruikt dit adres al.",
+      "dell_host_immutable": "Je kunt de netwerkidentiteit niet stilzwijgend vervangen. Ontkoppel en registreer het andere scherm opnieuw.",
+      "source_route_required": "Kies minstens één actuele native TV-/receiveringang om de route of de gewijzigde speler te bevestigen.",
+      "confirm_source_steps": "Bevestig het verwijderen van opdrachten van de ontkoppelde speler.",
+      "cec_invalid": "Kies twee werkelijk CEC-ingeschakelde, in Foundation geselecteerde apparaten met geverifieerde HDMI-verbinding. Doel vereist een echte native inputroute en geen conflicterende CEC-aansturing.",
+      "cec_in_use": "Deze gedeelde bron wordt nog door een CEC-activiteit gebruikt. Verwijder eerst die verbinding.",
+      "cec_needs_endpoints": "Deze activiteit vereist een CEC-ingeschakelde speler/receiver en een CEC-doel met native inputroute.",
+      "yaml_invalid": "Ongeldige YAML of ruimteconfiguratie. Gebruik unieke sleutels, juiste toestel-ID's en echte beschikbare ingangen.",
+      "yaml_confirm_remove": "Bevestig uitdrukkelijk dat de vermelde ruimtes verwijderd mogen worden.",
+      "speech_invalid": "Kies een geschikte speler en geregistreerde TTS-provider en bevestig.",
+      "speech_unavailable": "Geen geselecteerde Cast-speler kan een aparte spraakbestemming gebruiken."
     }
   }
 }

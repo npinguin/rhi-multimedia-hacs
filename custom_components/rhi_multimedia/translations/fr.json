@@ -97,9 +97,9 @@
     "step": {
       "init": {
         "title": "Gérer Multimedia",
-        "description": "Foundation reste responsable des intégrations et de la sélection des appareils. Modifiez ici les pièces et activités.",
+        "description": "Choisissez Assisted pour configurer les pièces, appareils et activités, ou YAML pour une configuration contrôlée par scripts. Foundation reste responsable de la sélection des appareils.",
         "data": {
-          "action": "Que souhaitez-vous faire ?"
+          "action": "Méthode de configuration"
         }
       },
       "existing_room": {
@@ -171,7 +171,8 @@
         "title": "Vérifier et enregistrer",
         "description": "Vérifiez les appareils et routes sélectionnés ci-dessous. Différé signifie que l’appareil doit être allumé pour la vérification. Les associations indisponibles inchangées sont conservées. Aucune commande physique n’est envoyée.\n\n{summary}",
         "data": {
-          "confirm": "Enregistrer la configuration Multimedia"
+          "confirm": "Enregistrer la configuration Multimedia",
+          "confirm_remove": "Je confirme la suppression des pièces indiquées"
         }
       },
       "validate_room_update": {
@@ -206,6 +207,105 @@
           "controller": "Responsable de la commande",
           "confirm": "Je confirme le périmètre complet et le transfert à un seul responsable"
         }
+      },
+      "tv_wake": {
+        "title": "Destination Wake-on-LAN du téléviseur",
+        "description": "Configurez la commande native d’allumage de l’écran LG webOS sélectionné. Seules les adresses MAC de cet appareil Home Assistant sont autorisées.",
+        "data": {
+          "mode": "Commande d’allumage",
+          "mac": "Adresse MAC du téléviseur sélectionné",
+          "broadcast_address": "Adresse IPv4 de destination",
+          "broadcast_port": "Port UDP"
+        }
+      },
+      "quick_edit_activity": {
+        "title": "Modifier rapidement une activité",
+        "description": "Modifiez le nom, le lecteur natif sélectionné dans Foundation et les entrées TV/ampli exactes. Les sources HDMI n’exigent aucun lecteur natif. Confirmez la suppression de commandes du lecteur retiré et arrêtez les activités actives avant l’enregistrement.",
+        "data": {
+          "activity_name": "Nom de l'activité",
+          "primary_source": "Lecteur multimédia natif participant (facultatif)",
+          "confirm_source_steps": "Confirmer la suppression des commandes du lecteur retiré"
+        }
+      },
+      "existing_dell": {
+        "title": "Choisir un écran Dell LAN",
+        "data": {
+          "display": "Écran configuré"
+        }
+      },
+      "dell_display": {
+        "title": "Écran Dell C8621QT sur LAN",
+        "description": "Configurez l'écran réel avec une adresse IPv4 privée. Un seul écran Home Assistant natif sera créé. Sélectionnez-le ensuite dans Foundation avant de l'associer à une pièce. Sans Wake-on-LAN ni arrêt complet.",
+        "data": {
+          "name": "Nom de l'écran",
+          "host": "Adresse IPv4 privée du LAN"
+        }
+      },
+      "dell_remove": {
+        "title": "Supprimer l'écran Dell",
+        "description": "Seul un écran Dell non associé à une pièce Multimedia peut être supprimé.",
+        "data": {
+          "confirm": "Supprimer l'écran Dell sélectionné"
+        }
+      },
+      "guided_activity": {
+        "title": "Que voulez-vous faire ?",
+        "description": "Choisissez d’abord l’activité, puis la pièce réelle et les routes natives compatibles. Aucun appareil n’est commandé pendant la configuration.",
+        "data": {
+          "activity_type": "Que voulez-vous faire ?"
+        }
+      },
+      "guided_room": {
+        "title": "Dans quelle pièce ?",
+        "description": "Choisissez d’abord l’activité, puis la pièce réelle et les routes natives compatibles. Aucun appareil n’est commandé pendant la configuration.",
+        "data": {
+          "room": "Dans quelle pièce ?"
+        }
+      },
+      "cec_device": {
+        "title": "HDMI-CEC natif par appareil",
+        "description": "N'activez que si HDMI-CEC est réellement activé sur cet appareil HA sélectionné. Ce seul choix ne supprime aucune commande.",
+        "data": {
+          "device": "Appareil",
+          "enabled": "HDMI-CEC activé sur cet appareil"
+        }
+      },
+      "cec_activity": {
+        "title": "Liaison HDMI-CEC vérifiée",
+        "description": "Confirmez le raccordement HDMI réel et CEC sur les deux appareils, puis choisissez les commandes automatiques. L'entrée cible reste vérifiée. Fix It est proposé en cas d'écart ; aucune commande physique durant la configuration.",
+        "data": {
+          "target": "Écran / ampli cible",
+          "source": "Lecteur / ampli initiateur",
+          "verified_link": "Liaison HDMI physique et CEC des deux côtés vérifiés",
+          "skip_power_on": "CEC allume la cible (ignorer allumage natif)",
+          "skip_power_off": "CEC éteint la cible (ignorer arrêt natif)",
+          "skip_source": "CEC choisit l'entrée configurée (ignorer sélection native)",
+          "remove_link": "Supprimer cette liaison de l'activité"
+        }
+      },
+      "assisted": {
+        "title": "Configuration assistée",
+        "description": "Choisissez les pièces, appareils ou activités à configurer. Les associations existantes sont préservées.",
+        "data": {
+          "task": "Configurer"
+        }
+      },
+      "yaml": {
+        "title": "Import YAML (avancé)",
+        "description": "{note}",
+        "data": {
+          "mode": "Mode de modification",
+          "yaml_text": "Multimedia rooms.yaml (définitions complètes des pièces)"
+        }
+      },
+      "speech_endpoint": {
+        "title": "Notifications vocales du haut-parleur",
+        "description": "Choisissez un lecteur Cast approuvé et un fournisseur TTS natif. Une seule destination native couvre toutes les associations de cet appareil. La parole est envoyée uniquement lorsque le lecteur est déjà inactif; elle ne réveille ni n’interrompt la lecture. Core Notifications gère le consentement et les règles.",
+        "data": {
+          "player": "Haut-parleur",
+          "tts": "Fournisseur vocal",
+          "confirm": "Confirmer l’appareil et toutes ses pièces associées"
+        }
       }
     },
     "error": {
@@ -225,7 +325,21 @@
       "confirm_remove_incompatible": "Confirmez les activités concernées avant de continuer.",
       "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
       "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
-      "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils."
+      "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils.",
+      "wake_unavailable": "Sélectionnez dans Foundation un téléviseur LG webOS doté d’une adresse MAC native vérifiée.",
+      "wake_invalid_target": "L’adresse MAC, l’adresse IPv4 ou le port UDP est invalide pour ce téléviseur.",
+      "dell_invalid_host": "Saisissez une adresse IPv4 privée valide. Les URL, les adresses publiques et localhost sont interdits.",
+      "dell_duplicate_host": "Un autre écran Dell configuré utilise déjà cette adresse.",
+      "dell_host_immutable": "L'identité réseau ne peut pas être remplacée silencieusement. Dissociez l'écran avant d'en enregistrer un autre.",
+      "source_route_required": "Choisissez au moins une entrée native TV/ampli actuellement disponible pour confirmer le routage ou le changement de lecteur.",
+      "confirm_source_steps": "Confirmez la suppression des commandes du lecteur multimédia retiré.",
+      "cec_invalid": "Choisissez deux appareils CEC activés et sélectionnés dans Foundation, avec liaison HDMI vérifiée, entrée native réelle et sans conflit.",
+      "cec_in_use": "Cette source partagée est encore utilisée par une activité CEC ; retirez d'abord la liaison.",
+      "cec_needs_endpoints": "Cette activité nécessite un lecteur/ampli initiateur et un écran/ampli cible CEC activés avec entrée native.",
+      "yaml_invalid": "YAML ou configuration des pièces invalide. Utilisez des clés uniques, les vrais identifiants et les entrées disponibles.",
+      "yaml_confirm_remove": "Confirmez explicitement la suppression des pièces indiquées.",
+      "speech_invalid": "Choisissez un lecteur et un fournisseur TTS enregistrés et confirmez.",
+      "speech_unavailable": "Aucun lecteur Cast sélectionné ne peut utiliser une destination vocale distincte."
     }
   }
 }

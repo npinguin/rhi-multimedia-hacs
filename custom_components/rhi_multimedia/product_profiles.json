@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "owner_domain": "rhi_multimedia",
+  "description": "Native manufacturer/model-gated product profiles and optional original, explicitly illustrative premium visual refs. Artwork conveys type, never physical proof, features, routes or controls.",
+  "entries": [
+    {
+      "profile_id": "multimedia.display.lg_oled77g3",
+      "asset_type": "display",
+      "manufacturer": "LG",
+      "model": "OLED77G3",
+      "evidence": "Owner-confirmed hardware identity in Multimedia #9; apply only after exact native HA Device Registry manufacturer+model match",
+      "visual": {
+        "ref": "rhi_multimedia.display.lg_oled_g3",
+        "path": "assets/devices/lg_oled_g3.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "2aca7d665b74a049fe4171d1fed3c6a60afd5e83dd63f197b5f1ff62058f870f"
+      }
+    },
+    {
+      "profile_id": "multimedia.audio_zone.denon_avr_x3800h",
+      "asset_type": "audio_zone",
+      "manufacturer": "Denon",
+      "model": "AVR-X3800H",
+      "evidence": "Owner-confirmed household AVR model in Multimedia #9; zone support remains native-only",
+      "visual": {
+        "ref": "rhi_multimedia.audio_zone.denon_x3800h",
+        "path": "assets/devices/denon_x3800h.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "abd0a6663c2d5c65e6e3e9313b11ef237ef0a025048087e04c68db39fe84c2ad"
+      },
+      "characteristics": {
+        "amplified_channels": 9,
+        "subwoofer_outputs": 4,
+        "hdmi_inputs": 6,
+        "hdmi_outputs": 3
+      },
+      "characteristics_source": "https://www.denon.com/en-us/product/av-receivers/avr-x3800h/300609.html"
+    },
+    {
+      "profile_id": "multimedia.display.dell_c8621qt",
+      "asset_type": "display",
+      "manufacturer": "Dell",
+      "model": "C8621QT",
+      "evidence": "Owner-confirmed physical display identity in Multimedia #30; LAN protocol remains FIELD HOLD",
+      "visual": {
+        "ref": "rhi_multimedia.display.dell_c8621qt",
+        "path": "assets/devices/dell_c8621qt.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "10efd9d9b8b2f9e743340ab0c647cad2deebe0a306cc77aaeed78f6dcf51e1d6"
+      },
+      "characteristics": {
+        "screen_inches": 85.6,
+        "panel": "IPS",
+        "resolution": "3840 × 2160",
+        "touch_points": 20,
+        "hdmi_inputs": 4
+      },
+      "characteristics_source": "https://www.dell.com/en-us/shop/dell-86-4k-interactive-touch-monitor-c8621qt/apd/210-awkc/"
+    },
+    {
+      "profile_id": "multimedia.display.loewe_reference_55_4k",
+      "asset_type": "display",
+      "manufacturer": "Loewe",
+      "model": "Reference 55 4K",
+      "evidence": "Owner-confirmed first-floor display identity in Multimedia #31; native HA integration identity remains FIELD HOLD",
+      "visual": {
+        "ref": "rhi_multimedia.display.loewe_reference_55",
+        "path": "assets/devices/loewe_reference_55.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "8bcc995efd8c0de85c2f481a4dcd763acf1fc0322db6421e742806d25855d55c"
+      }
+    },
+    {
+      "profile_id": "multimedia.audio_zone.denon_avc_x3800h",
+      "asset_type": "audio_zone",
+      "manufacturer": "Denon",
+      "model": "AVC-X3800H",
+      "evidence": "Exact EU variant only; owner-approved visual equivalence, device identity still from native HA registry",
+      "visual": {
+        "ref": "rhi_multimedia.audio_zone.denon_x3800h",
+        "path": "assets/devices/denon_x3800h.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "abd0a6663c2d5c65e6e3e9313b11ef237ef0a025048087e04c68db39fe84c2ad"
+      },
+      "characteristics": {
+        "amplified_channels": 9,
+        "subwoofer_outputs": 4,
+        "hdmi_inputs": 6,
+        "hdmi_outputs": 3
+      },
+      "characteristics_source": "https://www.denon.com/nl-nl/product/archive-av-receivers/avc-x3800h/AVCX3800H.html"
+    },
+    {
+      "profile_id": "multimedia.display.lg_oled77g36la",
+      "asset_type": "display",
+      "manufacturer": "LG",
+      "model": "OLED77G36LA",
+      "evidence": "Official EU G3 77-inch SKU; apply only with native HA manufacturer/model evidence",
+      "visual": {
+        "ref": "rhi_multimedia.display.lg_oled_g3",
+        "path": "assets/devices/lg_oled_g3.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "2aca7d665b74a049fe4171d1fed3c6a60afd5e83dd63f197b5f1ff62058f870f"
+      },
+      "characteristics": {
+        "screen_inches": 77,
+        "panel": "OLED",
+        "resolution": "3840 × 2160"
+      },
+      "characteristics_source": "https://www.lg.com/nl/televisies-soundbars/oled-evo/oled77g36la/"
+    },
+    {
+      "profile_id": "multimedia.media_player.apple_tv_4k",
+      "asset_type": "media_player",
+      "manufacturer": "Apple",
+      "model": "Apple TV 4K",
+      "evidence": "Profile is generic 4K generation label; photo/render is an illustration, not generation authentication",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.apple_tv_4k",
+        "path": "assets/devices/apple_tv_4k.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; not vendor photography",
+        "sha256_webp": "3432ac122aa4d9a978f2d6587261c0db9789e6ec7e0f0f962fb689b91cdc8c75"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.nvidia_shield_tv",
+      "asset_type": "media_player",
+      "manufacturer": "NVIDIA",
+      "model": "SHIELD TV",
+      "evidence": "Exact native model family label required; 2017/2019 physical variants are not inferred",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.nvidia_shield_tv",
+        "path": "assets/devices/nvidia_shield_tv.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; not vendor photography",
+        "sha256_webp": "560793208094142d7a68ac3128896b3f1be436f6ed9a33f53ee9a52367385e80"
+      }
+    }
+  ]
+}

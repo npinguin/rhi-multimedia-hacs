@@ -35,6 +35,9 @@ async def async_get_config_entry_diagnostics(hass, entry):
                 sources[room][key].update({
                     "role": device.get("role"),
                     "physical_id": device.get("physical_id"),
+                    "asset_id": device.get("asset_id", device.get("physical_id")),
+                    "hdmi_cec_enabled": device.get("hdmi_cec_enabled") is True,
+                    "native_readback_quality": adapter.native_readback_quality(device),
                     "foundation_concept": device.get("foundation_concept"),
                     "foundation_candidate_id": device.get("foundation_candidate_id"),
                     "foundation_approved": approved,
@@ -45,6 +48,14 @@ async def async_get_config_entry_diagnostics(hass, entry):
             routes[room] = {
                 activity: {
                     "devices": list(definition["devices"]),
+                    # The activity's producer-approved physical CEC graph,
+                    # not an inferred connection or confirmed hardware action.
+                    "cec_links": [
+                        {key: link[key] for key in (
+                            "source", "target", "verified_link",
+                            "skip_power_on", "skip_power_off", "skip_source")}
+                        for link in definition.get("cec_links", [])
+                    ],
                     "inputs": [{"device": step["device"], "type": step["type"],
                                 "candidates": list(step["candidates"]),
                                 **adapter.preview_route(spec["devices"][step["device"]], step)}
@@ -55,6 +66,10 @@ async def async_get_config_entry_diagnostics(hass, entry):
             }
 
     execution = {room: engine.snapshot(room) for room in engine.rooms} if engine else {}
+    target_states = ({
+        room: engine.target_state(room) if engine.states[room].activity else None
+        for room in engine.rooms
+    } if engine else {})
     return {
         "ux": ux_diagnostics(hass, entry),
         "identity": {"domain": DOMAIN, "version": manifest["version"],
@@ -72,6 +87,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "build_handoff": {"foundation": "required for physical command authorization",
                           "selection_error": selection_error},
         "execution": execution,
+        "target_readback": target_states,
         "source_readback": sources,
         "last_controls": dict(adapter.last_controls) if adapter else {},
         "last_attempts": {room: dict(value) for room, value in engine.last_attempts.items()} if engine else {},

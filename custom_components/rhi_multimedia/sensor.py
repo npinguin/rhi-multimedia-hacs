@@ -4,20 +4,118 @@ from __future__ import annotations
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, EVENT_UPDATE
-from .experience import VERSION, build_room
+from .experience import VERSION, build_room, logical_asset_id
 from .foundation import selected_index
+from .validation import native_state
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     context = hass.data[DOMAIN]
     rooms = context["engine"].rooms
+    assets = logical_asset_projection_specs(hass, rooms)
     async_add_entities([RoomSensor(context, entry.entry_id, room, kind)
                         for room in rooms for kind in ("status", "sources")]
+                       + [LogicalAssetSensor(context, entry.entry_id, key, value)
+                          for key, value in sorted(assets.items())]
                        + [PlanningTargetsSensor(context, entry.entry_id)])
+
+
+def logical_asset_projection_specs(hass, rooms: dict) -> dict:
+    """Exactly one RHI logical device per configured actionable AV asset.
+
+    Native vendor devices retain their identity and control. The existing Dell
+    native media_player is already RHI-owned and must not acquire a wrapper.
+    """
+    registry = er.async_get(hass)
+    assets: dict[str, dict] = {}
+    for room_id, spec in rooms.items():
+        for device in spec["devices"].values():
+            entity_id = device["entity"]
+            if not entity_id.startswith("media_player."):
+                continue  # Remote companions/passive HDMI routes are relationships.
+            registered = registry.async_get(entity_id)
+            if registered is not None and getattr(registered, "platform", None) == DOMAIN:
+                continue
+            key = logical_asset_id(device)
+            item = assets.setdefault(key, {"device": device, "rooms": set()})
+            item["rooms"].add(room_id)
+    return assets
+
+
+class LogicalAssetSensor(SensorEntity):
+    """Read-only native status; no physical writer or inferred control success."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unrecorded_attributes = frozenset({"source_entity_id", "native_device_id",
+                                       "source_integration", "rooms", "foundation_candidate_id"})
+
+    def __init__(self, context, entry_id: str, asset_id: str, spec: dict):
+        self.context = context
+        self.asset_id = asset_id
+        self.device = spec["device"]
+        self.room_ids = tuple(sorted(spec["rooms"]))
+        self._attr_unique_id = f"{entry_id}:asset:{asset_id}:status"
+        self._attr_name = "Status"
+        state = native_state(context["adapter"].hass, self.device["entity"])
+        attrs = getattr(state, "attributes", {}) if state else {}
+        name = attrs.get("friendly_name") or self.device.get("name")
+        if not isinstance(name, str) or not name.strip():
+            name = self.device["entity"].rsplit(".", 1)[-1].replace("_", " ").title()
+        label = {"display": "Display", "amplifier": "Audio zone",
+                 "source": "Media player"}.get(self.device.get("foundation_concept"), "Multimedia asset")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"asset:{entry_id}:{asset_id}")},
+            manufacturer="Robotix", model=f"Logical {label}", name=name,
+        )
+
+    async def async_added_to_hass(self):
+        self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
+
+    @callback
+    def _changed(self, _room):
+        self.async_write_ha_state()
+
+    def _evidence(self):
+        source = selected_index(self.hass).get(
+            (self.device.get("foundation_concept"), self.device["entity"]))
+        approved = (source is not None
+                    and source.candidate_id == self.device.get("foundation_candidate_id"))
+        state = native_state(self.hass, self.device["entity"])
+        return source if approved else None, state
+
+    @property
+    def available(self):
+        source, state = self._evidence()
+        return bool(source and state is not None
+                    and state.state not in ("unknown", "unavailable"))
+
+    @property
+    def native_value(self):
+        source, state = self._evidence()
+        return state.state if source and state and state.state not in (
+            "unknown", "unavailable") else None
+
+    @property
+    def extra_state_attributes(self):
+        source, _state = self._evidence()
+        return {
+            "owner_domain": DOMAIN, "asset_id": self.asset_id,
+            "rooms": list(self.room_ids),
+            "role": self.device.get("role"),
+            "concept": self.device.get("foundation_concept"),
+            "foundation_approved": bool(source),
+            "foundation_candidate_id": self.device.get("foundation_candidate_id"),
+            "source_entity_id": self.device["entity"],
+            "source_integration": getattr(source, "integration", None) if source else None,
+            "native_device_id": getattr(source, "device_registry_id", None) if source else None,
+            "readback": "native_ha_state" if source else "unapproved_or_missing_source",
+        }
 
 
 class RoomSensor(SensorEntity):
@@ -26,7 +124,8 @@ class RoomSensor(SensorEntity):
     # High-frequency, live presentation properties must not bloat Recorder.
     # Keep the original execution phase, activity, reservation, warnings and
     # Core event observation recorded for history and incident lifecycle.
-    _unrecorded_attributes = frozenset({"source_roles", "now_playing", "audio", "activities", "commands"})
+    _unrecorded_attributes = frozenset({"source_roles", "now_playing", "audio", "activities", "commands",
+                                        "last_attempt", "last_control", "target_state"})
 
     def __init__(self, context, entry_id: str, room: str, kind: str):
         self.context = context

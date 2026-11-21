@@ -118,3 +118,65 @@ function rhiMmSiteDateTime(hass,at){
       {dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(date);
   }catch{return '—';}
 }
+
+// Official Home Assistant Options Flow is the only configuration transaction
+// authority. No local store or device discovery: this is a thin typed route to
+// the existing integration wizard (the same backend as Configure).
+const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
+  'add_room','rename_room','edit_room','remove_room',
+  'guided_activity','add_activity','quick_edit_activity','edit_activity','remove_activity',
+  'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml'
+]));
+async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''}){
+  if(hass?.user?.is_admin!==true||typeof hass.callWS!=='function'||
+     typeof hass.callApi!=='function'||!RHI_MM_OPTION_ACTIONS.has(action))
+    throw new Error('Multimedia configuration is not authorized');
+  const entries=await hass.callWS({type:'config_entries/get',domain:'rhi_multimedia'});
+  const matched=Array.isArray(entries)?entries.filter(e=>
+    e?.domain==='rhi_multimedia'&&e.supports_options===true&&
+    typeof e.entry_id==='string'&&e.entry_id):[];
+  if(matched.length!==1)throw new Error('Multimedia Options Flow unavailable');
+  let step=await hass.callApi('POST','config/config_entries/options/flow',
+    {handler:matched[0].entry_id});
+  const advance=async(expected,data)=>{
+    if(step?.type!=='form'||step.step_id!==expected||typeof step.flow_id!=='string')
+      throw new Error('Unexpected Multimedia Options Flow step');
+    step=await hass.callApi('POST',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`,data);
+  };
+  // Server evaluates every step and may return the same form with errors.
+  // In that case expose the exact server form, never skip its validation.
+  try{
+    // HA validates the current form's schema. Route contextual card actions
+    // through the existing Assisted selector while retaining two entry choices.
+    if(action==='yaml')await advance('init',{action:'yaml'});
+    else{
+      await advance('init',{action:'assisted'});
+      await advance('assisted',{task:action});
+    }
+    if(action==='expert_yaml'){
+      if(!['room','device','activity'].includes(scope)||typeof room!=='string'||!room||
+         (scope==='room'&&id)||(scope!=='room'&&(!id||typeof id!=='string')))
+        throw new Error('Expert YAML requires a specific configured object');
+      await advance('expert_target',{scope,room,id});
+    }
+    if(room&&step?.step_id==='existing_room')await advance('existing_room',{room});
+    if(activity&&step?.step_id==='existing_activity')await advance('existing_activity',{activity});
+  }catch(err){
+    // A started server flow must be removed after a transport/shape failure.
+    if(typeof step?.flow_id==='string'){
+      try{await hass.callApi('DELETE',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`);}catch(_){}
+    }
+    throw err;
+  }
+  return step;
+}
+async function rhiMmOptionsAdvance(hass,step,data){
+  if(hass?.user?.is_admin!==true||step?.type!=='form'||
+     typeof step.flow_id!=='string'||typeof hass.callApi!=='function')
+    throw new Error('Multimedia configuration cannot be submitted');
+  return hass.callApi('POST',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`,data);
+}
+async function rhiMmOptionsCancel(hass,step){
+  if(!step?.flow_id||typeof hass?.callApi!=='function')return;
+  await hass.callApi('DELETE',`config/config_entries/options/flow/${encodeURIComponent(step.flow_id)}`);
+}

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "product": "rhi_multimedia",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "bundle_filename": "rhi-multimedia-ux.js",
-  "runtime_sha256": "259ae14ea5ffd35f4191cb1405e1608de8c01c1b98f8d1daccbb4eaf86f0bc78",
+  "runtime_sha256": "e4c9906aab0287246f824e1aba045bda96d07551b9aa87469a86787df7c88127",
   "core_version": "1.6.4",
   "files": [
     {
@@ -13,22 +13,70 @@
       "sha256": "264f0d86798a2a53e30b8beb5cae366e4b0916adbb3716b3deb23b5ddbed053d"
     },
     {
+      "path": "assets/devices/apple_tv_4k.svg",
+      "size": 4771,
+      "bytes": 4771,
+      "sha256": "e8d2d272632ae1cec15579136a52424f226c4dd4f2c453a1a5bd6e46e36c6074"
+    },
+    {
+      "path": "assets/devices/dell_c8621qt.svg",
+      "size": 5174,
+      "bytes": 5174,
+      "sha256": "18c19cef3a45c4c2711ab3724c229d14f9bddb9b6b66aad2a6889940c6102bba"
+    },
+    {
+      "path": "assets/devices/denon_x3800h.svg",
+      "size": 4604,
+      "bytes": 4604,
+      "sha256": "b13fa09622cb20dc7c50f6b9427084aee5f5ee56e1e410b39e6eda121f3c7215"
+    },
+    {
+      "path": "assets/devices/lg_oled_g3.svg",
+      "size": 4288,
+      "bytes": 4288,
+      "sha256": "859ce2089ce955cae74144aa87d5c472268a4f533f6812f2d59359c0145bd7a3"
+    },
+    {
+      "path": "assets/devices/loewe_reference_55.svg",
+      "size": 4424,
+      "bytes": 4424,
+      "sha256": "2d8e69463181147df4bb2ac88f2b2baecb4a003d6b11e92c15b6baa08a3910c1"
+    },
+    {
+      "path": "assets/devices/nvidia_shield_tv.svg",
+      "size": 3865,
+      "bytes": 3865,
+      "sha256": "2932c3adee6bb9f7c956ae7d2a9a7372cb0734b8cadd7dcdca93f39501a43bd4"
+    },
+    {
+      "path": "assets/heroes/multimedia-activities.svg",
+      "size": 4761,
+      "bytes": 4761,
+      "sha256": "f2296a8f6bce275a88e62ea1bc0010c6dfe713281fba55d8b7f99157e900f7b0"
+    },
+    {
+      "path": "assets/heroes/multimedia-insights.svg",
+      "size": 5378,
+      "bytes": 5378,
+      "sha256": "d4c86cfb9d522b902fe67cb5be7b9ffca266ca5914cbbc3d82a31e88a51dfba7"
+    },
+    {
       "path": "assets/heroes/multimedia-overview.svg",
-      "size": 3258,
-      "bytes": 3258,
-      "sha256": "6d5786c6ca7f84257dca8e91116b6cd8522b6af162d5c9e215d8264052159b9b"
+      "size": 9078,
+      "bytes": 9078,
+      "sha256": "3e77dc6c9a4861f760d05137894ba42c1c702bdce7bf50a4d46161e7a350b41d"
     },
     {
       "path": "rhi-multimedia-ux.js",
-      "size": 130721,
-      "bytes": 130721,
-      "sha256": "259ae14ea5ffd35f4191cb1405e1608de8c01c1b98f8d1daccbb4eaf86f0bc78"
+      "size": 212640,
+      "bytes": 212640,
+      "sha256": "e4c9906aab0287246f824e1aba045bda96d07551b9aa87469a86787df7c88127"
     },
     {
       "path": "rhi-multimedia-ux.js.sha256",
       "size": 87,
       "bytes": 87,
-      "sha256": "412762346c6a6615c6e1604d8771abf8513f510145facce80cc62deba7f17a89"
+      "sha256": "f8478731039d2cf3b3df8565e0a83523b7a3d0abab9282c02b327ed46b8f9a36"
     }
   ]
 }

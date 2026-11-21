@@ -97,9 +97,9 @@
     "step": {
       "init": {
         "title": "Manage Multimedia",
-        "description": "Foundation keeps ownership of integrations and device selection. Edit rooms and activities here.",
+        "description": "Choose Assisted to manage rooms, devices and activities, or YAML for reviewed configuration-as-code. Foundation still owns physical device selection.",
         "data": {
-          "action": "What would you like to do?"
+          "action": "Configuration method"
         }
       },
       "existing_room": {
@@ -171,7 +171,8 @@
         "title": "Review and save",
         "description": "Review the actual selected devices and input routes below. Deferred means the device must be awake before verification. Unchanged unavailable links are retained. No physical commands are sent.\n\n{summary}",
         "data": {
-          "confirm": "Save Multimedia configuration"
+          "confirm": "Save Multimedia configuration",
+          "confirm_remove": "I confirm deleting the listed rooms"
         }
       },
       "validate_room_update": {
@@ -206,6 +207,105 @@
           "controller": "Room control owner",
           "confirm": "I confirm the complete affected scope and single-writer cutover"
         }
+      },
+      "tv_wake": {
+        "title": "TV Wake-on-LAN destination",
+        "description": "Configure the selected LG webOS screen's existing native power-on action. Only MAC addresses from the selected Home Assistant device are allowed.",
+        "data": {
+          "mode": "Power-on action",
+          "mac": "Selected TV network MAC",
+          "broadcast_address": "Destination IPv4 address",
+          "broadcast_port": "UDP port"
+        }
+      },
+      "quick_edit_activity": {
+        "title": "Quick edit activity",
+        "description": "Edit the name, the participating Foundation-selected native media player and exact TV/receiver input routes. HDMI-only sources need no native player. Removing player-specific commands requires explicit confirmation; stop active activities before saving.",
+        "data": {
+          "activity_name": "Activity name",
+          "primary_source": "Participating native media player (optional)",
+          "confirm_source_steps": "Confirm removal of commands belonging to the disconnected player"
+        }
+      },
+      "existing_dell": {
+        "title": "Select Dell LAN display",
+        "data": {
+          "display": "Configured display"
+        }
+      },
+      "dell_display": {
+        "title": "Dell C8621QT LAN display",
+        "description": "Configure the actual display on a private LAN address. On initial setup, this creates one native Home Assistant display, which must then be approved in Foundation before use in a room. No Wake-on-LAN or hard power off.",
+        "data": {
+          "name": "Display name",
+          "host": "Private LAN IPv4 address"
+        }
+      },
+      "dell_remove": {
+        "title": "Remove Dell display",
+        "description": "Confirm removal. Only displays that are not linked into a Multimedia room may be removed.",
+        "data": {
+          "confirm": "Remove selected Dell display"
+        }
+      },
+      "guided_activity": {
+        "title": "What would you like to do?",
+        "description": "Choose a supported activity intent first. Then select a real configured room and its native media routes. No device is controlled during setup.",
+        "data": {
+          "activity_type": "What would you like to do?"
+        }
+      },
+      "guided_room": {
+        "title": "In which room?",
+        "description": "Choose a supported activity intent first. Then select a real configured room and its native media routes. No device is controlled during setup.",
+        "data": {
+          "room": "In which room?"
+        }
+      },
+      "cec_device": {
+        "title": "Native HDMI-CEC per device",
+        "description": "Only enable when HDMI-CEC is really enabled on this selected Home Assistant device; enabling alone never skips commands.",
+        "data": {
+          "device": "Device",
+          "enabled": "HDMI-CEC enabled on this device"
+        }
+      },
+      "cec_activity": {
+        "title": "Verified HDMI-CEC relationship",
+        "description": "Confirm the actual physical HDMI connection between both CEC-enabled native devices. Choose which commands the upstream device performs automatically. The explicit destination input remains a mandatory target-state check. If missing, the resident may use Fix It; no physical command is sent while configuring.",
+        "data": {
+          "target": "Target display / receiver",
+          "source": "Upstream player / receiver",
+          "verified_link": "I have verified the physical HDMI link and CEC on both devices",
+          "skip_power_on": "CEC will switch the target on (skip native power-on)",
+          "skip_power_off": "CEC will switch the target off (skip native power-off)",
+          "skip_source": "CEC will select the configured target input (skip native source command)",
+          "remove_link": "Remove this activity link"
+        }
+      },
+      "assisted": {
+        "title": "Assisted setup",
+        "description": "Choose what you want to configure. Existing device bindings and activities are preserved.",
+        "data": {
+          "task": "Configure"
+        }
+      },
+      "yaml": {
+        "title": "YAML import (advanced)",
+        "description": "{note}",
+        "data": {
+          "mode": "Update mode",
+          "yaml_text": "Multimedia rooms.yaml (complete room definitions)"
+        }
+      },
+      "speech_endpoint": {
+        "title": "Speaker speech notifications",
+        "description": "Choose an approved Cast player and native TTS provider. This creates one native notification destination for all bindings of that asset. Speech is sent only when the player is already idle; it never wakes or interrupts playback. Core Notifications owns destination consent and rules.",
+        "data": {
+          "player": "Speaker",
+          "tts": "Speech provider",
+          "confirm": "Confirm the selected asset and all its room bindings"
+        }
       }
     },
     "error": {
@@ -225,7 +325,21 @@
       "confirm_remove_incompatible": "Confirm the affected activities before continuing.",
       "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
       "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
-      "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints."
+      "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints.",
+      "wake_unavailable": "Select an LG webOS screen in Foundation with a verified native network MAC before configuring WOL.",
+      "wake_invalid_target": "The selected MAC, IPv4 destination or UDP port is invalid for this TV.",
+      "dell_invalid_host": "Use a valid private LAN IPv4 address; public addresses, URLs and localhost are not supported.",
+      "dell_duplicate_host": "Another configured Dell display already uses this address.",
+      "dell_host_immutable": "A linked display's network identity cannot be replaced. Unbind and register a new display.",
+      "source_route_required": "Select at least one currently offered native TV/receiver input to confirm the route or the changed player.",
+      "confirm_source_steps": "Confirm that commands belonging to the disconnected player may be removed.",
+      "cec_invalid": "Select two genuinely CEC-enabled, Foundation-selected endpoints and a verified HDMI connection. The target must have one real native input route and no conflicting CEC controller.",
+      "cec_in_use": "This shared endpoint is still referenced by a verified CEC activity; remove that link first.",
+      "cec_needs_endpoints": "This activity needs a selected CEC-enabled upstream player/receiver and a CEC-enabled target with a native input route.",
+      "yaml_invalid": "Invalid YAML or room definition. Use unique keys, exact device IDs and the real native input routes.",
+      "yaml_confirm_remove": "Explicitly confirm removal of the listed rooms.",
+      "speech_invalid": "Choose an eligible player and registered TTS provider and confirm.",
+      "speech_unavailable": "No selected Cast speaker supports a separate speech destination."
     }
   }
 }
