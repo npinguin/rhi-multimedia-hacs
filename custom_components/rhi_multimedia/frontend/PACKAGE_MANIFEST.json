@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "product": "rhi_multimedia",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "bundle_filename": "rhi-multimedia-ux.js",
-  "runtime_sha256": "38541984df325dbac36415b5337a8a5821977b0b3064838f9b3f9646274f6010",
+  "runtime_sha256": "49a3b0e12f2c271d89a3d1a0c1111c8af4ff68b97b4d0f1bd16a41217072461c",
   "core_version": "1.6.4",
   "files": [
     {
@@ -11,6 +11,18 @@
       "size": 17019,
       "bytes": 17019,
       "sha256": "264f0d86798a2a53e30b8beb5cae366e4b0916adbb3716b3deb23b5ddbed053d"
+    },
+    {
+      "path": "assets/devices/amazon_echo_dot.svg",
+      "size": 1834,
+      "bytes": 1834,
+      "sha256": "ebde2df0e45b8b1e1ae146e83cd9e55db7170420afb3ed09ed4bfffc957c49fb"
+    },
+    {
+      "path": "assets/devices/amazon_echo_spot.svg",
+      "size": 1999,
+      "bytes": 1999,
+      "sha256": "e50f4658679782929e98afefb8dcac53ad676fcaddcf750fab058169f3ccbf69"
     },
     {
       "path": "assets/devices/apple_tv_4k.svg",
@@ -25,10 +37,22 @@
       "sha256": "18c19cef3a45c4c2711ab3724c229d14f9bddb9b6b66aad2a6889940c6102bba"
     },
     {
+      "path": "assets/devices/denon_home_150.svg",
+      "size": 1695,
+      "bytes": 1695,
+      "sha256": "20f2fbfd3df16d0611d3edf06524131e84185768209dfdaae8d4f2a9a0372a58"
+    },
+    {
       "path": "assets/devices/denon_x3800h.svg",
       "size": 4604,
       "bytes": 4604,
       "sha256": "b13fa09622cb20dc7c50f6b9427084aee5f5ee56e1e410b39e6eda121f3c7215"
+    },
+    {
+      "path": "assets/devices/google_nest_hub.svg",
+      "size": 2386,
+      "bytes": 2386,
+      "sha256": "5696b3bae69625f7aed961cbb00bda3e7b2b55353118a9bb91ea22729ff6acc1"
     },
     {
       "path": "assets/devices/lg_oled_g3.svg",
@@ -68,15 +92,15 @@
     },
     {
       "path": "rhi-multimedia-ux.js",
-      "size": 278677,
-      "bytes": 278677,
-      "sha256": "38541984df325dbac36415b5337a8a5821977b0b3064838f9b3f9646274f6010"
+      "size": 278581,
+      "bytes": 278581,
+      "sha256": "49a3b0e12f2c271d89a3d1a0c1111c8af4ff68b97b4d0f1bd16a41217072461c"
     },
     {
       "path": "rhi-multimedia-ux.js.sha256",
       "size": 87,
       "bytes": 87,
-      "sha256": "ba938096a0633d8ff7dcb66e5230e84326ec93d0cac712334b9958d66a912385"
+      "sha256": "5324bbc3c18839f2380039f98588b61dad10dd9a4bc44108bd18375005a8734d"
     }
   ]
 }

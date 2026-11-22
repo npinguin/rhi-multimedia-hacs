@@ -116,6 +116,46 @@
       "characteristics_source": "https://www.lg.com/nl/televisies-soundbars/oled-evo/oled77g36la/"
     },
     {
+      "profile_id": "multimedia.display.lg_oled55g36la",
+      "asset_type": "display",
+      "manufacturer": "LG",
+      "model": "OLED55G36LA",
+      "evidence": "Official LG 55-inch OLED evo G3 model SKU; native HA manufacturer/model must match exactly, independent of command eligibility",
+      "visual": {
+        "ref": "rhi_multimedia.display.lg_oled_g3",
+        "path": "assets/devices/lg_oled_g3.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "2aca7d665b74a049fe4171d1fed3c6a60afd5e83dd63f197b5f1ff62058f870f"
+      },
+      "characteristics": {
+        "screen_inches": 55,
+        "panel": "OLED",
+        "resolution": "3840 × 2160"
+      },
+      "characteristics_source": "https://www.lg.com/nl/televisies-soundbars/oled-evo/oled55g36la/"
+    },
+    {
+      "profile_id": "multimedia.display.lg_oled55g3",
+      "asset_type": "display",
+      "manufacturer": "LG",
+      "model": "OLED55G3",
+      "evidence": "Official LG 55-inch G3 family model label; only exact native HA manufacturer/model can select this family illustration",
+      "visual": {
+        "ref": "rhi_multimedia.display.lg_oled_g3",
+        "path": "assets/devices/lg_oled_g3.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original generated illustration; no manufacturer photograph copied or redistributed",
+        "sha256_webp": "2aca7d665b74a049fe4171d1fed3c6a60afd5e83dd63f197b5f1ff62058f870f"
+      },
+      "characteristics": {
+        "screen_inches": 55,
+        "panel": "OLED",
+        "resolution": "3840 × 2160"
+      },
+      "characteristics_source": "https://www.lg.com/au/tv-soundbars/oled-evo-tv/oled55g3/"
+    },
+    {
       "profile_id": "multimedia.media_player.apple_tv_4k",
       "asset_type": "media_player",
       "manufacturer": "Apple",
@@ -141,6 +181,118 @@
         "kind": "illustrative_generated",
         "rights": "Original generated illustration; not vendor photography",
         "sha256_webp": "560793208094142d7a68ac3128896b3f1be436f6ed9a33f53ee9a52367385e80"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.denon_home_150",
+      "asset_type": "media_player",
+      "manufacturer": "Denon",
+      "model": "Denon Home 150",
+      "evidence": "Denon official Home 150 wireless speaker; only exact native HA manufacturer/model matches",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.denon_home_150",
+        "path": "assets/devices/denon_home_150.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "dad4eba16451d96196c366858d9f69a6b64d4ce5540116e62eaf24d9960074d1"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.denon_home_150_short",
+      "asset_type": "media_player",
+      "manufacturer": "Denon",
+      "model": "Home 150",
+      "evidence": "Denon official Home 150 product family; exact native manufacturer and model required",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.denon_home_150",
+        "path": "assets/devices/denon_home_150.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "dad4eba16451d96196c366858d9f69a6b64d4ce5540116e62eaf24d9960074d1"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.google_nest_hub",
+      "asset_type": "media_player",
+      "manufacturer": "Google",
+      "model": "Nest Hub",
+      "evidence": "Google official Nest Hub family label; art illustrates family, not an inferred generation",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.google_nest_hub",
+        "path": "assets/devices/google_nest_hub.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "3ffa1148f438caa9a35a185da437fe099b3d03b45058df42dabd7422f1acd08b"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.google_nest_hub_full",
+      "asset_type": "media_player",
+      "manufacturer": "Google",
+      "model": "Google Nest Hub",
+      "evidence": "Google official product name; no hardware or display generation inferred",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.google_nest_hub",
+        "path": "assets/devices/google_nest_hub.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "3ffa1148f438caa9a35a185da437fe099b3d03b45058df42dabd7422f1acd08b"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.google_nest_hub_2",
+      "asset_type": "media_player",
+      "manufacturer": "Google",
+      "model": "Nest Hub (2nd gen)",
+      "evidence": "Google Store official Nest Hub (2nd gen) naming; exact native identity required",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.google_nest_hub",
+        "path": "assets/devices/google_nest_hub.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "3ffa1148f438caa9a35a185da437fe099b3d03b45058df42dabd7422f1acd08b"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.amazon_echo_spot_2024",
+      "asset_type": "media_player",
+      "manufacturer": "Amazon",
+      "model": "Echo Spot (2024 Release)",
+      "evidence": "Amazon official Echo Spot 2024 release; do not apply artwork to unverified older Echo Spot",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.amazon_echo_spot_2024",
+        "path": "assets/devices/amazon_echo_spot.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "5e7e20492663f53d4773be259b0759b3f186476bde56c7f968c885b064c94071"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.amazon_echo_dot_5",
+      "asset_type": "media_player",
+      "manufacturer": "Amazon",
+      "model": "Echo Dot (5th Generation)",
+      "evidence": "Amazon official fifth-generation spherical Echo Dot naming",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.amazon_echo_dot_sphere",
+        "path": "assets/devices/amazon_echo_dot.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "06706ec34ea3a7f61c404d78e2b1140bde4c39b2030fec60bf2434021274a8f2"
+      }
+    },
+    {
+      "profile_id": "multimedia.media_player.amazon_echo_dot_4",
+      "asset_type": "media_player",
+      "manufacturer": "Amazon",
+      "model": "Echo Dot (4th Generation)",
+      "evidence": "Amazon official fourth-generation spherical Echo Dot; original family illustration, not a generation diagnostic",
+      "visual": {
+        "ref": "rhi_multimedia.media_player.amazon_echo_dot_sphere",
+        "path": "assets/devices/amazon_echo_dot.svg",
+        "kind": "illustrative_generated",
+        "rights": "Original AI-generated illustrative product art (2026-11-22); no manufacturer photo redistributed. Exact physical generation requires native HA Device Registry proof.",
+        "sha256_webp": "06706ec34ea3a7f61c404d78e2b1140bde4c39b2030fec60bf2434021274a8f2"
       }
     }
   ]
