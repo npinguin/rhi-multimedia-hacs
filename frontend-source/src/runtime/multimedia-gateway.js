@@ -148,7 +148,7 @@ function rhiMmSiteDateTime(hass,at){
 // the existing integration wizard (the same backend as Configure).
 const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
   'add_room','rename_room','edit_room','remove_room',
-  'guided_activity','add_activity','quick_edit_activity','edit_activity','remove_activity',
+  'guided_activity','add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity',
   'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
 ]));
 async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',

@@ -212,10 +212,14 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-floor-room-buttons button{min-height:44px;padding:7px 12px;background:#fff;border:1px solid #d6e2ee;border-radius:9px;color:#295377;font:inherit;font-size:12px;cursor:pointer}
 .mm-floor-room-buttons button.active{background:#e8f3ff;border-color:#99c2ef;color:#0e5daa;font-weight:700}
 .mm-cockpit{display:grid;grid-template-columns:minmax(165px,.9fr) minmax(230px,1.4fr) minmax(175px,1fr);align-items:start;gap:10px}
+/* Without a native remote, keep device actions visible instead of reserving a blank panel. */
+.mm-cockpit-without-remote{grid-template-columns:minmax(225px,.9fr) minmax(0,2.25fr)}
+.mm-cockpit-without-remote .mm-cockpit-devices{grid-column:auto}
 .mm-cockpit>.mm-surface,.mm-cockpit>.mm-cockpit-controls,.mm-cockpit-controls>.mm-focused-remote{min-width:0;margin:0}
 .mm-cockpit-activities,.mm-cockpit-devices{display:grid;gap:8px}
 .mm-cockpit h3{margin:0;font-size:14px;color:#1a3e64}
 .mm-cockpit-current{font-size:12px;color:#5d7891;margin:2px 0}
+.mm-cockpit-nowplaying{margin:4px 0;padding:8px;border-radius:8px;background:#f4f8fd;color:#345c7b;font-size:12px;overflow-wrap:break-word}
 .mm-cockpit-activity-list{display:grid;gap:6px}
 .mm-cockpit-activity .mm-activity{width:100%;min-height:44px;text-align:left}
 .mm-activity-primary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:stretch}
@@ -226,11 +230,14 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-activity-primary .mm-activity-off:disabled{opacity:.5;cursor:not-allowed}
 .mm-activity-primary .mm-activity-off:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
 .mm-cockpit-activity small{display:block;margin:4px 0 2px;font-size:11px}
+.mm-source-repair-hint{font-size:12px;line-height:1.45;color:#4d657f;overflow-wrap:break-word;margin:7px 0}
+.mm-source-repair{min-height:44px;padding:8px 12px;border:1px solid #b8d4ef;border-radius:9px;background:#f2f8ff;color:#125a9c;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.mm-source-repair:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
 .mm-cockpit-activities .mm-room-foot{margin-top:5px;flex-wrap:wrap}
 .mm-cockpit-device{margin:0!important;border:1px solid #e1eaf4;border-radius:9px;padding:7px 9px}
-.mm-cockpit-device-heading{display:flex;align-items:center;justify-content:space-between;gap:9px;min-height:44px;color:#2d4e70}
+.mm-cockpit-device-heading{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px;min-height:44px;color:#2d4e70}
 .mm-cockpit-device-heading span{display:flex;align-items:center;gap:7px;min-width:0}
-.mm-cockpit-device-heading b{font-size:12px;overflow-wrap:anywhere}
+.mm-cockpit-device-heading b{font-size:12px;word-break:normal;overflow-wrap:break-word}
 .mm-cockpit-device-heading small{font-size:10px;white-space:normal;text-align:right}
 .mm-cockpit-device-details{border-top:1px solid #e7eef8;margin-top:8px}
 .mm-cockpit-device-details>summary{min-height:40px;display:flex;align-items:center;
@@ -267,7 +274,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-remote-numbers{display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:6px;max-width:220px;margin:10px auto}
 .mm-remote-numbers button{min-height:44px;border:1px solid #d5e4f1;border-radius:9px;background:#fff;font:inherit;cursor:pointer}
 @media(max-width:1080px){.mm-cockpit{grid-template-columns:minmax(180px,1fr) minmax(250px,1.7fr)}.mm-cockpit-devices{grid-column:1/-1}}
-@media(max-width:700px){.mm-cockpit{grid-template-columns:1fr}.mm-cockpit-devices{grid-column:auto}.mm-floor-room-select{align-items:start;flex-direction:column}}
+@media(max-width:700px){.mm-cockpit,.mm-cockpit-without-remote{grid-template-columns:1fr}.mm-cockpit-devices,.mm-cockpit-without-remote .mm-cockpit-devices{grid-column:auto}.mm-floor-room-select{align-items:start;flex-direction:column}.mm-cockpit-device-heading{grid-template-columns:minmax(0,1fr) auto}.mm-cockpit-device-heading .mm-native-media-link{grid-column:1/-1;justify-self:start}}
 
 .mm-remote-text-input{display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:8px 0}
 .mm-remote-text-input label{display:grid;gap:5px;flex:1;min-width:165px;color:#627a94;font-size:12px}
@@ -330,3 +337,106 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-activity-plan li{display:grid;gap:2px;padding:4px 0;overflow-wrap:anywhere}
 .mm-activity-plan li span{color:#687d91}
 .mm-activity-plan summary:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+
+
+/* Multimedia Premium resident experience: one coherent action/button grammar.
+   Backend flags and native readback determine activity color/availability. */
+.mm-cockpit{grid-template-columns:minmax(210px,.8fr) minmax(285px,1.12fr) minmax(280px,1.15fr);gap:12px}
+.mm-cockpit-activity-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.mm-cockpit-activity-list .mm-activity-choice{display:flex;align-items:center;gap:9px;min-height:48px;
+  padding:8px 10px;border:1px solid #d5e0ed;background:#fff;border-radius:10px;
+  color:#234769;font:inherit;font-size:12px;font-weight:650;text-align:left;cursor:pointer;min-width:0}
+.mm-activity-choice ha-icon{--mdc-icon-size:21px;flex:none}
+.mm-activity-choice span{min-width:0;overflow-wrap:break-word}
+.mm-cockpit-activity-list .mm-activity-choice.active{background:#1c5e9c;color:#fff;border-color:#1c5e9c}
+.mm-cockpit-activity-list .mm-activity-choice:disabled{opacity:.53;cursor:not-allowed}
+.mm-cockpit-activity-list .mm-all-off{border-color:#cbd8e5;color:#5d3440;background:#f9fbfd}
+.mm-cockpit-activity-list .mm-all-off:not(:disabled):hover{background:#f8eef0;border-color:#c9aeb6}
+.mm-activity-choice:focus-visible,.mm-activity-repair:focus-visible,.mm-remote-command:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+.mm-activity-status{display:flex;align-items:center;flex-wrap:wrap;justify-content:space-between;gap:6px;
+  margin:4px 0 2px;font-size:11px;color:#586f88}
+.mm-activity-repair{display:inline-flex;gap:5px;align-items:center;min-height:40px;padding:5px 9px;
+  border:1px solid #e4cd9f;background:#fffbf2;border-radius:8px;color:#805920;
+  font:inherit;font-weight:650;font-size:11px;cursor:pointer}
+.mm-activity-repair ha-icon{--mdc-icon-size:17px}
+.mm-cockpit-activities .mm-activity-plan{border-top:1px solid #e0e8f1;margin-top:6px;padding-top:6px}
+.mm-cockpit-activities .mm-activity-plan summary{cursor:pointer;min-height:38px;font-size:11px;color:#37668d}
+.mm-cockpit-activities .mm-activity-plan li{font-size:11px;line-height:1.5;margin:4px 0}
+.mm-now-playing{display:grid;gap:10px}
+.mm-now-playing h3{font-size:14px}
+.mm-media-identity{display:grid;grid-template-columns:96px minmax(0,1fr);align-items:center;gap:12px;min-width:0}
+.mm-media-artwork{display:grid;place-items:center;width:96px;height:96px;object-fit:cover;
+  border-radius:11px;background:#edf3fa;color:#557a9b}
+.mm-media-artwork ha-icon{--mdc-icon-size:36px}
+.mm-media-copy{display:grid;gap:3px;min-width:0}
+.mm-media-copy strong{font-size:15px;line-height:1.35;overflow-wrap:break-word;color:#193d61}
+.mm-media-copy span,.mm-media-copy small{font-size:11px;color:#5c748c;overflow-wrap:break-word}
+.mm-media-progress{display:grid;gap:5px}
+.mm-media-progress progress{height:7px;width:100%;max-width:100%;accent-color:#266bae}
+.mm-media-progress span{font-size:10px;text-align:right;color:#70849a;font-variant-numeric:tabular-nums}
+.mm-media-transport{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+.mm-media-action{display:grid;place-items:center;width:46px;height:46px;padding:0;border:1px solid #d3e0ee;
+  background:#fff;border-radius:10px;color:#245b90;cursor:pointer;flex:none}
+.mm-media-action ha-icon{--mdc-icon-size:21px}
+.mm-media-action:focus-visible,.mm-media-volume input:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+.mm-media-audio{display:flex;align-items:center;gap:8px}
+.mm-media-volume{display:grid;gap:4px;flex:1;min-width:0;font-size:11px;color:#53708a}
+.mm-media-volume input{width:100%;accent-color:#296da7;min-height:28px}
+.mm-cockpit-device-heading{grid-template-columns:minmax(0,1fr) auto;gap:6px 8px}
+.mm-cockpit-device-heading .mm-native-media-link{grid-column:1/-1;justify-self:start}
+.mm-device-nowplaying{display:flex;align-items:start;gap:8px;padding:8px;border-radius:8px;
+  background:#f4f8fc;font-size:11px;color:#315879;min-width:0}
+.mm-device-nowplaying ha-icon{--mdc-icon-size:19px;flex:none}
+.mm-device-nowplaying span{display:grid;gap:2px;min-width:0}
+.mm-device-nowplaying b{overflow-wrap:break-word}
+.mm-device-nowplaying small{color:#657c91}
+.mm-remote-command{display:grid;place-items:center;min-width:44px;min-height:44px;
+  border:1px solid #cfddeb;border-radius:9px;background:#f8fbfe;color:#1f527f;
+  font:inherit;font-weight:650;font-size:11px;cursor:pointer}
+.mm-remote-command ha-icon{--mdc-icon-size:22px}
+.mm-remote-command span{padding:0 4px;overflow-wrap:break-word;text-align:center}
+.mm-remote-navigation .mm-remote-command{width:100%;height:100%}
+.mm-remote-numbers .mm-remote-command{min-width:0;width:100%}
+.mm-native-buttons .mm-remote-command{min-width:44px}
+.mm-remote-command:hover:not(:disabled),.mm-media-action:hover:not(:disabled){background:#e8f3ff}
+@media(max-width:1100px){.mm-cockpit{grid-template-columns:minmax(220px,.9fr) minmax(290px,1.2fr)}
+  .mm-cockpit-devices{grid-column:1/-1}}
+@media(max-width:700px){.mm-cockpit,.mm-cockpit-without-remote{grid-template-columns:minmax(0,1fr)}
+  .mm-cockpit-devices{grid-column:auto}.mm-media-identity{grid-template-columns:76px minmax(0,1fr)}
+  .mm-media-artwork{width:76px;height:76px}.mm-cockpit-activity-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Activity authoring stays inside the existing two-column Settings pane. */
+.mm-activity-wizard-stages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 14px}
+.mm-activity-wizard-stages button{display:flex;align-items:center;gap:9px;min-height:48px;padding:9px 11px;
+ border:1px solid #d4e1ef;border-radius:10px;background:#fff;color:#325a7d;
+ text-align:left;font:inherit;font-size:12px;cursor:pointer}
+.mm-activity-wizard-stages button b{display:grid;place-items:center;flex:none;width:26px;height:26px;
+ border-radius:50%;border:1px solid #c8d9eb;font-size:12px}
+.mm-activity-wizard-stages button.active{border-color:#9ec3e9;background:#edf5ff;color:#154d83;font-weight:700}
+.mm-activity-wizard-stages button.active b{background:#216ba7;border-color:#216ba7;color:#fff}
+.mm-activity-wizard-stages button:focus-visible,.mm-settings-edit-cast:focus-visible,.mm-step-move:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+.mm-activity-device-stage{display:grid;gap:8px}
+.mm-device-choice{display:flex;align-items:center;gap:10px;min-height:56px;padding:9px 12px;
+ border:1px solid #e1e8f1;border-radius:9px;color:#345876}
+.mm-device-choice.selected{border-color:#b1d0ed;background:#f5faff}
+.mm-device-choice ha-icon{--mdc-icon-size:21px;color:#28699f;flex:none}
+.mm-device-choice span{display:grid;gap:3px;min-width:0;flex:1}
+.mm-device-choice b{font-size:12px;overflow-wrap:break-word}
+.mm-device-choice small{font-size:11px;color:#678097;overflow-wrap:break-word}
+.mm-settings-edit-cast{min-height:44px;padding:9px 13px;border:1px solid #a9cdea;
+ border-radius:9px;background:#eaf4ff;color:#17578c;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.mm-step-move{display:inline-grid;place-items:center;width:42px;height:42px;padding:0;
+ border:1px solid #d1deed;border-radius:8px;background:#f8fbff;color:#275e92;cursor:pointer}
+.mm-step-move ha-icon{--mdc-icon-size:19px}
+@media(max-width:700px){.mm-activity-wizard-stages{grid-template-columns:1fr}}
+
+/* Native step outcomes from the latest backend attempt, not frontend estimates. */
+.mm-step-trace{margin:10px 0 3px;padding:8px 10px;border:1px solid #d7e3ef;
+  border-radius:9px;background:#f8fbff;color:#355c7e}
+.mm-step-trace summary{min-height:38px;display:list-item;cursor:pointer;
+  font-size:12px;font-weight:650}
+.mm-step-trace ol{padding-left:20px;display:grid;gap:6px;margin:8px 0}
+.mm-step-trace li{font-size:11px;line-height:1.45;overflow-wrap:break-word}
+.mm-step-trace-action{display:block;color:#3e607c}
+.mm-step-trace-result{display:block;color:#6b8298}
+.mm-step-trace .mm-room-error{color:#a04242}

@@ -209,6 +209,7 @@ class _Wizard:
         self._editing_room = False
         self._previous_room = None
         self._guided_activity_type = None
+        self._activity_tuning = False
 
     async def async_step_room(self, user_input=None):
         areas = area_choices(self.hass)
@@ -503,15 +504,61 @@ class _Wizard:
         return schema
 
     async def async_step_next(self, user_input=None):
+        # The same HA Options Flow owns a new activity from the first native
+        # input choice through device order, typed steps and one atomic Save.
+        # A missing/older room draft must not become an unrelated edit.
+        eligible = (self._room_id in self._rooms
+                    and self._activity_key in self._rooms[self._room_id]["activities"])
+        options = {**NEXT, **({"tune_activity": "Choose devices, order and action sequence"}
+                              if eligible else {})}
         if user_input:
-            action = user_input["action"]
+            action = user_input.get("action")
             if action == "add_activity":
                 return await self.async_step_activity()
             if action == "add_room":
                 return await self.async_step_room()
+            if action == "tune_activity" and eligible:
+                self._editing_activity = self._activity_key
+                self._activity_tuning = True
+                return await self.async_step_activity_devices()
+            if action != "review":
+                return self.async_show_form(step_id="next",
+                    errors={"base": "selection_changed"}, data_schema=vol.Schema({
+                        vol.Required("action", default="review"): vol.In(options)}))
             return await self.async_step_review()
         return self.async_show_form(step_id="next", data_schema=vol.Schema({
-            vol.Required("action", default="review"): vol.In(NEXT)}))
+            vol.Required("action", default="review"): vol.In(options)}))
+
+    async def async_step_activity_tune(self, user_input=None):
+        """Continue editing one draft activity, still before any HA Options Save."""
+        if (not getattr(self, "_activity_tuning", False)
+                or self._editing_activity not in self._rooms[self._room_id]["activities"]):
+            return await self.async_step_review()
+        if user_input:
+            action = user_input.get("action")
+            if action == "script":
+                return await self.async_step_script_step()
+            if action == "review":
+                return await self.async_step_review()
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        return self.async_show_form(step_id="activity_tune",
+            data_schema=vol.Schema({
+                vol.Required("action", default="script"): vol.In({
+                    "script": "Add, edit, move or remove a start/stop action",
+                    "review": "Review and save the complete activity"})}),
+            description_placeholders={
+                "activity": activity.get("name", self._editing_activity),
+                "steps": str(len(activity.get("steps", []))),
+                "stop_steps": str(len(activity.get("stop_steps", []))),
+                "note": "Continue editing actions or review the whole draft; no equipment commands are sent.",
+            })
+
+    async def _script_edit_done(self):
+        # Native standalone step editing still goes to Review; a newly created
+        # activity can accumulate as many safe actions as needed before Save.
+        if getattr(self, "_activity_tuning", False):
+            return await self.async_step_activity_tune()
+        return await self.async_step_review()
 
     def _review_summary(self):
         lines = []
@@ -921,7 +968,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                    "add_room": "Add room", "edit_room": "Edit room devices and connections",
                    "guided_activity": "Create an activity: start with what you want to do",
                    "add_activity": "Add activity", "rename_room": "Rename room / change area",
-                   "edit_activity": "Edit activity", "quick_edit_activity": "Quick edit activity name and inputs",
+                   "edit_activity": "Edit activity", "activity_devices": "Choose approved activity devices and startup order", "quick_edit_activity": "Quick edit activity name and inputs",
                    "remove_activity": "Remove activity",
                    "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card",
                    "harmony_owner": "Harmony / Premium control ownership",
@@ -979,6 +1026,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             "guided_activity": "Activities · create TV, movie, music or presentation",
             "add_activity": "Activities · add a custom activity",
             "edit_activity": "Activities · edit a full activity",
+            "activity_devices": "Activities · choose devices and startup order",
             "quick_edit_activity": "Activities · quick edit name and real HDMI input",
             "remove_activity": "Activities · remove an activity",
             "harmony_owner": "Advanced · Harmony / Premium command ownership",
@@ -1592,6 +1640,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             if self._option_action == "remove_activity":
                 self._rooms[self._room_id]["activities"].pop(key)
                 return await self.async_step_review()
+            if self._option_action == "activity_devices":
+                self._editing_activity = key
+                return await self.async_step_activity_devices()
             if self._option_action == "quick_edit_activity":
                 self._editing_activity = key
                 return await self.async_step_quick_edit_activity()
@@ -1612,6 +1663,116 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         return self.async_show_form(step_id="existing_activity", data_schema=vol.Schema({
             vol.Required("activity"): vol.In(choices)}))
 
+
+    async def async_step_activity_devices(self, user_input=None):
+        """Harmony-style step 1: one exact approved set of existing room devices.
+
+        This is the existing HA Options Flow draft, not a second config store.
+        No device is created, selected by label, actuated or written before Review.
+        Removing old actions is destructive and requires explicit confirmation.
+        """
+        room = self._rooms[self._room_id]
+        activity = room["activities"][self._editing_activity]
+        current = list(activity["devices"])
+        devices = room["devices"]
+        sources, _ = av_sources(self.hass)
+        approved = {(src.concept, src.entity_id, src.candidate_id) for src in sources}
+        choices = {key: f"{dev.get('name', key)} · {dev['entity']}"
+                   for key, dev in devices.items()
+                   if (dev.get("foundation_concept"), dev["entity"],
+                       dev.get("foundation_candidate_id")) in approved}
+        errors = {}
+        if user_input is not None:
+            selected = user_input.get("devices")
+            if (not isinstance(selected, list) or not selected or
+                    len(selected) != len(set(selected)) or
+                    any(key not in choices for key in selected)):
+                errors["base"] = "not_foundation_selected"
+            else:
+                chosen = set(selected)
+                kind = activity.get("activity_type", "watch_tv")
+                if (kind in ("watch_tv", "watch_hdmi", "watch_source", "play_game")
+                        and "screen" not in chosen):
+                    errors["base"] = "screen_required"
+                elif (kind in ("watch_source", "play_game") and not any(
+                        devices[key].get("foundation_concept") == "source" for key in chosen)):
+                    errors["base"] = "source_required"
+                elif (kind == "listen_music" and not any(
+                        devices[key].get("foundation_concept") in ("amplifier", "source")
+                        for key in chosen)):
+                    errors["base"] = "audio_required"
+                else:
+                    removed = set(current) - chosen
+                    dependent = (any(step["device"] in removed
+                                     for phase in ("steps", "stop_steps")
+                                     for step in activity.get(phase, []))
+                                 or any(v["device"] in removed
+                                        for v in activity.get("button_map", {}).values())
+                                 or any(step["device"] in removed
+                                        for macro in activity.get("macros", {}).values()
+                                        for step in macro.get("steps", []))
+                                 or any(link["source"] in removed or link["target"] in removed
+                                        for link in activity.get("cec_links", [])))
+                    if dependent and user_input.get("confirm_remove") is not True:
+                        errors["base"] = "confirm_source_steps"
+                    else:
+                        candidate = deepcopy(activity)
+                        candidate["steps"] = [s for s in candidate.get("steps", [])
+                                              if s["device"] in chosen]
+                        candidate["stop_steps"] = [s for s in candidate.get("stop_steps", [])
+                                                   if s["device"] in chosen]
+                        candidate["button_map"] = {name: mapping for name, mapping
+                                                   in candidate.get("button_map", {}).items()
+                                                   if mapping["device"] in chosen}
+                        candidate["macros"] = {name: {**macro, "steps": [s for s in macro["steps"]
+                                                   if s["device"] in chosen]}
+                                               for name, macro in candidate.get("macros", {}).items()
+                                               if any(s["device"] in chosen for s in macro["steps"])}
+                        candidate["cec_links"] = [link for link in candidate.get("cec_links", [])
+                                                  if link["source"] in chosen and link["target"] in chosen]
+                        self._pending_activity = candidate
+                        self._pending_cast = [key for key in current if key in chosen]
+                        self._pending_cast.extend(key for key in devices
+                                                  if key in chosen and key not in current)
+                        return await self.async_step_activity_device_order()
+        return self.async_show_form(step_id="activity_devices", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("devices", default=[k for k in current if k in choices]):
+                    _select_many(choices or {"none": "No Foundation-approved devices"}),
+                vol.Optional("confirm_remove", default=False): bool,
+            }), description_placeholders={"room": room.get("name", self._room_id),
+                "activity": activity.get("name", self._editing_activity)})
+
+    async def async_step_activity_device_order(self, user_input=None):
+        """Harmony-style step 2: deterministic startup order, CEC still guarded.
+
+        All mutations are in the pending Options Flow transaction and require
+        the existing atomic Review/Save. Individual script steps remain editable
+        through the same Options Flow once the activity cast has been reviewed.
+        """
+        ordered = list(self._pending_cast)
+        choices = {key: self._rooms[self._room_id]["devices"][key].get("name", key)
+                   for key in ordered}
+        errors = {}
+        if user_input is not None:
+            requested = [user_input.get(f"device_{index}") for index in range(len(ordered))]
+            if len(requested) != len(ordered) or set(requested) != set(ordered):
+                errors["base"] = "selection_changed"
+            else:
+                pending = deepcopy(self._pending_activity)
+                pending["devices"] = requested
+                self._rooms[self._room_id]["activities"][self._editing_activity] = pending
+                return await (self.async_step_activity_tune()
+                              if getattr(self, "_activity_tuning", False)
+                              else self.async_step_review())
+        return self.async_show_form(step_id="activity_device_order", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required(f"device_{index}", default=key): vol.In(choices)
+                for index, key in enumerate(ordered)
+            }), description_placeholders={
+                "activity": self._pending_activity.get("name", self._editing_activity),
+                "note": "Select the actual power-on sequence; verified CEC links still impose safe dependencies.",
+            })
 
     async def async_step_button_mapping(self, user_input=None):
         """Configure one semantic activity button using the HA Options Flow."""
@@ -1783,14 +1944,14 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         errors["base"] = "selection_changed"
                     else:
                         steps.pop(index)
-                        return await self.async_step_review()
+                        return await self._script_edit_done()
                 elif operation in ("up", "down"):
                     other = index + (-1 if operation == "up" else 1)
                     if not 0 <= other < len(steps):
                         errors["base"] = "selection_changed"
                     else:
                         steps[index], steps[other] = steps[other], steps[index]
-                        return await self.async_step_review()
+                        return await self._script_edit_done()
                 else:
                     self._script_phase = phase
                     self._script_operation = operation
@@ -1946,7 +2107,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     steps[self._script_index] = step
                 else:
                     steps.insert(self._script_index, step)
-                return await self.async_step_review()
+                return await self._script_edit_done()
         return self.async_show_form(step_id="script_arguments", errors=errors,
                                     data_schema=vol.Schema(args))
 
