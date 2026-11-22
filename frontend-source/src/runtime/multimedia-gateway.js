@@ -147,6 +147,7 @@ function rhiMmSiteDateTime(hass,at){
 // authority. No local store or device discovery: this is a thin typed route to
 // the existing integration wizard (the same backend as Configure).
 const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
+  'complete_setup',
   'add_room','rename_room','edit_room','remove_room',
   'guided_activity','add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity',
   'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
@@ -173,7 +174,8 @@ async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''
   try{
     // HA validates the current form's schema. Route contextual card actions
     // through the existing Assisted selector while retaining two entry choices.
-    if(action==='yaml')await advance('init',{action:'yaml'});
+    if(action==='complete_setup')await advance('init',{action:'complete_setup'});
+    else if(action==='yaml')await advance('init',{action:'yaml'});
     else{
       await advance('init',{action:'assisted'});
       await advance('assisted',{task:action});

@@ -7,6 +7,7 @@ No JSON entry, duplicate entity selection or guessed hardware connections.
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 import re
 import yaml
 import voluptuous as vol
@@ -725,6 +726,10 @@ class _Wizard:
         return None
 
     async def async_step_review(self, user_input=None):
+        if (getattr(self, "_complete_setup", False) and user_input
+                and user_input.get("return_to_setup") is True):
+            self._complete_setup_finish = False
+            return await self.async_step_complete_setup()
         errors = {}
         if user_input:
             if not user_input.get("confirm"):
@@ -755,6 +760,8 @@ class _Wizard:
                     else:
                         return await self._finish()
         fields = {vol.Required("confirm", default=False): bool}
+        if getattr(self, "_complete_setup", False):
+            fields[vol.Optional("return_to_setup", default=False)] = bool
         if getattr(self, "_yaml_deleted_rooms", None):
             fields[vol.Required("confirm_remove", default=False)] = bool
         preview = self._review_summary()
@@ -809,14 +816,15 @@ MAX_CONFIG_YAML_BYTES = 128_000
 # owning domain validation and HA/browser acceptance.
 YAML_SCOPED_FIELDS = {
     "room": frozenset({"name", "area_id", "floor_id", "harmony_controller",
-                       "devices", "activities"}),
+                       "devices", "activities", "room_areas"}),
     "device": frozenset({"entity", "physical_id", "asset_id", "role", "name",
                          "foundation_concept", "foundation_candidate_id",
                          "hdmi_cec_enabled", "post_power_on_delay_ms", "power_mode", "power_on",
-                         "power_off", "timeout", "on_states", "speech_tts_registry_id"}),
+                         "power_off", "timeout", "on_states", "speech_tts_registry_id",
+                         "room_area"}),
     "activity": frozenset({"name", "activity_type", "devices", "steps",
                            "stop_steps", "cec_links", "favorite",
-                           "button_map", "macros"}),
+                           "button_map", "macros", "room_area"}),
 }
 
 
@@ -962,7 +970,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         self._dell_key = None
 
     async def async_step_init(self, user_input=None):
-        options = {"assisted": "Assisted — configure rooms, devices and activities",
+        options = {"complete_setup": "Complete home setup — one Review and Save",
+                   "assisted": "Assisted — configure rooms, devices and activities",
                    "yaml": "YAML — update one room/device/activity or import (advanced)",
                    "expert_yaml": "Expert YAML — edit one selected object",
                    "add_room": "Add room", "edit_room": "Edit room devices and connections",
@@ -985,6 +994,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                    "dell_remove": "Remove unassigned Dell C8621QT display"}
         if user_input:
             action = user_input["action"]
+            if action == "complete_setup":
+                return await self.async_step_complete_setup()
             if action == "assisted":
                 return await self.async_step_assisted()
             if action == "yaml":
@@ -1009,12 +1020,86 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 return await self.async_step_review()
             self._option_action = action
             return await self.async_step_existing_room()
-        # The HA-facing choice has exactly two methods. Existing direct
-        # action IDs remain accepted for the resident card's admin shortcuts,
-        # but are not an overwhelming 19-choice entry menu.
-        methods = {key: options[key] for key in ("assisted", "yaml")}
+        # One supported visual setup route, plus Expert YAML. Keep the old
+        # direct action IDs/Assisted handlers for backward compatibility but
+        # stop advertising obsolete wizard alternatives to new admins.
+        # Offer only three top-level routes in native HA. Assisted is the
+        # existing explicit advanced gateway for contextual card actions;
+        # hiding it from HA's actual form schema rejects those actions before
+        # async_step_init can dispatch. Keep it available, not the default.
+        methods = {key: options[key] for key in ("complete_setup", "yaml", "assisted")}
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
             vol.Required("action"): vol.In(methods)}))
+
+    async def async_step_complete_setup(self, user_input=None):
+        """Full semantic iPad editor backed solely by existing YAML/Review/Save.
+
+        The frontend edits a JSON document (strict YAML subset) in this ONE
+        native HA Options Flow. Existing YAML validation, Foundation approval,
+        concurrency, ownership and final atomic Config Entry Save are reused.
+        No intermediate task router, secondary store or physical commands.
+        """
+        self._complete_setup = True  # Preserve Review → Back to same draft.
+        if user_input is not None:
+            proposed = user_input.get("yaml_text")
+            if not isinstance(proposed, str):
+                return await self.async_step_complete_setup()
+            result = await self.async_step_yaml({"mode": "replace",
+                                                 "yaml_text": proposed})
+            if result.get("type") == "form" and result.get("step_id") == "yaml":
+                # Keep the full iPad editor and unsaved draft when validation
+                # rejects data, rather than falling back to the legacy forms.
+                return await self._complete_setup_form(
+                    text=proposed, errors=result.get("errors") or {})
+            return result
+        return await self._complete_setup_form()
+
+    async def _complete_setup_form(self, text=None, errors=None):
+        from .validation import native_state
+        areas = area_choices(self.hass)
+        approved, _ = av_sources(self.hass)
+        sources = []
+        for src in approved:
+            if src.concept not in ("display", "amplifier", "source"):
+                continue
+            state = native_state(self.hass, src.entity_id)
+            attrs = getattr(state, "attributes", {}) or {} if state else {}
+            label = attrs.get("friendly_name")
+            sources.append({
+                "entity": src.entity_id,
+                "candidate": src.candidate_id,
+                "concept": src.concept,
+                "provider": src.provider,
+                "available": src.available,
+                "area_id": src.area_id,
+                "label": label if isinstance(label, str) and label.strip()
+                         else src.entity_id,
+                "source_list": source_lists(self.hass, src.entity_id)["source_list"],
+                "sound_mode_list": source_lists(self.hass, src.entity_id)["sound_mode_list"],
+            })
+        if text is None:
+            text = json.dumps({
+                "rooms": self._rooms,
+                "dell_displays": self._dell_displays,
+                "enable_ux": (self._yaml_enable_ux if self._yaml_enable_ux is not None
+                              else self._original_enable_ux),
+                "default_step_delay_ms": (self._yaml_step_delay_ms
+                                          if self._yaml_step_delay_ms is not None
+                                          else self._original_step_delay_ms),
+            }, ensure_ascii=False, indent=2)
+        return self.async_show_form(
+            step_id="complete_setup",
+            errors=errors or {},
+            data_schema=vol.Schema({
+                vol.Required("yaml_text", default=text):
+                    selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+            }),
+            description_placeholders={
+                "areas_json": json.dumps(areas, ensure_ascii=False),
+                "sources_json": json.dumps(sources, ensure_ascii=False),
+                "note": "One draft, one Review/Save; HA Areas and Foundation "
+                        "candidate registry are authoritative. Cancel discards all.",
+            })
 
     async def async_step_assisted(self, user_input=None):
         """One friendly entry for the existing, fully functional HA wizard."""

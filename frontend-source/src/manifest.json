@@ -4,6 +4,7 @@
     "vendor/rhi-ux-core.js",
     "runtime/multimedia-gateway.js",
     "domain/multimedia-view-model.js",
+    "ui/whole-home-editor.js",
     "ui/multimedia-card.js"
   ],
   "assets_root": "assets"
