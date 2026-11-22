@@ -35,9 +35,9 @@ function rhiMmDeviceArt(device,illustrationLabel,variant='thumbnail'){
 }
 
 const MM_MODULES = [
-  {id:'multimedia',label:'Multimedia',items:[{id:'overview',label:'Overview'},{id:'rooms',label:'Rooms'}]},
-  {id:'activities',label:'Activities',items:[{id:'activities',label:'Activities'}]},
-  {id:'insights',label:'Insights',items:[{id:'devices',label:'Devices'},{id:'diagnostics',label:'Diagnostics'}]},
+  {id:'overview',label:'Overview',items:[{id:'overview',label:'Overview'}]},
+  {id:'settings',label:'Settings',items:[{id:'settings',label:'Settings'}]},
+  {id:'insights',label:'Insights',items:[{id:'insights',label:'Insights'}]},
 ];
 
 // Presentation-only grouping: preserve exact native values and unknown vendor keys.
@@ -59,7 +59,7 @@ function rhiMmRemoteGroups(options){
 // A transient view of server-returned HA Options Flow schema. The HA backend
 // alone validates and saves; unknown field types cannot be submitted.
 function rhiMmOptionPairs(field){
-  const raw=field?.type==='selector'?field.selector?.select?.options:field?.options;
+  const raw=field?.selector?.select?.options??field?.options;
   if(!Array.isArray(raw))return [];
   return raw.map(o=>Array.isArray(o)?[o[0],o[1]??o[0]]:
     o&&typeof o==='object'?[o.value,o.label??o.value]:[o,o])
@@ -67,11 +67,20 @@ function rhiMmOptionPairs(field){
 }
 function rhiMmOptionSupported(field){
   if(!field||typeof field.name!=='string')return false;
+  // Real HA Options Flow schemas describe selectors WITHOUT a separate type.
+  // Accept only the fields we can render faithfully; the backend validates
+  // their values and is still the only configuration writer.
+  if(field.selector!==undefined){
+    const kinds=Object.keys(field.selector||{});
+    if(kinds.length!==1)return false;
+    return (kinds[0]==='text'&&field.selector.text!==null&&
+            typeof field.selector.text==='object'&&field.selector.text.multiple!==true)||
+      (kinds[0]==='select'&&rhiMmOptionPairs(field).length>0)||
+      (kinds[0]==='boolean'&&typeof field.selector.boolean==='object')||
+      (kinds[0]==='number'&&typeof field.selector.number==='object');
+  }
   if(['string','boolean','integer','float'].includes(field.type))return true;
-  if(field.type==='select')return rhiMmOptionPairs(field).length>0;
-  return field.type==='selector'&&(
-    (!!field.selector?.select&&rhiMmOptionPairs(field).length>0)||
-    !!field.selector?.text);
+  return field.type==='select'&&rhiMmOptionPairs(field).length>0;
 }
 function rhiMmOptionDefaults(step){
   const values={};
@@ -80,13 +89,12 @@ function rhiMmOptionDefaults(step){
     if(suggestion!==undefined&&suggestion!==null)values[field.name]=suggestion;
     else if(Object.prototype.hasOwnProperty.call(field,'default'))values[field.name]=field.default;
     else if(!field.required)continue; // No implicit write to optional native fields.
-    else if(field.type==='boolean')values[field.name]=false;
-    else if(field.type==='string')values[field.name]='';
+    else if(field.type==='boolean'||field.selector?.boolean)values[field.name]=false;
+    else if(field.type==='string'||field.selector?.text)values[field.name]='';
     else if(field.type==='integer')values[field.name]=Number.isInteger(field.valueMin)?field.valueMin:0;
-    else if(field.type==='float')values[field.name]=0;
-    else if(field.type==='select')values[field.name]=rhiMmOptionPairs(field)[0]?.[0];
-    else if(field.type==='selector'&&field.selector?.select?.multiple)values[field.name]=[];
-    else if(field.type==='selector'&&field.selector?.select)values[field.name]=rhiMmOptionPairs(field)[0]?.[0];
+    else if(field.type==='float'||field.selector?.number)values[field.name]=0;
+    else if(field.selector?.select?.multiple)values[field.name]=[];
+    else if(field.type==='select'||field.selector?.select)values[field.name]=rhiMmOptionPairs(field)[0]?.[0];
   }
   return values;
 }
@@ -96,11 +104,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
     super(); this.attachShadow({mode:'open'});
     this.config={}; this._hass=null; this._view=''; this._room='';
     this._lastSignature=''; this._feedback=new Map();
-    this._expanded=new Set();this._remoteSelections=new Map();this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
+    this._expanded=new Set();this._remoteSelections=new Map();this._remoteTabs=new Map();
+    this._settingsCategory='locations';this._settingsSelections=new Map();
+    this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
     this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
     this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;
     this._onLocation=()=>{
-      if(!['activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
+      if(!['settings','activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
         void this.cancelOptions();
       }else{this._lastSignature='';this.render();}
     };
@@ -159,11 +169,39 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._contextKey='';this.render();
       return;
     }
+    const category=event.target?.closest?.('[data-mm-settings-category]');
+    if(category){
+      if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
+      const chosen=category.getAttribute('data-mm-settings-category');
+      if(['locations','devices','activities'].includes(chosen)){
+        this._settingsCategory=chosen;this._lastSignature='';this.render();
+      }
+      return;
+    }
+    const settingsPick=event.target?.closest?.('[data-mm-settings-pick]');
+    if(settingsPick){
+      // A selected object must never silently change beneath an open
+      // native Options Flow transaction for a different configuration scope.
+      // End the old transaction before showing the newly selected object.
+      if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
+      this._settingsSelections.set(this._settingsCategory,settingsPick.getAttribute('data-mm-settings-pick'));
+      this._lastSignature='';this.render();return;
+    }
+    const remoteTab=event.target?.closest?.('[data-remote-tab]');
+    if(remoteTab){
+      const room=remoteTab.getAttribute('data-room'),device=remoteTab.getAttribute('data-device');
+      const tab=remoteTab.getAttribute('data-remote-tab');
+      if(['buttons','numbers','text'].includes(tab)){
+        this._remoteTabs.set(room+':'+device,tab);
+        this._lastSignature='';this.render();
+      }
+      return;
+    }
     const focus=event.target?.closest?.('[data-remote-focus]');
     if(focus){
       const id=focus.getAttribute('data-room'),key=focus.getAttribute('data-remote-focus');
       const route=this.currentRoute(),room=rhiMmRooms(this._hass).rooms?.find(r=>r.id===id);
-      if(route.view==='rooms'&&room&&(!route.room||route.room===room.id)&&room.devices.some(d=>d.key===key)){
+      if(['rooms','overview'].includes(route.view)&&room&&(!route.room||route.room===room.id)&&room.devices.some(d=>d.key===key)){
         const active=room.activities.find(a=>a.id===room.activity_id&&a.active);
         this._remoteSelections.set(room.id+':'+(active?.id||'manual'),key);
         this._lastSignature='';this.render();
@@ -178,7 +216,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
       room:option.getAttribute('data-mm-option-room')||'',
       activity:option.getAttribute('data-mm-option-activity')||'',
       scope:option.getAttribute('data-mm-option-scope')||'',
-      id:option.getAttribute('data-mm-option-id')||''});return;}
+      id:option.getAttribute('data-mm-option-id')||'',
+      phase:option.getAttribute('data-mm-option-phase')||'',
+      operation:option.getAttribute('data-mm-option-operation')||'',
+      index:option.hasAttribute('data-mm-option-index')?
+        Number(option.getAttribute('data-mm-option-index')):null,
+      device:option.getAttribute('data-mm-option-device')||'',
+      stepType:option.getAttribute('data-mm-option-type')||''});return;}
     const submitOption=event.target?.closest?.('[data-mm-option-submit]');
     if(submitOption){event.preventDefault();await this.submitOptions();return;}
     const cancelOption=event.target?.closest?.('[data-mm-option-cancel]');
@@ -188,6 +232,25 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this.navigate(nav.getAttribute('data-nav'),nav.getAttribute('data-room')||'');return;}
     const more=event.target?.closest?.('[data-more-info]');
     if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');if(entityId)this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));return;}
+    const shortcut=event.target?.closest?.('[data-mm-shortcut]');
+    if(shortcut&&!shortcut.disabled){
+      const room=shortcut.getAttribute('data-room');
+      const kind=shortcut.getAttribute('data-mm-shortcut');
+      const key=shortcut.getAttribute('data-shortcut-key');
+      const contract=rhiMmRooms(this._hass);
+      const record=contract.ready?contract.rooms.find(entry=>entry.id===room):null;
+      await this.executeIntent(room,rhiMmShortcutIntent(record,kind,key),contract);
+      return;
+    }
+    const sendText=event.target?.closest?.('[data-device-text-submit]');
+    if(sendText && !sendText.disabled){
+      const room=sendText.getAttribute('data-room'),device=sendText.getAttribute('data-device');
+      const inputs=this.shadowRoot?.querySelectorAll?.('[data-device-text]')||[];
+      const input=[...inputs].find(el=>el.getAttribute('data-room')===room&&
+        el.getAttribute('data-device')===device);
+      if(input && input.value.trim())await this.executeDevice(room,device,'remote_text',input.value);
+      return;
+    }
     const direct=event.target?.closest?.('[data-device-action]');
     if(direct){if(!direct.disabled){const raw=direct.getAttribute('data-value');await this.executeDevice(direct.getAttribute('data-room'),direct.getAttribute('data-device'),direct.getAttribute('data-device-action'),raw===null?undefined:JSON.parse(raw));}return;}
     const action=event.target?.closest?.('[data-action]');
@@ -198,6 +261,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
     await this.execute(roomId,service,activity);
   }
   async onControlChange(event){
+    const floor=event.target?.closest?.('[data-floor-select]');
+    if(floor){this.navigate('overview','',floor.value);return;}
     const input=event.target?.closest?.('[data-device-input]');
     if(!input||input.disabled||input.value==='')return;
     const action=input.getAttribute('data-device-input');
@@ -218,7 +283,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
     else this._optionsData[key]=el.value;
   }
   _optionRefresh(){this._optionsRevision++;this._lastSignature='';this.render();}
-  async openOptions({action,room='',activity='',scope='',id=''}) {
+  async openOptions({action,room='',activity='',scope='',id='',
+    phase='',operation='',index=null,device='',stepType=''}) {
     if(!this._hass?.user?.is_admin||this._optionsBusy)return;
     const oldStep=this._optionsStep;
     const epoch=++this._optionsEpoch;
@@ -233,7 +299,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         try{await this._hass.loadBackendTranslation('options','rhi_multimedia');}catch(_){}
       }
       if(epoch!==this._optionsEpoch)return;
-      const step=await rhiMmOptionsBegin(this._hass,{action,room,activity,scope,id});
+      const step=await rhiMmOptionsBegin(this._hass,{
+        action,room,activity,scope,id,phase,operation,index,device,stepType});
       if(epoch!==this._optionsEpoch){
         await rhiMmOptionsCancel(this._hass,step);
         return;
@@ -301,7 +368,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const label=escape(this.optionLabel(step,field));
     const attr=`data-mm-option-field="${escape(key)}" ${disabled}`;
     const pairs=rhiMmOptionPairs(field);
-    const multiple=field.type==='selector'&&field.selector?.select?.multiple===true;
+    const multiple=field.selector?.select?.multiple===true;
     const error=step.errors?.[key]?escape(this.optionError(step,step.errors[key])):'';
     if(!rhiMmOptionSupported(field))return `<p class="mm-room-error">${label}: ${this.t('setup_field_unsupported')}</p>`;
     let control;
@@ -313,17 +380,18 @@ class HomeBrainMultimediaCard extends HTMLElement {
           ${escape(title)}</label>`).join('')}</fieldset>`;
       return `<div class="mm-option-field">${control}${error?`<small class="mm-room-error">${error}</small>`:''}</div>`;
     }
-    if(field.type==='selector'&&field.selector?.text){
+    if(field.selector?.text?.multiline===true){
       control=`<textarea ${attr} rows="12" spellcheck="false"
         class="mm-option-yaml" aria-label="${label}">${escape(value??'')}</textarea>`;
-    }else if(field.type==='select'||field.type==='selector'){
+    }else if(field.type==='select'||field.selector?.select){
       control=`<select ${attr}>${pairs.map(([item,title])=>
         `<option value="${escape(item)}" ${value===item?'selected':''}>${escape(title)}</option>`).join('')}</select>`;
-    }else if(field.type==='boolean'){
+    }else if(field.type==='boolean'||field.selector?.boolean){
       control=`<input type="checkbox" ${attr} ${value===true?'checked':''}/>`;
     }else{
-      control=`<input type="${['integer','float'].includes(field.type)?'number':'text'}" ${attr}
-        ${field.type==='integer'?'step="1"':field.type==='float'?'step="any"':''}
+      const numeric=['integer','float'].includes(field.type)||!!field.selector?.number;
+      control=`<input type="${numeric?'number':'text'}" ${attr}
+        ${field.type==='integer'?'step="1"':numeric?'step="any"':''}
         value="${escape(value??'')}"/>`;
     }
     return `<label class="mm-option-field">${label}${control}${error?`<small class="mm-room-error">${error}</small>`:''}</label>`;
@@ -343,16 +411,16 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.description`,
         step.description_placeholders||{}):null;
     const unsupported=!!step&&!(step.data_schema||[]).every(rhiMmOptionSupported);
+    const guidance=description||step?.description_placeholders?.note;
     return `<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
       <h3>${escape(label||this.t('setup_editor'))}</h3>
-      ${description?`<p class="mm-options-description">${escape(description)}</p>`:''}
-      ${step?.description_placeholders?.note?`<p class="mm-options-description">${escape(step.description_placeholders.note)}</p>`:''}
+      ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
       ${base?`<p role="alert" class="mm-room-error">${escape(base)}</p>`:''}
       ${this._optionsNotice?`<p role="status">${escape(this._optionsNotice)}</p>`:''}
       ${step?.type==='form'?`<div class="mm-option-fields">
         ${(step.data_schema||[]).map(field=>this.optionInput(step,field)).join('')}</div>`:''}
       <div class="mm-setup-actions">
-        ${step?`<button type="button" data-mm-option-submit ${this._optionsBusy||unsupported?'disabled':''}>${this.t('setup_continue')}</button>`:''}
+        ${step?`<button type="button" data-mm-option-submit ${this._optionsBusy||unsupported?'disabled':''}>${step.step_id==='review'?this.t('settings_save'):this.t('setup_continue')}</button>`:''}
         ${step?`<button type="button" data-mm-option-cancel>${this.t('setup_cancel')}</button>`:''}
         <a href="/config/integrations/integration/rhi_multimedia">${this.t('setup_manage')}</a>
       </div></section>`;
@@ -397,13 +465,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const editing=!!this._optionsStep;
     const fingerprint=JSON.stringify([editing?'editing':model.ready,editing?null:model.rooms,
       editing?null:model.unavailable,editing?null:model.backendVersion,
-      route.view,route.room,route.floor,[...this._feedback],
+      route.view,route.room,route.floor,[...this._feedback],this._settingsCategory,
+      [...this._settingsSelections],[...this._remoteTabs],
       this._optionsRevision,this._hass.user?.id,this._hass.user?.is_admin,this._hass.locale?.language||this._hass.language]);
     // Keep independently mounted Core cards connected when media state changes.
     // Only replace the domain page, not the shared contextual editor.
     if(this._lastSignature!==fingerprint){
       this._lastSignature=fingerprint;
-      const shell=rhiUxDomainShell({product:'Home Intelligence',domain:'MULTIMEDIA',modules:MM_MODULES.map(m=>({...m,label:this.t(m.id),items:m.items.map(i=>({...i,label:this.t(i.id),target:i.id}))})),activeModule:MM_MODULES.find(m=>m.items.some(i=>i.id===route.view))?.id||'multimedia',activeItem:route.view});
+      const shell=rhiUxDomainShell({product:'Home Intelligence',domain:'MULTIMEDIA',modules:MM_MODULES.map(m=>({...m,label:this.t(m.id),items:m.items.map(i=>({...i,label:this.t(i.id),target:i.id}))})),activeModule:MM_MODULES.find(m=>m.items.some(i=>i.id===route.view))?.id||'overview',activeItem:route.view});
       const page=this.renderPage(model,route.view,route.room);
       const footer=rhiUxTechnicalFooter({product:'RHI Multimedia',uxVersion:RHI_MM_UX_VERSION,backendVersion:model.ready?model.backendVersion:this.t('not_published'),issue:!model.ready?this.t('backend_unavailable'):((model.summary.attention_rooms||model.unavailable)?this.t('attention'):this.t('ready')),severity:!model.ready?'warning':(model.summary.attention_rooms||model.unavailable)?'warning':''});
       if(!this.shadowRoot.querySelector?.('[data-mm-page]')){
@@ -417,7 +486,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     // Use the exact same Core scope on Overview and Activities. A room
     // drill-down narrows it; Devices/Diagnostics carry no implicit context.
-    const ids=model.ready&&['overview','activities'].includes(route.view)?model.rooms.map(r=>r.id):
+    const filtered=route.floor?model.rooms.filter(r=>route.floor==='__unassigned__'?!r.floor_id:r.floor_id===route.floor):model.rooms;
+    const focused=filtered.find(r=>r.id===route.room)||filtered[0];
+    const ids=model.ready&&route.view==='overview'?(focused?[focused.id]:[]):
+      model.ready&&route.view==='activities'?model.rooms.map(r=>r.id):
       model.ready&&route.view==='rooms'&&model.rooms.length?(route.room?model.rooms.filter(r=>r.id===route.room).map(r=>r.id):[model.rooms[0].id]):[];
     this.renderContext(ids);
   }
@@ -493,22 +565,17 @@ class HomeBrainMultimediaCard extends HTMLElement {
     });
   }
   hero(view){
-    const group=view==='overview'||view==='rooms'?'multimedia':view==='activities'?'activities':'insights';
+    const group=view==='overview'||view==='rooms'?'multimedia':
+      view==='settings'||view==='activities'?'activities':'insights';
     const hero=rhiUxPageHero({
       title:this.t(view==='overview'?'overview_title':view),
       description:this.t('hero_'+view),
       image:rhiMmHeroAsset(group),
       imageAlt:this.t('hero_art_'+group),
     });
-    const manage=this._hass.user?.is_admin?
-      `<div class="mm-hero-actions">
-        <button type="button" class="mm-hero-settings" data-mm-option-action="yaml"
-          title="${rhiUxEscape(this.t('setup_expert_yaml_all'))}">${rhiUxEscape(this.t('setup_expert_yaml_all'))}
-          <ha-icon icon="mdi:code-tags"></ha-icon></button>
-        <a href="/config/integrations/integration/rhi_multimedia" class="mm-hero-settings"
-          title="${rhiUxEscape(this.t('manage'))}">${rhiUxEscape(this.t('settings'))}
-          <ha-icon icon="mdi:cog-outline"></ha-icon></a></div>`:'';
-    return `<div class="mm-hero-frame">${hero}${manage}</div>`;
+    // Settings owns the single global YAML action; duplicate hero shortcuts
+    // make everyday screens taller and obscure the resident's first action.
+    return `<div class="mm-hero-frame">${hero}</div>`;
   }
   unavailable(model){return `<section class="mm-callout mm-attention"><ha-icon icon="mdi:connection"></ha-icon><div><b>${this.t('not_ready')}</b><p>${rhiUxEscape(model.reason)}</p><p>${this.t('setup_help')}</p></div></section>`;}
   feedback(roomId){const feedback=this._feedback.get(roomId);return feedback?rhiUxWriteFeedback(feedback):'';}
@@ -517,43 +584,163 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(!model.ready){
       // A first-time installer must be able to reach the authoritative
       // Options Flow even before any room sensor exists.
-      const firstSetup=view==='activities'&&this._hass?.user?.is_admin?
+      const firstSetup=view==='settings'&&this._hass?.user?.is_admin?
+        this.settings({rooms:[]}):view==='activities'&&this._hass?.user?.is_admin?
         this.activities({rooms:[]}):'';
-      const editor=!['activities','devices'].includes(view)?this.renderOptionsEditor():'';
+      const editor=!['activities','devices','settings'].includes(view)?this.renderOptionsEditor():'';
       return rhiUxPageTemplate({hero,content:editor+this.unavailable(model)+firstSetup});
     }
-    const status=view==='overview'?rhiUxStatusGrid([
-      {icon:'mdi:home-outline',label:this.t('rooms'),value:model.summary.room_count,detail:this.t('configured_rooms')},
-      {icon:'mdi:play-circle-outline',label:this.t('active'),value:model.summary.active_rooms,detail:this.t('activity_state')},
-      {icon:'mdi:music-circle-outline',label:this.t('playback'),value:model.summary.playing_rooms,detail:this.t('playing_readback')},
-      {icon:'mdi:alert-circle-outline',label:this.t('attention'),value:model.summary.attention_rooms,detail:this.t('review_rooms')},
-    ]):'';
+    // Object statuses belong beside the activity/device, not in a duplicate
+    // top-level KPI strip occupying the resident's first viewport.
+    const status='';
     const content={
       overview:()=>this.overview(model),rooms:()=>this.rooms(model,roomId),activities:()=>this.activities(model),
+      settings:()=>this.settings(model),insights:()=>this.insights(model),
       devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model),
     }[view]||(()=>this.overview(model));
-    const editor=!['activities','devices'].includes(view)?this.renderOptionsEditor():'';
+    const editor=!['activities','devices','settings'].includes(view)?this.renderOptionsEditor():'';
     return rhiUxPageTemplate({hero,status,content:editor+(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
   }
   overview(model){
-    // Floors are published by the Multimedia backend from HA registries, not
-    // guessed from room names or frontend entity scans. Missing means unassigned.
+    // Exact HA floor/area registry values come from the domain backend.
+    // A floor filters buttons; selecting a room never sends a command.
+    const escape=rhiUxEscape;
     const floors=[...new Map(model.rooms.filter(r=>r.floor_id&&r.floor_name)
       .map(r=>[r.floor_id,r.floor_name])).entries()]
       .sort((a,b)=>a[1].localeCompare(b[1]));
-    const selected=floors.some(([id])=>id===this._floor)?this._floor:'';
-    const visible=selected?model.rooms.filter(r=>r.floor_id===selected):model.rooms;
-    const buttons=floors.length?
-      `<nav class="mm-floor-nav" aria-label="${rhiUxEscape(this.t('floor_navigation'))}">
-      <button type="button" data-floor="" aria-pressed="${!selected}" class="${!selected?'active':''}">${rhiUxEscape(this.t('all_floors'))}</button>
-      ${floors.map(([id,name])=>`<button type="button" data-floor="${rhiUxEscape(id)}" aria-pressed="${selected===id}" class="${selected===id?'active':''}"><ha-icon icon="mdi:layers-outline"></ha-icon>${rhiUxEscape(name)}</button>`).join('')}</nav>`:'';
-    return `<section class="mm-section mm-overview"><div class="mm-heading">
-      <div><h2>${this.t('rooms_activities')}</h2><p>${this.t('compact_room_help')}</p></div>
-      <button class="mm-link" data-nav="rooms">${this.t('all_rooms')} <ha-icon icon="mdi:chevron-right"></ha-icon></button>
-      </div>${buttons}${model.rooms.length?`<div class="mm-room-stack">${visible.length?
-        visible.map(room=>this.roomCard(room,true)).join(''):
-        rhiUxState({state:'empty',title:this.t('no_floor_rooms'),detail:this.t('choose_other_floor')})}</div>`:
-        rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('create_room')})}</section>`;
+    const hasUnassigned=model.rooms.some(r=>!r.floor_id);
+    // Never show the whole house as room buttons when 7+ rooms span floors.
+    // Prefer explicit URL selection, then an explicitly selected room, then
+    // the most populated native floor. No guessed "Ground Floor" name.
+    const validFloor=id=>floors.some(([key])=>key===id)||(id==='__unassigned__'&&hasUnassigned);
+    const previous=model.rooms.find(r=>r.id===this._room);
+    const firstFloor=[...floors].sort((a,b)=>
+      model.rooms.filter(r=>r.floor_id===b[0]).length-
+      model.rooms.filter(r=>r.floor_id===a[0]).length||
+      a[1].localeCompare(b[1]))[0]?.[0];
+    const floor=validFloor(this._floor)?this._floor:
+      validFloor(previous?.floor_id)?previous.floor_id:
+      previous&&!previous.floor_id?'__unassigned__':
+      firstFloor||(hasUnassigned?'__unassigned__':'');
+    const visible=floor==='__unassigned__'?model.rooms.filter(r=>!r.floor_id):
+      floor?model.rooms.filter(r=>r.floor_id===floor):model.rooms;
+    const room=visible.find(r=>r.id===this._room)||visible[0];
+    const selector=`<label class="mm-floor-filter">${this.t('floor_navigation')}
+      <select data-floor-select aria-label="${this.t('floor_navigation')}">
+        ${floors.map(([id,name])=>`<option value="${escape(id)}" ${floor===id?'selected':''}>${escape(name)}</option>`).join('')}
+        ${hasUnassigned?`<option value="__unassigned__" ${floor==='__unassigned__'?'selected':''}>${this.t('settings_unassigned')}</option>`:''}
+      </select></label>`;
+    const roomButtons=visible.map(r=>`<button type="button" data-nav="overview"
+      data-room="${escape(r.id)}" class="${room?.id===r.id?'active':''}"
+      aria-pressed="${room?.id===r.id}">${escape(r.name)}</button>`).join('');
+    if(!room)return `<section class="mm-section mm-overview">
+      <div class="mm-floor-room-select">${selector}<div class="mm-floor-room-buttons">${roomButtons}</div></div>
+      ${rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('choose_other_floor')})}</section>`;
+    const activities=room.control_owner==='harmony'?[]:[...(room.activities||[])]
+      .sort((a,b)=>Number(b.active===true)-Number(a.active===true)||
+        Number(b.favorite===true)-Number(a.favorite===true));
+    const activityButtons=activities.map(a=>{
+      const key=room.id+':activity:'+a.id;
+      const linked=(a.device_keys||[]).map(deviceKey=>
+        room.devices.find(device=>device.key===deviceKey)?.name||this.t('device_unavailable'));
+      const targets=(a.target_state?.targets||[]).map(target=>{
+        const device=room.devices.find(row=>row.key===target.device_key);
+        const expected=Array.isArray(target.expected)?target.expected.join(', '):target.expected;
+        return `<li><strong>${escape(device?.name||this.t('device_unavailable'))}</strong>
+          <span>${this.t('settings_expected')}: ${escape(expected??this.t('not_published'))}</span>
+          <span>${this.t('target_actual')}: ${escape(target.actual??this.t('not_published'))}</span></li>`;
+      }).join('');
+      const plan=(a.script_steps||[]).map(step=>{
+        const name=room.devices.find(row=>row.key===step.device_key)?.name;
+        return `<li>${escape(name||this.t('device_unavailable'))} ·
+          ${escape(this.t('script_action_'+step.action))}
+          ${step.value?` · ${escape(step.value)}`:''}</li>`;
+      }).join('');
+      const off=room.activity_id===a.id&&room.control_owner!=='harmony'?
+        `<button type="button" class="mm-activity-off" data-action="stop_activity"
+          data-room="${escape(room.id)}"
+          aria-label="${escape(this.t('activity_off')+' · '+a.name)}"
+          ${rhiMmCanRun(room,'stop_activity')?'':'disabled'}
+          title="${escape(room.commands?.stop?.reason||'')}">
+          <ha-icon icon="mdi:power"></ha-icon>${this.t('off')}</button>`:'';
+      return `<div class="mm-cockpit-activity">
+        <div class="mm-activity-primary">
+        <button type="button" class="mm-activity ${a.active?'active':''}"
+          data-action="start_activity" data-room="${escape(room.id)}" data-activity="${escape(a.id)}"
+          aria-pressed="${a.active===true}" ${rhiMmCanRun(room,'start_activity',a.id)?'':'disabled'}>
+          <ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>
+          ${a.favorite===true?`<ha-icon class="mm-favorite-star" icon="mdi:star"
+            title="${this.t('favorite')}"></ha-icon>`:''}${escape(a.name)}</button>${off}</div>
+        ${!a.available?`<small class="mm-room-error">${escape(a.disabled_reason||this.t('unavailable'))}</small>`:''}
+        <details class="mm-activity-plan" data-persist="${escape(key)}"
+          ${this._expanded.has(key)?'open':''}>
+          <summary>${this.t('details')} · ${linked.length} ${this.t('devices')}</summary>
+          ${targets?`<ol>${targets}</ol>`:plan?`<ol>${plan}</ol>`:
+            `<p class="mm-muted">${this.t('settings_no_steps')}</p>`}
+        </details>
+      </div>`;
+    }).join('');
+    const stop=!activities.some(a=>a.id===room.activity_id)&&rhiMmCanRun(room,'stop_activity')?`<button type="button"
+      data-action="stop_activity" data-room="${escape(room.id)}"><ha-icon icon="mdi:stop-circle-outline"></ha-icon>${this.t('stop_activity')}</button>`:'';
+    const fix=rhiMmCanRun(room,'recover_activity')?`<button type="button"
+      data-action="recover_activity" data-room="${escape(room.id)}"><ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:'';
+    const devices=(room.devices||[]).map(d=>{
+      const key=room.id+':device:'+d.key;
+      const unavailable=!d.available||!d.foundation_approved;
+      const advanced=['play','pause','stop','previous','next','remote_key','sound_mode']
+        .some(action=>d.controls?.[action]);
+      return `<div class="mm-cockpit-device">
+        <div class="mm-cockpit-device-heading">
+          <span>${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}<b>${escape(d.name)}</b></span>
+          <small class="${unavailable?'mm-room-error':''}">${unavailable?
+            this.t('device_unavailable'):escape(rhiMmStateLabel(this._hass,d.state))}</small>
+        </div>
+        ${this.roomDeviceBasicActions(room,d)}
+        <details class="mm-cockpit-device-details" data-persist="${escape(key)}"
+          ${this._expanded.has(key)?'open':''}>
+          <summary>${this.t('details')}</summary>
+          <div class="mm-cockpit-device-body">
+            <small>${escape(rhiMmRoleLabel(this._hass,d.role))} ${d.shared?' · '+this.t('shared_source'):''}</small>
+            ${advanced?this.roomManualControls({...room,activities:[],devices:[d]},true,false,'advanced'):''}
+            ${this.productSpecifications(d)}
+            ${this._hass?.user?.is_admin?`<button type="button" data-mm-option-action="expert_yaml"
+              data-mm-option-scope="device" data-mm-option-room="${escape(room.id)}"
+              data-mm-option-id="${escape(d.key)}">${this.t('settings_yaml')}</button>`:''}
+          </div>
+        </details>
+      </div>`;
+    }).join('');
+    const detail=room.error||room.warnings?.length||room.target_state?.targets?.length||room.last_attempt;
+    return `<section class="mm-section mm-overview">
+      <div class="mm-floor-room-select">${selector}
+        <div class="mm-floor-room-buttons" role="group" aria-label="${this.t('room')}">${roomButtons}</div>
+      </div>
+      <div class="mm-cockpit">
+        <article class="mm-surface mm-cockpit-activities"><h3>${this.t('activities')}</h3>
+          <p class="mm-cockpit-current">${escape(room.activity_name||this.t('no_activity'))}
+          <small>${escape(rhiMmRoomStatus(room,this._hass))}</small></p>
+          <div class="mm-cockpit-activity-list">${activityButtons||this.t('no_activities')}</div>
+          <div class="mm-room-foot">${stop}${fix}</div>
+          ${this.feedback(room.id)}
+        </article>
+        <div class="mm-cockpit-controls">${this.roomFocusedRemote(room)}
+          ${room.now_playing?.title?`<small>${escape(rhiMmMediaSubtitle(room,this._hass))}</small>`:''}
+        </div>
+        <article class="mm-surface mm-cockpit-devices"><h3>${this.t('devices')}</h3>
+          ${devices||this.t('no_devices')}</article>
+      </div>
+      ${detail?`<details class="mm-surface mm-cockpit-diagnostics" data-persist="${escape(room.id+':diagnostics')}"
+        ${this._expanded.has(room.id+':diagnostics')?'open':''}>
+        <summary>${this.t('details')} · ${this.t('diagnostics')}</summary>
+        ${room.error?`<p class="mm-room-error">${escape(room.error)}</p>`:''}
+        ${(room.warnings||[]).map(msg=>`<p class="mm-room-error">${escape(msg)}</p>`).join('')}
+        ${(room.target_state?.targets||[]).map(target=>`<div class="mm-diag-status">
+          <span>${escape(room.devices.find(d=>d.key===target.device_key)?.name||target.device_key)} · ${escape(target.type)}</span>
+          <small>${this.t('target_expected')}: ${escape(Array.isArray(target.expected)?target.expected.join(', '):target.expected)} ·
+            ${this.t('target_actual')}: ${escape(target.actual??this.t('not_published'))}</small></div>`).join('')}
+        ${room.last_attempt?`<p class="mm-muted">${this.t('last_attempt')}: ${escape(room.last_attempt.kind)} · ${escape(room.last_attempt.result)}</p>`:''}
+      </details>`:''}
+    </section>`;
   }
 
   compactRoomCard(room){
@@ -675,7 +862,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       Object.keys(d.controls||{}).length&&
       (room.control_owner==='harmony'?d.key===room.harmony_controller:
         !d.external_owner&&(!cast||cast.has(d.key))));
-    const navigation=devices.filter(d=>d.controls.remote_key?.enabled);
+    const navigation=devices.filter(d=>d.controls.remote_key?.enabled||d.controls.remote_text?.enabled);
     const players=navigation.filter(d=>d.role==='player');
     const candidates=players.length?players:navigation.length?navigation:
       devices.filter(d=>Object.entries(d.controls).some(([action,cap])=>cap.enabled&&['play','pause','previous','next','harmony_activity','power_on','power_off'].includes(action)));
@@ -693,12 +880,84 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const audioPanel=audioTarget&&audioTarget.key!==target?.key?
       this.roomManualControls({...room,devices:[audioTarget]},true,true,'audio'):'';
     const missing=!primary&&!audioPanel?rhiUxState({state:'unavailable',title:this.t('device_controls'),detail:this.t('select')}):'';
+    const shortcutReady=room.phase==='active'&&room.control_owner!=='harmony';
+    const mapped=shortcutReady?(active?.button_map||[]).map(button=>
+      `<button type="button" data-mm-shortcut="press_activity_button"
+        data-room="${e(room.id)}" data-shortcut-key="${e(button.button)}"
+        ${button.enabled===true?'':'disabled'}
+        title="${e(button.button)} · ${e(room.devices.find(d=>d.key===button.device_key)?.name||this.t('unavailable'))}">
+        ${e(this.t('activity_button_'+button.button).startsWith('activity_button_')?
+          button.button.replaceAll('_',' '):this.t('activity_button_'+button.button))}</button>`).join(''):'';
+    const macros=shortcutReady?(active?.macros||[]).map(macro=>
+      `<button type="button" data-mm-shortcut="run_activity_macro"
+        data-room="${e(room.id)}" data-shortcut-key="${e(macro.id)}"
+        ${macro.enabled===true?'':'disabled'}>${e(macro.name)}</button>`).join(''):'';
+    const shortcuts=mapped||macros?`<div class="mm-activity-shortcuts">
+        <b>${this.t('settings_activity_shortcuts')}</b>
+        <div class="mm-native-buttons">${mapped}${macros}</div>
+        </div>`:'';
     return `<article class="mm-surface mm-focused-remote" data-remote-room="${e(room.id)}">
       <div class="mm-heading"><h3>${this.t('remote_keys')} · ${e(room.name)}</h3></div>
-      ${buttons}${primary}${audioPanel}${missing}
+      ${buttons}${primary}${audioPanel}${shortcuts}${missing}
       </article>`;
   }
   roomNowPlaying(room){const media=room.now_playing;return `<article class="mm-surface"><h3>${this.t('now_playing')}</h3>${media?`<div class="mm-media-detail">${media.picture?`<img alt="${this.t('media_artwork')}" src="${rhiUxEscape(media.picture)}">`:''}<div><b>${rhiUxEscape(media.title||this.t('playing'))}</b><p>${rhiUxEscape(media.artist||this.t('artist_unknown'))}</p><small>${rhiUxEscape(media.album||'')}</small></div></div>`:rhiUxState({state:'unavailable',title:this.t('no_playback'),detail:this.t('playback_help')})}${room.audio?`<div class="mm-audio-readback"><ha-icon icon="mdi:volume-high"></ha-icon><span>${rhiUxEscape(room.audio.name)}: ${room.audio.volume_level===null?this.t('volume_unknown'):`${Math.round(room.audio.volume_level*100)}%`}</span></div>`:''}</article>`;}
+
+  roomDeviceBasicActions(room,device){
+    // Direct basic controls use the same native capability-checked gateway.
+    // Unknown power, source and volume capabilities remain disabled/absent.
+    const e=rhiUxEscape,c=device.controls||{};
+    const attrs=`data-room="${e(room.id)}" data-device="${e(device.key)}"`;
+    const allowed=action=>device.foundation_approved===true&&c[action]?.enabled===true;
+    const button=(action,label,icon,value)=>`<button type="button" ${attrs}
+      data-device-action="${action}" ${value===undefined?'':`data-value="${e(JSON.stringify(value))}"`}
+      aria-label="${e(device.name+' · '+label)}"
+      ${allowed(action)?'':`disabled title="${e(c[action]?.reason||this.t('action_unavailable'))}"`}>
+      <ha-icon icon="${icon}"></ha-icon>${e(label)}</button>`;
+    const harmony=room.control_owner==='harmony'&&room.harmony_controller===device.key;
+    const harmonyOff=harmony&&c.harmony_activity?.options?.includes('PowerOff')?
+      button('harmony_activity',this.t('off'),'mdi:power','PowerOff'):'';
+    const power=harmony?harmonyOff:
+      button('power_on',this.t('on'),'mdi:power-on')+
+      button('power_off',this.t('off'),'mdi:power-off');
+    const sources=Array.isArray(c.source?.options)?c.source.options:[];
+    const source=sources.length?`<label class="mm-device-basic-source">
+      ${this.t('input')}<select ${attrs} data-device-input="source"
+        aria-label="${e(device.name+' · '+this.t('input'))}"
+        ${allowed('source')?'':`disabled title="${e(c.source?.reason||this.t('action_unavailable'))}"`}>
+        <option value="" ${sources.includes(device.source)?'':'selected'}>${this.t('select')}</option>
+        ${sources.map(value=>`<option value="${e(value)}" ${value===device.source?'selected':''}>${e(value)}</option>`).join('')}
+      </select></label>`:'';
+    const validLevel=typeof device.volume_level==='number'&&
+      Number.isFinite(device.volume_level)&&device.volume_level>=0&&device.volume_level<=1;
+    const slider=c.volume?(validLevel?`<label class="mm-device-basic-volume">
+      ${this.t('volume')} · ${Math.round(device.volume_level*100)}%
+      <input type="range" min="0" max="1" step="0.01" value="${device.volume_level}"
+        ${attrs} data-device-input="volume"
+        aria-label="${e(device.name+' · '+this.t('volume'))}"
+        ${allowed('volume')?'':`disabled title="${e(c.volume?.reason||this.t('action_unavailable'))}"`}>
+      </label>`:`<small>${this.t('volume_unknown')}</small>`):'';
+    const volumeButtons=(c.volume_down?button('volume_down',this.t('volume_down'),'mdi:volume-minus'):'')+
+      (c.volume_up?button('volume_up',this.t('volume_up'),'mdi:volume-plus'):'');
+    const mute=c.mute&&typeof device.is_volume_muted==='boolean'?
+      button('mute',device.is_volume_muted?this.t('unmute'):this.t('mute'),
+        device.is_volume_muted?'mdi:volume-high':'mdi:volume-off',!device.is_volume_muted):'';
+    const playback=(c.play?button('play',this.t('play'),'mdi:play'):'')+
+      (c.pause?button('pause',this.t('pause'),'mdi:pause'):'');
+    const owners=Array.isArray(device.reserved_by_rooms)?
+      device.reserved_by_rooms.filter(r=>typeof r.name==='string'&&r.name.trim())
+        .map(r=>e(r.name)).join(', '):'';
+    return `<div class="mm-device-basic" role="group"
+      aria-label="${e(device.name+' · '+this.t('device_basic_actions'))}">
+      ${owners?`<small class="mm-device-reservation">${this.t('reserved_by')}: ${owners}</small>`:''}
+      ${power?`<div class="mm-device-basic-buttons">${power}</div>`:''}
+      ${source}
+      ${slider||volumeButtons||mute?`<div class="mm-device-basic-audio">
+        ${slider}<div class="mm-device-basic-buttons">${volumeButtons}${mute}</div>
+      </div>`:''}
+      ${playback?`<div class="mm-device-basic-buttons">${playback}</div>`:''}
+    </div>`;
+  }
   roomManualControls(room,quick=false,focused=false,part='all'){
     const labels=Object.fromEntries(Object.entries({power_on:'on',power_off:'off',volume_down:'volume_down',volume_up:'volume_up',play:'play',pause:'pause',stop:'stop',previous:'previous',next:'next',source:'input',sound_mode:'sound_mode',volume:'volume',mute:'mute',join_group:'add_player',unjoin_group:'leave_group',harmony_activity:'harmony_activity'}).map(([action,key])=>[action,this.t(key)]));
     const escape=rhiUxEscape;
@@ -712,11 +971,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const disabled=cap=>cap.enabled?'':`disabled title="${escape(cap.reason||this.t('unavailable'))}"`;
       const button=(action,label,value)=>c[action]?`<button type="button" ${attrs} data-device-action="${action}" ${value===undefined?'':`data-value="${escape(JSON.stringify(value))}"`} ${disabled(c[action])}>${escape(label)}</button>`:'';
       const options=(action,current)=>c[action]?`<label>${labels[action]}<select ${attrs} data-device-input="${action}" ${disabled(c[action])}><option value="">${escape(current||this.t('select'))}</option>${c[action].options.map(v=>`<option value="${escape(v)}" ${v===current?'selected':''}>${escape(c[action].option_labels?.[v]||v)}</option>`).join('')}</select></label>`:'';
-      const actions=focused?(part==='audio'?['volume_down','volume_up']:['power_on','power_off','previous','play','pause','stop','next',...(part==='all'?['volume_down','volume_up']:[])]):
+      const actions=part==='advanced'?['previous','stop','next']:
+        focused?(part==='audio'?['volume_down','volume_up']:['power_on','power_off','previous','play','pause','stop','next',...(part==='all'?['volume_down','volume_up']:[])]):
         quick?['power_on','power_off','play','pause',...(!c.volume?['volume_down','volume_up']:[])]:['power_on','power_off','volume_down','volume_up','previous','play','pause','stop','next'];
       const buttons=actions.map(action=>button(action,labels[action])).join('');
-      const volume=part!=='primary'&&c.volume&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
-      const mute=part!=='primary'&&typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
+      const volume=part!=='primary'&&part!=='advanced'&&c.volume&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
+      const mute=part!=='primary'&&part!=='advanced'&&typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
       const remote=part!=='audio'&&c.remote_key?(()=>{
         const sections=rhiMmRemoteGroups(c.remote_key.options);
         const key=room.id+':'+d.key+':remote';
@@ -734,16 +994,42 @@ class HomeBrainMultimediaCard extends HTMLElement {
           return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}><summary>${this.t('remote_'+section.name)}</summary><div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
         }).join('');
         if(focused){
-          const direct=sections.find(section=>section.name==='media');
-          const advanced=sections.filter(section=>section.name!=='navigation'&&section.name!=='media').map(section=>{
-            const persist=key+':'+section.name;
-            return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}><summary>${this.t('remote_'+section.name)}</summary><div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
-          }).join('');
-          return `${navigation}${direct?`<div class="mm-native-buttons" role="group" aria-label="${this.t('remote_media')}">${direct.keys.map(renderKey).join('')}</div>`:''}${advanced}`;
+          const tabKey=room.id+':'+d.key;
+          const chosen=this._remoteTabs.get(tabKey)||'buttons';
+          const numbers=sections.find(section=>section.name==='numbers');
+          const media=sections.find(section=>section.name==='media');
+          const extras=sections.filter(section=>!['navigation','media','numbers'].includes(section.name))
+            .map(section=>{
+              const persist=key+':'+section.name;
+              return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}>
+                <summary>${this.t('remote_'+section.name)}</summary>
+                <div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
+            }).join('');
+          const tabs=[['buttons',this.t('remote_buttons')],['numbers',this.t('remote_numbers')],
+                      ['text',this.t('remote_text')]];
+          const selector=`<div class="mm-remote-tabs" role="group" aria-label="${this.t('remote_keys')}">
+            ${tabs.map(([id,label])=>`<button type="button" data-remote-tab="${id}" data-room="${escape(room.id)}"
+              data-device="${escape(d.key)}" aria-pressed="${chosen===id}">${escape(label)}</button>`).join('')}
+          </div>`;
+          const content=chosen==='numbers'?
+            (numbers?.keys.length?`<div class="mm-remote-numbers" role="group" aria-label="${this.t('remote_numbers')}">
+              ${numbers.keys.map(renderKey).join('')}</div>`:
+              `<p class="mm-muted">${this.t('remote_not_supported')}</p>`):
+            chosen==='text'?(c.remote_text?.enabled?
+              `<div class="mm-remote-text-input"><label>${this.t('remote_text')}
+                <input type="text" maxlength="256" data-device-text data-room="${escape(room.id)}"
+                  data-device="${escape(d.key)}" autocomplete="off"
+                  placeholder="${this.t('remote_text_placeholder')}"></label>
+                <button type="button" data-device-text-submit data-room="${escape(room.id)}"
+                  data-device="${escape(d.key)}">${this.t('remote_text_send')}</button></div>`:
+              `<p class="mm-muted">${this.t('remote_text_unavailable')}</p>`):
+            `${navigation}${media?`<div class="mm-native-buttons" role="group"
+               aria-label="${this.t('remote_media')}">${media.keys.map(renderKey).join('')}</div>`:''}${extras}`;
+          return selector+content;
         }
         return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}</details>`;
       })():'';
-      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
+      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'||part==='advanced'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(part==='advanced'?options('sound_mode',d.sound_mode)+remote:room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
     }).join('');
     if(!body)return '';
     return quick?`<div class="mm-quick-controls">${body}</div>`:
@@ -782,6 +1068,224 @@ class HomeBrainMultimediaCard extends HTMLElement {
         ${rhiUxEscape(link.skipped.join(', '))}</span></div>`;
     }));
     const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length||cec.length?`<div class="mm-device-list">${cec.join('')}${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
+  settings(model){
+    const esc=rhiUxEscape,manage=this._hass?.user?.is_admin===true;
+    const category=this._settingsCategory;
+    const groups={
+      locations:model.rooms.map(room=>({
+        id:room.id,room,label:room.name,
+        subtitle:[room.floor_name,room.area_name].filter(Boolean).join(' · '),
+        scope:'room',objectId:''})),
+      devices:model.rooms.flatMap(room=>(room.devices||[]).map(device=>({
+        id:room.id+':'+device.key,room,device,
+        label:device.name,subtitle:room.name+' · '+rhiMmRoleLabel(this._hass,device.role),
+        scope:'device',objectId:device.key}))),
+      activities:model.rooms.flatMap(room=>(room.activities||[]).map(activity=>({
+        id:room.id+':'+activity.id,room,activity,
+        label:activity.name,subtitle:room.name,
+        scope:'activity',objectId:activity.id}))),
+    };
+    const entries=groups[category]||[];
+    const remembered=this._settingsSelections.get(category);
+    const selected=entries.find(item=>item.id===remembered)||entries[0];
+    const itemRows=entries.map(item=>`<button type="button" class="mm-settings-item ${selected?.id===item.id?'active':''}"
+        data-mm-settings-pick="${esc(item.id)}" aria-pressed="${selected?.id===item.id}">
+        <strong>${esc(item.label)}</strong><small>${esc(item.subtitle)}</small></button>`).join('');
+    const classes=[
+      ['profiles',this.t('settings_profiles'),true],
+      ['locations',this.t('settings_floor_rooms'),false],
+      ['devices',this.t('devices'),false],
+      ['activities',this.t('activities'),false],
+    ];
+    const menu=classes.map(([key,label,disabled])=>`<button type="button"
+      data-mm-settings-category="${esc(key)}" ${disabled?'disabled':''}
+      class="mm-settings-nav ${category===key?'active':''}" aria-pressed="${category===key}">
+      ${esc(label)}${disabled?`<small>${this.t('settings_later')}</small>`:''}</button>`).join('');
+    const scopeButton=selected&&manage?`<button type="button" class="mm-settings-yaml"
+      data-mm-option-action="expert_yaml" data-mm-option-room="${esc(selected.room.id)}"
+      data-mm-option-scope="${esc(selected.scope)}" data-mm-option-id="${esc(selected.objectId)}">
+      <ha-icon icon="mdi:code-tags"></ha-icon>${this.t('settings_yaml')}</button>`:'';
+    const selectedActivity=selected?.activity;
+    const selectedDevice=selected?.device;
+    const script=selectedActivity?`<div class="mm-script-devices">
+      ${(selectedActivity.device_keys||[]).map(key=>{
+        const device=selected.room.devices.find(d=>d.key===key);
+        const all=selectedActivity.script_steps||[];
+        const steps=all.filter(step=>step.device_key===key);
+        const stop=(selectedActivity.stop_script_steps||[]).filter(step=>step.device_key===key);
+        const goals=(selectedActivity.target_state?.targets||[]).filter(target=>target.device_key===key);
+        const power=selectedActivity.power_plan?.find(item=>item.device_key===key);
+        const ready=power?.action==='cec_wake'?this.t('settings_cec_wake'):
+          power?.action==='ensure_ready'?this.t('settings_ensure_ready'):this.t('not_published');
+        const quickType=device?.controls?.remote_key?.options?.length?'remote_key':
+          device?.controls?.source?.options?.length?'source':'delay';
+        const renderSteps=(rows,kind)=>rows.map(step=>{
+          const detail=step.action==='volume'&&typeof step.level==='number'?
+            Math.round(step.level*100)+'%':
+            step.action==='delay'&&typeof step.milliseconds==='number'?
+            step.milliseconds+' ms':
+            step.action==='wait_until'?
+            (Array.isArray(step.states)?step.states.join(', '):'')+
+              (typeof step.timeout==='number'?' · '+this.t('settings_wait_timeout')+
+                ' '+step.timeout+' s':''):
+            step.value??step.candidates?.join(', ')??step.level??'';
+          // The engine only applies inter-step delay between two ordinary
+          // commands, not after the last command or beside explicit waits.
+          const next=kind==='steps'?all[step.index]:null;
+          const pause=kind==='steps'&&next&&!['delay','wait_until'].includes(step.action)&&
+            !['delay','wait_until'].includes(next.action);
+          const delay=pause?`${step.delay_ms!==undefined?this.t('settings_delay_override'):
+            this.t('settings_delay_inherited')} · ${esc(step.delay_ms??selected.room.default_step_delay_ms??0)} ms`:'';
+          const actionName=this.t('script_action_'+step.action);
+          return `<li class="mm-script-step"><span>${esc(step.index)}. ${esc(actionName)}
+            ${detail!==''?`<b>${esc(detail)}</b>`:''}</span>
+            <div class="mm-step-actions">${delay?`<small>${delay}</small>`:''}
+              ${manage?`<button type="button" class="mm-step-edit" data-mm-option-action="script_step"
+                data-mm-option-room="${esc(selected.room.id)}"
+                data-mm-option-activity="${esc(selectedActivity.id)}"
+                data-mm-option-phase="${esc(kind)}" data-mm-option-operation="edit"
+                data-mm-option-index="${esc(step.index-1)}"
+                data-mm-option-device="${esc(key)}" data-mm-option-type="${esc(step.action)}">
+                  ${this.t('settings_edit_step')}</button>`:''}</div></li>`;
+        }).join('');
+        return `<section class="mm-script-device">
+          <div class="mm-script-device-head"><strong>${esc(device?.name||key)}</strong>
+          <small>${this.t('settings_expected')}: ${esc(goals.length?goals.map(g=>g.type+' · '+(Array.isArray(g.expected)?g.expected.join(', '):g.expected)).join('; '):this.t('not_published'))}</small></div>
+          <div class="mm-script-automatic"><ha-icon icon="mdi:power"></ha-icon>
+            <span>${this.t('settings_automatic_start')}: ${ready}${power?.post_power_on_delay_ms>0?
+   ' · '+this.t('settings_post_power_delay')+': '+power.post_power_on_delay_ms+' ms':''}</span></div>
+          <ol class="mm-script-steps">${renderSteps(steps,'steps')||
+            `<li>${this.t('settings_no_steps')}</li>`}</ol>
+          ${manage?`<button type="button" class="mm-step-add" data-mm-option-action="script_step"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}"
+            data-mm-option-phase="steps" data-mm-option-operation="add"
+            data-mm-option-index="0" data-mm-option-device="${esc(key)}"
+            data-mm-option-type="${esc(quickType)}">
+            <ha-icon icon="mdi:plus"></ha-icon>${this.t('settings_add_step')}</button>`:''}
+          <details class="mm-script-stop"><summary>${this.t('settings_stop_actions')}</summary>
+            <ol class="mm-script-steps">${renderSteps(stop,'stop_steps')}
+              <li class="mm-script-automatic">${this.t('settings_automatic_stop')}</li>
+            </ol>
+            ${manage?`<button type="button" class="mm-step-add" data-mm-option-action="script_step"
+              data-mm-option-room="${esc(selected.room.id)}"
+              data-mm-option-activity="${esc(selectedActivity.id)}"
+              data-mm-option-phase="stop_steps" data-mm-option-operation="add"
+              data-mm-option-index="0">
+              <ha-icon icon="mdi:plus"></ha-icon>${this.t('settings_add_stop_step')}</button>`:''}
+          </details>
+          </section>`;
+      }).join('')}</div>`:'';
+    const details=!selected?`<p class="mm-muted">${this.t('settings_empty')}</p>`:
+      selectedActivity?`${script}
+        <section class="mm-activity-configured-actions">
+          <h4>${this.t('settings_activity_shortcuts')}</h4>
+          ${(selectedActivity.button_map||[]).length?
+            (selectedActivity.button_map||[]).map(b=>`<p>
+              <b>${esc(b.button.replaceAll('_',' '))}</b> →
+              ${esc(selected.room.devices.find(d=>d.key===b.device_key)?.name||b.device_key)}
+              · ${esc(b.action)} ${b.value?esc(b.value):''}
+              ${b.enabled?'':`<small class="mm-room-error">${this.t('action_unavailable')}</small>`}
+            </p>`).join(''):`<p class="mm-muted">${this.t('settings_no_mapping')}</p>`}
+          ${(selectedActivity.macros||[]).length?
+            selectedActivity.macros.map(m=>`<div class="mm-macro-entry"><b>${esc(m.name)}</b> ·
+              ${m.steps} ${this.t('settings_step_count')}
+              ${m.enabled?'':`<small class="mm-room-error">${this.t('action_unavailable')}</small>`}
+              <details class="mm-script-stop">
+                <summary>${this.t('settings_edit_steps')} · ${esc(m.name)}</summary>
+                <ol class="mm-script-steps">${(m.script_steps||[]).map(step=>{
+                  const device=selected.room.devices.find(d=>d.key===step.device_key);
+                  const value=step.value??step.candidates?.join(', ')??step.level??
+                    step.milliseconds??step.states?.join(', ')??'';
+                  const next=m.script_steps?.[step.index];
+                  const between=next&&!['delay','wait_until'].includes(step.action)&&
+                    !['delay','wait_until'].includes(next.action);
+                  const timing=step.action==='delay'?`${step.milliseconds} ms`:
+                    step.action==='wait_until'?`${step.timeout} s timeout`:
+                    between?`${step.delay_ms??selected.room.default_step_delay_ms??0} ms`:'';
+
+                  return `<li class="mm-script-step">${esc(step.index)}.
+                    ${esc(device?.name||step.device_key)} →
+                    ${esc(this.t('script_action_'+step.action))}
+                    ${value!==''?`<b>${esc(value)}</b>`:''}
+                    ${timing?`<small>${esc(timing)}</small>`:''}</li>`;
+                }).join('')}</ol>
+              </details>
+            </div>`).join(''):`<p class="mm-muted">${this.t('settings_no_macro')}</p>`}
+          ${manage?`<div class="mm-setup-actions">
+            <button type="button" data-mm-option-action="button_mapping"
+              data-mm-option-room="${esc(selected.room.id)}"
+              data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('settings_button_mapping')}</button>
+            <button type="button" data-mm-option-action="macro_manage"
+              data-mm-option-room="${esc(selected.room.id)}"
+              data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('settings_macro_shortcuts')}</button>
+          </div>`:''}
+        </section>
+        ${manage?`<div class="mm-setup-actions">
+          <button type="button" data-mm-option-action="script_step"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('settings_edit_steps')}</button>
+          <button type="button" data-mm-option-action="quick_edit_activity"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('setup_edit_activity')}</button>
+          <button type="button" data-mm-option-action="edit_activity"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('settings_edit_activity_devices')}</button>
+          <button type="button" data-mm-option-action="remove_activity"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('settings_remove_activity')}</button>
+          <button type="button" data-mm-option-action="cec_activity"
+            data-mm-option-room="${esc(selected.room.id)}"
+            data-mm-option-activity="${esc(selectedActivity.id)}">${this.t('setup_cec_activity')}</button>
+        </div>`:''}`:
+      selectedDevice?`<div class="mm-settings-facts">
+        <p>${this.t('native_state')}: ${esc(rhiMmStateLabel(this._hass,selectedDevice.state))}</p>
+        <p>HDMI-CEC: ${selectedDevice.hdmi_cec_enabled?this.t('enabled'):this.t('not_confirmed')}</p>
+        <p>${this.t('settings_post_power_delay')}: ${esc(selectedDevice.post_power_on_delay_ms??0)} ms</p>
+        ${this.roomAvailableControls(selectedDevice)}</div>
+${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-action="cec_device"
+          data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_cec_devices')}</button>
+          <button type="button" data-mm-option-action="edit_room"
+          data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_edit_devices')}</button>
+        </div>`:''}`:
+      `<div class="mm-settings-facts">
+         <p>${this.t('room')}: ${esc(selected.room.name)}</p>
+         <p>${this.t('floor_navigation')}: ${esc(selected.room.floor_name||this.t('not_published'))}</p>
+         <p>${this.t('setup_devices')}: ${selected.room.devices.length}</p>
+       </div>${manage?`<div class="mm-setup-actions">
+         <button type="button" data-mm-option-action="rename_room"
+           data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_edit_location')}</button>
+         <button type="button" data-mm-option-action="edit_room"
+           data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_edit_devices')}</button>
+         <button type="button" data-mm-option-action="remove_room"
+           data-mm-option-room="${esc(selected.room.id)}">${this.t('settings_remove_room')}</button>
+       </div>`:''}`;
+    const add=!manage?'':category==='activities'?`<div class="mm-setup-actions">
+      <button type="button" data-mm-option-action="add_activity"
+        ${selected?`data-mm-option-room="${esc(selected.room.id)}"`:''}>${this.t('setup_add_activity')}</button>
+      <button type="button" data-mm-option-action="script_defaults">${this.t('settings_default_delay')}</button>
+      ${selected?`<span class="mm-muted">${esc(selected.room.default_step_delay_ms??0)} ms</span>`:''}
+      </div>`:category==='locations'?`<button type="button" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>`:'';
+    return `<section class="mm-section mm-settings">
+      <div class="mm-heading"><h2>${this.t('settings')}</h2>
+        ${manage?`<button type="button" class="mm-settings-yaml mm-global-yaml"
+          data-mm-option-action="yaml"><ha-icon icon="mdi:code-tags"></ha-icon>${this.t('settings_edit_all_yaml')}</button>`:''}</div>
+      <div class="mm-settings-layout">
+        <nav class="mm-settings-menu" aria-label="${this.t('settings')}">${menu}</nav>
+        <div class="mm-settings-main">
+          ${this._optionsStep||this._optionsBusy||this._optionsError?
+            this.renderOptionsEditor():
+            `<div class="mm-settings-heading"><h3>${esc(selected?.label||classes.find(c=>c[0]===category)?.[1]||'')}</h3>
+              ${scopeButton}</div>
+              ${add}
+              <div class="mm-settings-choices">${itemRows}</div>
+              ${details}
+              ${this._optionsNotice?this.renderOptionsEditor():''}`}
+        </div>
+      </div>
+    </section>`;
+  }
+
   activities(model){
     // This is a configuration map, never a second activity executor. The
     // native Multimedia Options Flow remains the sole atomic config writer.
@@ -919,6 +1423,98 @@ class HomeBrainMultimediaCard extends HTMLElement {
         rhiUxState({state:'empty',title:this.t('no_devices'),detail:this.t('no_bound')})}
       </section>`;
   }
+
+  insights(model){
+    // Resident task order: problem -> affected device/route -> permitted fix.
+    // No summary counters or invented event history; evidence belongs to the
+    // existing native activity/target projection.
+    const esc=rhiUxEscape;
+    const rooms=[...model.rooms].sort((a,b)=>Number(b.attention===true)-Number(a.attention===true)||
+      String(a.name).localeCompare(String(b.name)));
+    const cards=rooms.map(room=>{
+      const target=room.target_state;
+      const misses=(target?.targets||[]).filter(item=>item.status!=='observed');
+      const offline=(room.devices||[]).filter(d=>d.available===false||d.foundation_approved===false);
+      const attention=room.attention===true;
+      // A provider failure may contain internal keys and entity names.
+      // Present a user explanation on D0; keep exact messages folded under
+      // diagnostics where they remain useful as genuine source evidence.
+      const affected=offline[0]||room.devices?.find(d=>d.key===misses[0]?.device_key);
+      const message=room.phase==='starting'||room.phase==='stopping'?
+        this.t('waiting'):
+        offline.length?`${affected?.name||room.name}: ${this.t('insights_unavailable')}`:
+        attention&&misses.length?`${affected?.name||room.name}: ${this.t('insights_target_mismatch')}`:
+        attention?this.t('insights_attention'):
+        this.t('insights_no_issue');
+      const latest=room.last_attempt;
+      const more=room.id+':insights:details';
+      const tech=room.id+':insights:technical';
+      const targeted=misses.map(item=>{
+        const name=(room.devices||[]).find(d=>d.key===item.device_key)?.name||item.device_key;
+        const expected=Array.isArray(item.expected)?item.expected.join(', '):item.expected;
+        return `<div class="mm-insight-target"><b>${esc(name)}</b>
+          <span>${this.t('settings_expected')}: ${esc(expected??this.t('not_published'))}</span>
+          <span>${this.t('target_actual')}: ${esc(item.actual??this.t('not_published'))}</span></div>`;
+      }).join('');
+      const devices=offline.map(d=>`<div class="mm-insight-target"><b>${esc(d.name)}</b>
+        <span>${esc(d.foundation_approved===false?this.t('diag_not_selected'):this.t('diag_device_unavailable'))}</span>
+      </div>`).join('');
+      const fix=rhiMmCanRun(room,'recover_activity')?`<button type="button"
+          class="mm-insight-fix" data-action="recover_activity" data-room="${esc(room.id)}">
+          <ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:'';
+      const state=attention?this.t('insights_attention'):rhiMmRoomStatus(room,this._hass);
+      const open=attention||offline.length>0;
+      return `<article class="mm-surface mm-insight ${attention?'mm-insight-attention':''}">
+        <div class="mm-insight-head">
+          <div><h3>${esc(room.name)}</h3>
+            <small>${esc(room.activity_name||this.t('no_activity'))}</small></div>
+          <span class="mm-insight-state">${esc(state)}</span>
+        </div>
+        <p class="mm-insight-summary ${attention?'mm-room-error':''}">${esc(message)}</p>
+        ${open?`<div class="mm-insight-affected">${devices}${targeted}</div>`:''}
+        <div class="mm-insight-actions">${fix}
+          <button type="button" data-nav="overview" data-room="${esc(room.id)}">
+            ${this.t('insights_open_room')}</button></div>
+        ${this.feedback(room.id)}
+        <details data-persist="${esc(more)}" ${this._expanded.has(more)?'open':''}>
+          <summary>${this.t('insights_details')}</summary>
+          ${latest?`<div class="mm-diag-status">
+            <span>${this.t('last_attempt')}</span>
+            <b>${esc(latest.kind||this.t('unknown'))} · ${esc(latest.result||this.t('unknown'))}</b>
+            ${latest.failed_at?`<small>${this.t('failed_step')}: ${esc(latest.failed_at)}</small>`:''}
+          </div>`:''}
+          ${room.last_control?`<div class="mm-diag-status">
+            <span>${this.t('last_control')}</span>
+            <b>${esc(room.last_control.action||this.t('unknown'))} · ${esc(room.last_control.result||this.t('unknown'))}</b></div>`:''}
+          ${!open?`<div class="mm-insight-affected">${targeted}</div>`:''}
+          ${room.error?`<p class="mm-room-error">${esc(room.error)}</p>`:''}
+          ${(room.warnings||[]).map(warning=>`<p class="mm-room-error">${esc(warning)}</p>`).join('')}
+          ${(room.activities||[]).flatMap(a=>(a.routes||[]).map(route=>{
+            const d=room.devices?.find(x=>x.key===route.device_key);
+            return `<div class="mm-diag-route"><b>${esc(a.name)}</b>
+                <span>${esc(d?.name||route.device_key||this.t('unavailable'))}
+                · ${esc(route.type||this.t('unknown'))}</span>
+                <small>${esc(route.status||this.t('unknown'))}</small></div>`;
+          })).join('')}
+          <details data-persist="${esc(tech)}" ${this._expanded.has(tech)?'open':''}>
+            <summary>${this.t('technical')}</summary>
+            <div class="mm-tech">${(room.devices||[]).map(d=>`<p><b>${esc(d.name)}</b>
+              <small>${this.t('diag_source')}: ${esc(d.entity_id||this.t('not_published'))}</small>
+              <small>${this.t('readback_quality')}: ${esc(this.t('readback_'+(d.native_readback_quality||'unapproved')))}</small>
+              ${Object.entries(d.controls||{}).filter(([,c])=>!c.enabled&&c.reason).map(([action,c])=>
+                `<small>${esc(action)}: ${esc(c.reason)}</small>`).join('')}</p>`).join('')}</div>
+          </details>
+        </details>
+      </article>`;
+    }).join('');
+    return `<section class="mm-section mm-insights"><div class="mm-heading">
+        <div><h2>${this.t('insights')}</h2>
+          <p>${this.t('insights_explainer')}</p></div></div>
+      <div class="mm-insights-list">${cards||rhiUxState({
+        state:'empty',title:this.t('no_rooms'),detail:this.t('setup_help')})}</div>
+    </section>`;
+  }
+
   diagnostics(model){
     // Insights projects real runtime facts only: no synthetic availability,
     // historical averages, latency or counters. Expose route readback and

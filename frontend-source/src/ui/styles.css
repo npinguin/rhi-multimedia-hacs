@@ -167,3 +167,158 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 
 /* Contextual content only; keep the established shared shell. */
 .mm-room-operate{align-self:flex-start;margin:0 8px 10px;min-height:36px}.mm-compact-summary>.mm-device-art{width:38px;height:38px}.mm-focused-remote .mm-native-buttons{gap:6px}
+
+/* Approved Premium Settings: one category rail, one scoped editor. Existing
+   UX Core shell and Hero remain untouched. */
+.mm-settings-layout{display:grid;grid-template-columns:minmax(160px,210px) minmax(0,1fr);gap:12px;align-items:start}
+.mm-settings-menu{display:grid;gap:5px;padding:10px;border:1px solid #e4ebf5;border-radius:13px;background:#f8faff}
+.mm-settings-nav{min-height:44px;text-align:left;border:1px solid transparent;border-radius:9px;padding:9px 11px;background:transparent;color:#254769;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.mm-settings-nav.active{background:#eaf3ff;border-color:#c5dbf6;color:#1254a1}
+.mm-settings-nav:disabled{opacity:.45;cursor:not-allowed}.mm-settings-nav small{display:block;font-size:10px;font-weight:400}
+.mm-settings-main{min-width:0;border:1px solid #e0e8f2;border-radius:13px;padding:15px;background:#fff}
+.mm-settings-heading,.mm-settings .mm-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mm-settings-heading h3{font-size:16px;margin:0;color:#173e66}
+.mm-settings-yaml{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:7px 11px;border:1px solid #cddfeb;border-radius:8px;background:#f7faff;color:#145eaa;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.mm-settings-yaml ha-icon{--mdc-icon-size:17px}
+.mm-global-yaml{background:#eef5ff;border-color:#b7d3f4}
+.mm-settings-choices{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.mm-settings-item{display:grid;gap:3px;min-height:44px;min-width:115px;max-width:240px;padding:8px 10px;text-align:left;background:#fff;border:1px solid #dfe7f2;border-radius:9px;color:#234567;cursor:pointer}
+.mm-settings-item.active{background:#f0f6ff;border-color:#a9caef}
+.mm-settings-item strong{font-size:12px}.mm-settings-item small{font-size:10px;color:#6c8095}
+.mm-settings-facts p{margin:6px 0;font-size:12px}
+.mm-script-devices{display:grid;gap:9px;margin-top:12px}
+.mm-script-device{border:1px solid #e2eaf3;border-radius:10px;overflow:hidden}
+.mm-script-device-head{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;padding:9px 11px;background:#f7faff}
+.mm-script-device-head strong{font-size:13px}.mm-script-device-head small{font-size:11px;color:#657c95;max-width:75%;overflow-wrap:anywhere}
+.mm-script-steps{list-style:none;margin:0;padding:6px 11px 9px 25px;display:grid;gap:3px}
+.mm-script-steps li{display:flex;justify-content:space-between;gap:8px;font-size:12px;border-left:2px solid #e0ecfa;padding:4px 9px;overflow-wrap:anywhere}
+.mm-script-steps li small{color:#6d8198;white-space:nowrap}
+.mm-settings button:focus-visible,.mm-settings textarea:focus-visible{outline:2px solid #1267be;outline-offset:2px}
+@media(max-width:690px){.mm-settings-layout{grid-template-columns:1fr}.mm-settings-menu{display:flex;overflow-x:auto;gap:6px}.mm-settings-nav{flex:none}.mm-settings-main{padding:11px}.mm-script-device-head small{max-width:100%}}
+
+/* One-room operational cockpit. Existing shared Premium shell and Hero unchanged. */
+.mm-floor-room-select{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.mm-floor-filter{display:grid;gap:4px;font-size:11px;color:#61758d;font-weight:650;min-width:135px}
+.mm-floor-filter select{min-height:44px;padding:8px 10px;background:#fff;border:1px solid #d9e5f1;border-radius:9px;color:#1c466e;font:inherit;font-size:12px}
+.mm-floor-room-buttons{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.mm-floor-room-buttons button{min-height:44px;padding:7px 12px;background:#fff;border:1px solid #d6e2ee;border-radius:9px;color:#295377;font:inherit;font-size:12px;cursor:pointer}
+.mm-floor-room-buttons button.active{background:#e8f3ff;border-color:#99c2ef;color:#0e5daa;font-weight:700}
+.mm-cockpit{display:grid;grid-template-columns:minmax(165px,.9fr) minmax(230px,1.4fr) minmax(175px,1fr);align-items:start;gap:10px}
+.mm-cockpit>.mm-surface,.mm-cockpit>.mm-cockpit-controls,.mm-cockpit-controls>.mm-focused-remote{min-width:0;margin:0}
+.mm-cockpit-activities,.mm-cockpit-devices{display:grid;gap:8px}
+.mm-cockpit h3{margin:0;font-size:14px;color:#1a3e64}
+.mm-cockpit-current{font-size:12px;color:#5d7891;margin:2px 0}
+.mm-cockpit-activity-list{display:grid;gap:6px}
+.mm-cockpit-activity .mm-activity{width:100%;min-height:44px;text-align:left}
+.mm-activity-primary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:stretch}
+.mm-activity-primary .mm-activity-off{display:inline-flex;align-items:center;justify-content:center;
+  gap:4px;min-height:44px;padding:7px 10px;border:1px solid #cad8e6;border-radius:9px;
+  background:#fff;color:#345775;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.mm-activity-primary .mm-activity-off ha-icon{--mdc-icon-size:18px}
+.mm-activity-primary .mm-activity-off:disabled{opacity:.5;cursor:not-allowed}
+.mm-activity-primary .mm-activity-off:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+.mm-cockpit-activity small{display:block;margin:4px 0 2px;font-size:11px}
+.mm-cockpit-activities .mm-room-foot{margin-top:5px;flex-wrap:wrap}
+.mm-cockpit-device{margin:0!important;border:1px solid #e1eaf4;border-radius:9px;padding:7px 9px}
+.mm-cockpit-device-heading{display:flex;align-items:center;justify-content:space-between;gap:9px;min-height:44px;color:#2d4e70}
+.mm-cockpit-device-heading span{display:flex;align-items:center;gap:7px;min-width:0}
+.mm-cockpit-device-heading b{font-size:12px;overflow-wrap:anywhere}
+.mm-cockpit-device-heading small{font-size:10px;white-space:normal;text-align:right}
+.mm-cockpit-device-details{border-top:1px solid #e7eef8;margin-top:8px}
+.mm-cockpit-device-details>summary{min-height:40px;display:flex;align-items:center;
+  font-size:11px;color:#365e84;cursor:pointer}
+.mm-device-basic{display:grid;gap:7px;margin-top:7px}
+.mm-device-basic-buttons{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.mm-device-basic-buttons button{display:inline-flex;align-items:center;justify-content:center;
+  flex:1 1 70px;min-width:0;min-height:44px;gap:4px;padding:6px 8px;border:1px solid #c9dbea;
+  border-radius:8px;background:#f6faff;color:#245680;font:inherit;font-size:11px;
+  font-weight:650;cursor:pointer}
+.mm-device-basic-buttons button ha-icon{--mdc-icon-size:17px;flex:none}
+.mm-device-basic-buttons button:disabled{opacity:.5;cursor:not-allowed}
+.mm-device-basic-buttons button:focus-visible,
+.mm-device-basic select:focus-visible,.mm-device-basic input:focus-visible{
+  outline:2px solid #176bc0;outline-offset:2px}
+.mm-device-basic-source,.mm-device-basic-volume{display:grid;gap:4px;
+  min-width:0;font-size:11px;color:#4f6983}
+.mm-device-basic-source select{min-height:44px;width:100%;min-width:0;
+  border:1px solid #cbdbea;border-radius:8px;background:#fff;color:#245680;
+  padding:6px 8px;font:inherit}
+.mm-device-basic-volume input{width:100%;min-height:28px;accent-color:#2765a8}
+.mm-device-basic-audio{display:grid;gap:6px}
+.mm-device-basic small{color:#5e738a}
+@media(min-width:1090px) and (max-width:1450px){
+  .mm-device-basic-buttons button{flex-basis:100%}
+}
+.mm-cockpit-device-body{border-top:1px solid #e7eef8;margin-top:5px;padding-top:9px}
+.mm-cockpit-device-body small{font-size:11px;color:#60758e}
+.mm-cockpit-device-body button{min-height:44px}
+.mm-cockpit-diagnostics{margin-top:12px}
+.mm-remote-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 12px}
+.mm-remote-tabs button{min-height:44px;flex:1;border:1px solid #d6e4f1;border-radius:8px;background:#fff;font:inherit;font-size:12px;cursor:pointer}
+.mm-remote-tabs button[aria-pressed=true]{background:#e9f3ff;border-color:#9bc6ed;color:#1259a5;font-weight:700}
+.mm-remote-numbers{display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:6px;max-width:220px;margin:10px auto}
+.mm-remote-numbers button{min-height:44px;border:1px solid #d5e4f1;border-radius:9px;background:#fff;font:inherit;cursor:pointer}
+@media(max-width:1080px){.mm-cockpit{grid-template-columns:minmax(180px,1fr) minmax(250px,1.7fr)}.mm-cockpit-devices{grid-column:1/-1}}
+@media(max-width:700px){.mm-cockpit{grid-template-columns:1fr}.mm-cockpit-devices{grid-column:auto}.mm-floor-room-select{align-items:start;flex-direction:column}}
+
+.mm-remote-text-input{display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:8px 0}
+.mm-remote-text-input label{display:grid;gap:5px;flex:1;min-width:165px;color:#627a94;font-size:12px}
+.mm-remote-text-input input{width:100%;min-height:44px;padding:8px 10px;background:#fff;color:#183a5c;border:1px solid #d6e4f1;border-radius:9px;font:inherit}
+.mm-remote-text-input button{min-height:44px;padding:9px 12px;background:#eaf3ff;color:#155da7;border:1px solid #a9cbed;border-radius:9px;font:inherit;cursor:pointer}
+
+/* User-first Insights: room/task truth, no synthetic KPI strip. */
+.mm-insights-list{display:grid;gap:10px}
+.mm-insight{display:grid;gap:8px;min-width:0}
+.mm-insight-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.mm-insight-head h3{margin:0;font-size:15px;color:#183d66}
+.mm-insight-head small{display:block;font-size:11px;color:#657d94;margin-top:2px}
+.mm-insight-state{font-size:11px;color:#566f87;border:1px solid #e3eaf2;border-radius:10px;padding:5px 8px;max-width:100%;overflow-wrap:anywhere}
+.mm-insight-attention .mm-insight-state{color:#8e4a16;border-color:#efd7bb;background:#fffbf4}
+.mm-insight-summary{margin:0;color:#3a5774;font-size:12px;line-height:1.5}
+.mm-insight-affected{display:flex;gap:7px;flex-wrap:wrap}
+.mm-insight-target{display:grid;gap:2px;min-width:145px;flex:1 1 180px;padding:9px 11px;border:1px solid #e0e9f4;border-radius:9px;background:#f8fbff}
+.mm-insight-target b{font-size:12px;color:#2a4d6e}
+.mm-insight-target span{font-size:11px;color:#526d84;overflow-wrap:anywhere}
+.mm-insight-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mm-insight-actions button{display:inline-flex;gap:6px;align-items:center;min-height:44px;border:1px solid #cadced;border-radius:8px;background:#fff;color:#155b9c;font:inherit;font-size:12px;font-weight:600;padding:8px 12px;cursor:pointer}
+.mm-insight-actions button.mm-insight-fix{background:#ecf5ff}
+.mm-insight details{border-top:1px solid #e7edf5;padding-top:9px}
+.mm-insight details summary{cursor:pointer;min-height:38px;display:flex;align-items:center;font-size:12px;color:#355978;font-weight:600}
+.mm-insights button:focus-visible,.mm-insights summary:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+
+/* Activity editor: show automatic device readiness + user-authored actions. */
+.mm-script-automatic{display:flex;align-items:center;gap:7px;font-size:11px;color:#5f738c;padding:7px 11px}
+.mm-script-automatic ha-icon{--mdc-icon-size:16px}
+.mm-script-stop{border-top:1px solid #edf2f8;margin:0}
+.mm-script-stop summary{display:flex;align-items:center;min-height:44px;padding:6px 11px;color:#315b7f;font-size:12px;cursor:pointer}
+.mm-script-step{flex-wrap:wrap}
+.mm-script-step span{min-width:0;flex:1 1 170px}
+.mm-script-step small{flex:0 0 auto;max-width:100%;white-space:normal;text-align:right}
+
+/* Native Options Flow quick access from the exact configured device/step. */
+.mm-step-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.mm-step-actions small{font-size:10px}
+.mm-step-edit,.mm-step-add{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:44px;min-width:44px;border:1px solid #d6e4f2;border-radius:8px;background:#fff;color:#195b98;padding:6px 9px;font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.mm-step-add{margin:4px 10px 9px;background:#f6faff}
+.mm-step-add ha-icon{--mdc-icon-size:15px}
+.mm-script-device button:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+
+/* Favorite activities reuse the normal guarded start command, no second macro writer. */
+.mm-cockpit-activity .mm-favorite-star{--mdc-icon-size:15px;color:#c18a33;flex:none;margin-right:3px}
+
+/* Assigned activity buttons and shortcuts reuse the native room control flow. */
+.mm-activity-shortcuts{display:grid;gap:8px;margin:10px 0 0;padding:10px 0 0;border-top:1px solid #e4ecf5}
+.mm-activity-shortcuts>b{font-size:12px;color:#2b4e6f}
+.mm-activity-shortcuts .mm-native-buttons{display:flex;gap:5px;flex-wrap:wrap}
+.mm-activity-shortcuts button{min-height:44px;min-width:44px;padding:6px 11px;background:#f5f9ff;border:1px solid #cfe0f2;border-radius:9px;color:#175a9d;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.mm-activity-shortcuts button:disabled{opacity:.5;cursor:not-allowed}
+.mm-activity-shortcuts button:focus-visible{outline:2px solid #176bc0;outline-offset:2px}
+
+/* Folded activity plan, one existing room scope, no duplicate Attention row. */
+.mm-cockpit-current small{display:block;margin-top:2px;color:#6d8092;font-size:11px}
+.mm-activity-plan{border:1px solid #e5ecf5;border-radius:8px;margin:4px 0}
+.mm-activity-plan summary{min-height:40px;padding:6px 10px;cursor:pointer;color:#426784;font-size:11px;display:flex;align-items:center}
+.mm-activity-plan ol{margin:2px 0 7px;padding:4px 10px 4px 23px;font-size:11px;color:#46637c}
+.mm-activity-plan li{display:grid;gap:2px;padding:4px 0;overflow-wrap:anywhere}
+.mm-activity-plan li span{color:#687d91}
+.mm-activity-plan summary:focus-visible{outline:2px solid #176bc0;outline-offset:2px}

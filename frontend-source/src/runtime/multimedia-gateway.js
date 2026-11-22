@@ -1,5 +1,5 @@
 // Existing native room status entities own the resident-facing properties.
-const RHI_MM_VIEWS = Object.freeze(['overview','rooms','activities','devices','diagnostics']);
+const RHI_MM_VIEWS = Object.freeze(['overview','settings','insights','rooms','activities','devices','diagnostics']);
 const RHI_MM_PHASES = ['idle','starting','active','partial','stopping','interrupted','error'];
 
 function rhiMmRooms(hass) {
@@ -44,6 +44,26 @@ function rhiMmIntent(room, service, activity = '') {
   return {domain:'rhi_multimedia',service,data};
 }
 
+function rhiMmShortcutIntent(room, action, key){
+  // Native backend publishes the only active activity's mapped controls.
+  // No guessed player, device or macro owner in the browser.
+  if(!room||room.phase!=='active'||room.control_owner==='harmony'||
+     typeof key!=='string'||!key)return null;
+  const active=room.activities?.find(a=>a.id===room.activity_id&&a.active===true);
+  if(!active)return null;
+  if(action==='press_activity_button'){
+    if(!Array.isArray(active.button_map)||
+       !active.button_map.some(button=>button.button===key&&button.enabled===true))return null;
+    return {domain:'rhi_multimedia',service:action,data:{room:room.id,button:key}};
+  }
+  if(action==='run_activity_macro'){
+    if(!Array.isArray(active.macros)||
+       !active.macros.some(macro=>macro.id===key&&macro.enabled===true))return null;
+    return {domain:'rhi_multimedia',service:action,data:{room:room.id,macro:key}};
+  }
+  return null;
+}
+
 function rhiMmDeviceIntent(room, key, action, value) {
   const device=room?.devices?.find(d=>d.key===key);
   const capability=device?.controls?.[action];
@@ -51,7 +71,9 @@ function rhiMmDeviceIntent(room, key, action, value) {
   if(Array.isArray(capability.options)){if(typeof value!=='string'||!capability.options.includes(value))return null;}
   else if(action==='volume'){if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1)return null;}
   else if(action==='mute'){if(typeof value!=='boolean')return null;}
-  else if(value!==undefined&&value!==null)return null;
+  else if(action==='remote_text'){
+    if(typeof value!=='string'||value.length<1||value.length>256||/[\x00-\x1f\x7f]/.test(value))return null;
+  }else if(value!==undefined&&value!==null)return null;
   return {domain:'rhi_multimedia',service:'control_device',data:{room:room.id,device:key,action,...(value!==undefined&&value!==null?{value}:{})}};
 }
 
@@ -64,6 +86,8 @@ async function rhiMmExecute(hass,intent){
   if(!result||result.room!==intent.data.room||result.service!==intent.service||
     (intent.service==='start_activity'&&result.activity!==intent.data.activity)||
     (intent.service==='control_device'&&(result.device!==intent.data.device||result.action!==intent.data.action))||
+    (intent.service==='press_activity_button'&&result.button!==intent.data.button)||
+    (intent.service==='run_activity_macro'&&result.macro!==intent.data.macro)||
     !['confirmed','submitted','failed','cancelled'].includes(result.result)){
     return {result:'unknown'};
   }
@@ -125,9 +149,10 @@ function rhiMmSiteDateTime(hass,at){
 const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
   'add_room','rename_room','edit_room','remove_room',
   'guided_activity','add_activity','quick_edit_activity','edit_activity','remove_activity',
-  'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml'
+  'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
 ]));
-async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''}){
+async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',
+  phase='',operation='',index=null,device='',stepType=''}){
   if(hass?.user?.is_admin!==true||typeof hass.callWS!=='function'||
      typeof hass.callApi!=='function'||!RHI_MM_OPTION_ACTIONS.has(action))
     throw new Error('Multimedia configuration is not authorized');
@@ -161,6 +186,28 @@ async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''
     }
     if(room&&step?.step_id==='existing_room')await advance('existing_room',{room});
     if(activity&&step?.step_id==='existing_activity')await advance('existing_activity',{activity});
+    // Direct per-device Add / Edit still uses the official HA Options Flow.
+    // Never infer an action or write from the browser. If the backend form
+    // has changed, stop at the form instead of guessing an alternative path.
+    if(action==='script_step'&&step?.step_id==='script_step'&&
+       ['steps','stop_steps'].includes(phase)&&
+       ['add','edit','remove','up','down'].includes(operation)&&
+       Number.isInteger(index)&&index>=0){
+      await advance('script_step',{phase,operation,index:String(index)});
+      if(step?.step_id==='script_detail'&&device&&stepType){
+        if(!['remote_key','source','sound_mode','volume','play','pause','delay','wait_until'].includes(stepType))
+          throw new Error('Unsupported Multimedia script step type');
+        // For an edit the backend must still describe the expected exact
+        // object; stale indices should not become edits to another device.
+        if(operation==='edit'){
+          const offered=step.data_schema||[];
+          const serverDevice=offered.find(f=>f.name==='device')?.default;
+          const serverType=offered.find(f=>f.name==='type')?.default;
+          if(serverDevice!==device||serverType!==stepType)return step;
+        }
+        await advance('script_detail',{device,type:stepType});
+      }
+    }
   }catch(err){
     // A started server flow must be removed after a transport/shape failure.
     if(typeof step?.flow_id==='string'){

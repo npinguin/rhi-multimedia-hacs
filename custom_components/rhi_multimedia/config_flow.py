@@ -17,7 +17,9 @@ from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
 from .dell_c8621qt import valid_host
 from .foundation import selected_native_macs
 from .source_discovery import area_choices, av_sources, source_lists, speech_player_eligible, tts_choices
-from .validation import native_state, cec_links_for_activity, route_status, validate_action, validate_rooms
+from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
+                         native_state, cec_links_for_activity, route_status, validate_action,
+                         validate_rooms, validate_step_delay)
 
 NONE = "__none__"
 CUSTOM_AREA = "__custom_room__"
@@ -379,6 +381,8 @@ class _Wizard:
                         self._activity_name = label
                         self._activity_cast = cast
                         self._activity_type = kind
+                        self._activity_favorite = user_input.get(
+                            "favorite", previous.get("favorite", False))
                         # A label-only edit must preserve routes and custom steps,
                         # including when an endpoint is temporarily unavailable.
                         # A changed cast needs explicit new routing.
@@ -398,7 +402,8 @@ class _Wizard:
                             else "watch_source" if previous_source != NONE else "watch_tv")
         # The guided flow already captured intent; never ask twice or allow
         # a stale browser to silently change its original selection.
-        schema = {vol.Required("activity_name", default=label): str}
+        schema = {vol.Required("activity_name", default=label): str,
+                  vol.Optional("favorite", default=previous.get("favorite", False)): bool}
         if editing or self._guided_activity_type not in ACTIVITIES:
             schema[vol.Required("activity_type", default=default_kind)] = vol.In(choices)
         if source_keys:
@@ -474,9 +479,14 @@ class _Wizard:
                 description_placeholders={"device": devices[key]["entity"]})
         activities = self._rooms[self._room_id]["activities"]
         self._editing_activity = None
-        activities[self._activity_key] = {**self._activity_previous, "name": self._activity_name,
-                                         "activity_type": self._activity_type,
-                                         "devices": list(self._activity_cast), "steps": list(self._steps)}
+        result = {**self._activity_previous, "name": self._activity_name,
+                  "activity_type": self._activity_type,
+                  "devices": list(self._activity_cast), "steps": list(self._steps)}
+        if getattr(self, "_activity_favorite", False):
+            result["favorite"] = True
+        else:
+            result.pop("favorite", None)
+        activities[self._activity_key] = result
         return await self.async_step_next()
 
     @staticmethod
@@ -574,12 +584,47 @@ class _Wizard:
                 # native input/sound-mode choices. A name-only edit retains
                 # existing routes even if their native source is currently
                 # offline; a newly introduced route is never guessed.
-                for kind in ("steps", "stop_steps"):
-                    original_steps = prior.get(kind, [])
-                    for step in activity.get(kind, []):
-                        if step in original_steps or step.get("type") not in ("source", "sound_mode"):
+                for button, binding in activity.get("button_map", {}).items():
+                    if binding == prior.get("button_map", {}).get(button):
+                        continue
+                    device = room["devices"][binding["device"]]
+                    action = binding["action"]
+                    if action == "remote_key":
+                        offered = self._script_native_keys(device)
+                    elif action in ("source", "sound_mode"):
+                        offered = source_lists(self.hass, device["entity"])[action + "_list"]
+                    else:
+                        offered = None
+                    if (action in BUTTON_VALUE_ACTIONS
+                            and (not offered or binding["value"] not in offered)):
+                        raise ValueError("Activity button not offered by selected native provider")
+                    if action not in BUTTON_VALUE_ACTIONS and not device["entity"].startswith("media_player."):
+                        raise ValueError("Media action requires a native media player")
+                script_pairs = [(prior.get(kind, []), activity.get(kind, []))
+                                for kind in ("steps", "stop_steps")]
+                for macro_id, macro in activity.get("macros", {}).items():
+                    previous = prior.get("macros", {}).get(macro_id, {})
+                    script_pairs.append((previous.get("steps", []), macro["steps"]))
+                for original_steps, proposed_steps in script_pairs:
+                    for step in proposed_steps:
+                        if step in original_steps:
                             continue
                         device = room["devices"][step["device"]]
+                        if step.get("type") == "remote_key":
+                            from .adapter import WEBOS_KEYS, REMOTE_KEYSETS
+                            source = next((selected_source for selected_source in current
+                                           if selected_source.concept == device.get("foundation_concept")
+                                           and selected_source.entity_id == device["entity"]
+                                           and selected_source.candidate_id == device.get("foundation_candidate_id")), None)
+                            integration = getattr(source, "provider", None)
+                            offered = (WEBOS_KEYS if integration == "webostv"
+                                       and device["entity"].startswith("media_player.") else
+                                       REMOTE_KEYSETS.get(integration, ()))
+                            if step["value"] not in offered:
+                                raise ValueError("Scripted remote key not supported by selected native provider")
+                            continue
+                        if step.get("type") not in ("source", "sound_mode"):
+                            continue
                         live = source_lists(self.hass, device["entity"])
                         offered = live["source_list" if step["type"] == "source"
                                        else "sound_mode_list"]
@@ -645,7 +690,9 @@ class _Wizard:
                                              self._entry.data.get("dell_displays", {}))
                     != self._original_dell_displays
                     or self._entry.options.get("enable_ux", True)
-                    != self._original_enable_ux):
+                    != self._original_enable_ux
+                    or self._entry.options.get("default_step_delay_ms", 0)
+                    != self._original_step_delay_ms):
                 errors["base"] = "selection_changed"
             elif (getattr(self, "_yaml_deleted_rooms", None)
                   and not user_input.get("confirm_remove")):
@@ -718,10 +765,11 @@ YAML_SCOPED_FIELDS = {
                        "devices", "activities"}),
     "device": frozenset({"entity", "physical_id", "asset_id", "role", "name",
                          "foundation_concept", "foundation_candidate_id",
-                         "hdmi_cec_enabled", "power_mode", "power_on",
+                         "hdmi_cec_enabled", "post_power_on_delay_ms", "power_mode", "power_on",
                          "power_off", "timeout", "on_states", "speech_tts_registry_id"}),
     "activity": frozenset({"name", "activity_type", "devices", "steps",
-                           "stop_steps", "cec_links"}),
+                           "stop_steps", "cec_links", "favorite",
+                           "button_map", "macros"}),
 }
 
 
@@ -862,6 +910,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         self._original_dell_displays = deepcopy(self._dell_displays)
         self._original_enable_ux = config_entry.options.get("enable_ux", True)
         self._yaml_enable_ux = None
+        self._original_step_delay_ms = validate_step_delay(config_entry.options.get("default_step_delay_ms", 0))
+        self._yaml_step_delay_ms = None
         self._dell_key = None
 
     async def async_step_init(self, user_input=None):
@@ -879,6 +929,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                    "speech_endpoint": "Speaker speech notifications",
                    "cec_device": "HDMI-CEC setting per selected device",
                    "cec_activity": "HDMI-CEC relationship and activity actions",
+                   "script_defaults": "Activity scripts — default delay between actions",
+                   "script_step": "Activity scripts — add, edit or reorder a step",
+                   "button_mapping": "Activity buttons — assign exact device and native command",
+                   "macro_manage": "One-touch shortcuts — create, edit or remove",
                    "dell_add": "Add Dell C8621QT LAN display",
                    "dell_edit": "Rename Dell C8621QT display",
                    "dell_remove": "Remove unassigned Dell C8621QT display"}
@@ -892,6 +946,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 return await self.async_step_expert_target()
             if action == "frontend":
                 return await self.async_step_frontend()
+            if action == "script_defaults":
+                return await self.async_step_script_defaults()
             if action == "add_room":
                 return await self.async_step_room()
             if action == "guided_activity":
@@ -935,6 +991,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             "dell_remove": "Advanced · remove unassigned Dell display",
             "frontend": "Dashboard · enable or disable card",
             "expert_yaml": "Advanced · edit one exact object via Expert YAML",
+            "script_defaults": "Activities · standard wait between commands",
+            "script_step": "Activities · edit the ordered script steps",
+            "button_mapping": "Activities · assign button to selected device",
+            "macro_manage": "Activities · manage named one-touch shortcuts",
             "review": "Review and save existing pending configuration",
         }
         if user_input is not None:
@@ -988,7 +1048,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
     async def async_step_yaml(self, user_input=None):
         """Advanced admin YAML import; never writes before normal Review/Save."""
         errors = {}
+        rejection_detail = ""
         focus = getattr(self, "_yaml_focus", None)
+        # An invalid input or missing Foundation source must not erase the
+        # administrator's unsaved YAML. Keep the same draft in this Options
+        # Flow form after validation errors; never persist it until Review/Save.
+        attempted_text = user_input.get("yaml_text") if isinstance(user_input, dict) else None
+        attempted_mode = user_input.get("mode", "merge") if isinstance(user_input, dict) else "merge"
         if user_input is not None:
             try:
                 document = user_input.get("yaml_text")
@@ -1009,7 +1075,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 # registrations / card preference; no new physical inventory
                 # or extra configuration authority. Scoped objects are unchanged.
                 if focus is None and payload and set(payload) <= {
-                        "rooms", "dell_displays", "enable_ux"}:
+                        "rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
                     room_document = yaml.safe_dump({"rooms": payload["rooms"]}) if "rooms" in payload else None
                     if room_document is not None:
                         proposed, explicit_removals = _yaml_plan(
@@ -1036,27 +1102,34 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     ux_option = payload.get("enable_ux", self._original_enable_ux)
                     if type(ux_option) is not bool:
                         raise ValueError("Invalid frontend preference")
+                    step_delay_ms = validate_step_delay(
+                        payload.get("default_step_delay_ms", self._original_step_delay_ms))
                 else:
                     proposed, explicit_removals = _yaml_plan(
                         document, self._original_rooms, mode)
                     dell = deepcopy(self._original_dell_displays)
                     ux_option = self._original_enable_ux
-                previous, previous_dell, previous_ux = (
-                    self._rooms, self._dell_displays, self._yaml_enable_ux)
+                    step_delay_ms = self._original_step_delay_ms
+                previous, previous_dell, previous_ux, previous_delay = (
+                    self._rooms, self._dell_displays, self._yaml_enable_ux,
+                    self._yaml_step_delay_ms)
                 self._rooms = deepcopy(proposed)
                 self._dell_displays = deepcopy(dell)
                 self._yaml_enable_ux = ux_option
+                self._yaml_step_delay_ms = step_delay_ms
                 try:
                     reason = self._review_configuration()
                 except (ValueError, KeyError, TypeError, RecursionError):
-                    self._rooms, self._dell_displays, self._yaml_enable_ux = (
-                        previous, previous_dell, previous_ux)
+                    self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
+                        previous, previous_dell, previous_ux, previous_delay)
                     errors["base"] = "selection_changed"
+                    rejection_detail = "Foundation or current room state changed; recheck selected sources"
                 else:
                     if reason:
-                        self._rooms, self._dell_displays, self._yaml_enable_ux = (
-                            previous, previous_dell, previous_ux)
+                        self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
+                            previous, previous_dell, previous_ux, previous_delay)
                         errors["base"] = reason
+                        rejection_detail = "The proposed settings failed native " + str(reason)
                     else:
                         self._yaml_import = True
                         self._yaml_deleted_rooms = sorted(
@@ -1067,11 +1140,16 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                                 sorted(k for k in dell if dell[k] != self._original_dell_displays[k]))
                         if ux_option != self._original_enable_ux:
                             self._yaml_diff += f"\nPremium UX enabled: {ux_option}"
+                        if step_delay_ms != self._original_step_delay_ms:
+                            self._yaml_diff += f"\nDefault inter-step delay: {step_delay_ms} ms"
                         if explicit_removals:
                             self._yaml_diff += "\nExplicit removals: " + ", ".join(explicit_removals)
                         return await self.async_step_review()
-            except (ValueError, TypeError, OverflowError, RecursionError):
+            except (ValueError, TypeError, OverflowError, RecursionError) as exc:
                 errors["base"] = "yaml_invalid"
+                # First bounded diagnostic only: never echo entire user YAML.
+                rejection_detail = "".join(ch for ch in (str(exc).splitlines() or [""])[0]
+                                           if ch.isprintable())[:200]
         if focus is not None:
             scope, room_id, object_id = focus
             room = self._original_rooms.get(room_id, {})
@@ -1087,6 +1165,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 patch["id"] = object_id
             current = yaml.safe_dump({"changes": [patch]}, sort_keys=False,
                                      allow_unicode=True, default_flow_style=False)
+            if errors and isinstance(attempted_text, str) and len(attempted_text.encode("utf-8")) <= MAX_CONFIG_YAML_BYTES:
+                current = attempted_text
             schema = vol.Schema({vol.Required("yaml_text", default=current):
                 selector.TextSelector(selector.TextSelectorConfig(multiline=True))})
             note = ("Expert editor for the selected object only. Other rooms, "
@@ -1097,9 +1177,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "rooms": self._rooms,
                 "dell_displays": self._original_dell_displays,
                 "enable_ux": self._original_enable_ux,
+                "default_step_delay_ms": self._original_step_delay_ms,
             }, sort_keys=False, allow_unicode=True, default_flow_style=False)
+            if errors and isinstance(attempted_text, str) and len(attempted_text.encode("utf-8")) <= MAX_CONFIG_YAML_BYTES:
+                current = attempted_text
+            mode_default = attempted_mode if attempted_mode in ("merge", "replace") else "merge"
             schema = vol.Schema({
-                vol.Required("mode", default="merge"): vol.In({
+                vol.Required("mode", default=mode_default): vol.In({
                     "merge": "Apply scoped changes or merge complete rooms (preserve others)",
                     "replace": "Replace all rooms (full rooms export only; destructive)"}),
                 vol.Required("yaml_text", default=current):
@@ -1107,6 +1191,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             note = ("Live HA Options Flow: use changes: for independent room/device/activity edits, "
                     "or rooms: for complete room import/export. Review before Save; "
                     "Foundation alone selects physical sources. No configuration.yaml/.storage writes.")
+        if errors:
+            note += "\n\nDraft NOT saved. " + (rejection_detail or
+                                                 "Review native identities and input choices.")
         return self.async_show_form(step_id="yaml", errors=errors,
                                     data_schema=schema,
                                     description_placeholders={"note": note})
@@ -1376,7 +1463,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                   vol.In({**areas, CUSTOM_AREA: "No Home Assistant area"})}))
 
     async def async_step_cec_device(self, user_input=None):
-        """Configure an explicitly checked native HDMI-CEC setting, never scan."""
+        """Configure native Power On settle timing and verified HDMI-CEC per device.
+
+        Keep one existing Options Flow writer, one physical-source policy and
+        the established shared-asset validation/review lifecycle.
+        """
         room = self._rooms[self._room_id]
         choices = {key: f"{dev['entity']} · {dev.get('role', key)}"
                    for key, dev in room["devices"].items()
@@ -1386,30 +1477,42 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return await self.async_step_review()
         errors = {}
         if user_input is not None:
-            key = user_input.get("device")
-            enabled = user_input.get("enabled")
+            key, enabled = user_input.get("device"), user_input.get("enabled")
             if key not in choices or type(enabled) is not bool:
                 errors["base"] = "cec_invalid"
             else:
-                physical = room["devices"][key].get("physical_id", room["devices"][key]["entity"])
-                proposal = deepcopy(self._rooms)
-                for spec in proposal.values():
-                    for dev in spec["devices"].values():
-                        if dev.get("physical_id", dev["entity"]) == physical:
-                            dev["hdmi_cec_enabled"] = enabled
                 try:
-                    validate_rooms(proposal)
+                    settle_ms = validate_step_delay(user_input.get(
+                        "post_power_on_delay_ms",
+                        room["devices"][key].get("post_power_on_delay_ms", 0)))
                 except ValueError:
-                    errors["base"] = "cec_in_use"
+                    errors["base"] = "cec_invalid"
                 else:
-                    self._rooms = proposal
-                    return await self.async_step_review()
+                    physical = room["devices"][key].get("physical_id", room["devices"][key]["entity"])
+                    proposal = deepcopy(self._rooms)
+                    for spec in proposal.values():
+                        for dev in spec["devices"].values():
+                            if dev.get("physical_id", dev["entity"]) == physical:
+                                dev["hdmi_cec_enabled"] = enabled
+                                dev["post_power_on_delay_ms"] = settle_ms
+                    try:
+                        validate_rooms(proposal)
+                    except ValueError:
+                        errors["base"] = "cec_in_use"
+                    else:
+                        self._rooms = proposal
+                        return await self.async_step_review()
         chosen = (user_input or {}).get("device", next(iter(choices)))
         return self.async_show_form(step_id="cec_device", errors=errors,
             data_schema=vol.Schema({
                 vol.Required("device", default=chosen if chosen in choices else next(iter(choices))): vol.In(choices),
                 vol.Required("enabled", default=room["devices"][chosen].get("hdmi_cec_enabled", False)
                              if chosen in choices else False): bool,
+                vol.Required("post_power_on_delay_ms",
+                             default=room["devices"][chosen].get("post_power_on_delay_ms", 0)
+                             if chosen in choices else 0):
+                    selector.NumberSelector(selector.NumberSelectorConfig(
+                        min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)),
             }),
             description_placeholders={"room": room.get("name", self._room_id)})
 
@@ -1492,6 +1595,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             if self._option_action == "quick_edit_activity":
                 self._editing_activity = key
                 return await self.async_step_quick_edit_activity()
+            if self._option_action == "script_step":
+                self._editing_activity = key
+                return await self.async_step_script_step()
+            if self._option_action == "button_mapping":
+                self._editing_activity = key
+                return await self.async_step_button_mapping()
+            if self._option_action == "macro_manage":
+                self._editing_activity = key
+                return await self.async_step_macro_manage()
             if self._option_action == "cec_activity":
                 self._editing_activity = key
                 return await self.async_step_cec_activity()
@@ -1499,6 +1611,344 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return await self.async_step_activity()
         return self.async_show_form(step_id="existing_activity", data_schema=vol.Schema({
             vol.Required("activity"): vol.In(choices)}))
+
+
+    async def async_step_button_mapping(self, user_input=None):
+        """Configure one semantic activity button using the HA Options Flow."""
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        cast = activity["devices"]
+        devices = self._rooms[self._room_id]["devices"]
+        mapping = activity.get("button_map", {})
+        errors = {}
+        if user_input is not None:
+            button, operation = user_input.get("button"), user_input.get("operation")
+            if button not in ACTIVITY_BUTTONS or operation not in ("assign", "remove"):
+                errors["base"] = "selection_changed"
+            elif operation == "remove":
+                if button in mapping:
+                    activity["button_map"].pop(button)
+                return await self.async_step_review()
+            elif (user_input.get("device") not in cast
+                  or user_input.get("action") not in BUTTON_ACTIONS):
+                errors["base"] = "selection_changed"
+            else:
+                binding = {"device": user_input["device"], "action": user_input["action"]}
+                if binding["action"] in BUTTON_VALUE_ACTIONS:
+                    self._button_pending = (button, binding)
+                    return await self.async_step_button_value()
+                activity.setdefault("button_map", {})[button] = binding
+                return await self.async_step_review()
+        return self.async_show_form(step_id="button_mapping", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("button", default=next(iter(sorted(mapping)), "home")):
+                    vol.In({button: button for button in sorted(ACTIVITY_BUTTONS)}),
+                vol.Required("operation", default="assign"):
+                    vol.In({"assign": "Assign/update", "remove": "Remove assignment"}),
+                vol.Required("device", default=cast[0]):
+                    vol.In({key: devices[key].get("name", key) for key in cast}),
+                vol.Required("action", default="remote_key"):
+                    vol.In({action: action.replace("_", " ").title()
+                            for action in sorted(BUTTON_ACTIONS)}),
+            }))
+
+    async def async_step_button_value(self, user_input=None):
+        """Only offer native commands/inputs of the exact selected provider."""
+        button, binding = self._button_pending
+        device = self._rooms[self._room_id]["devices"][binding["device"]]
+        action = binding["action"]
+        offered = (self._script_native_keys(device) if action == "remote_key"
+                   else source_lists(self.hass, device["entity"])[action + "_list"])
+        if not offered:
+            return self.async_show_form(step_id="button_value",
+                errors={"base": "selection_changed"}, data_schema=vol.Schema({}))
+        errors = {}
+        if user_input is not None:
+            value = user_input.get("value")
+            if value not in offered:
+                errors["base"] = "selection_changed"
+            else:
+                activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+                activity.setdefault("button_map", {})[button] = {**binding, "value": value}
+                return await self.async_step_review()
+        return self.async_show_form(step_id="button_value", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("value", default=offered[0]):
+                    vol.In({key: key for key in offered})}))
+
+
+    def _script_steps(self, activity, phase):
+        """Reuse one ordered-step editor for start/stop and named macros."""
+        if phase in ("steps", "stop_steps"):
+            return activity.setdefault(phase, [])
+        if isinstance(phase, str) and phase.startswith("macro:"):
+            macro = activity.get("macros", {}).get(phase[6:])
+            if isinstance(macro, dict):
+                return macro["steps"]
+        raise ValueError("Unknown script phase")
+
+    async def async_step_macro_manage(self, user_input=None):
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        macros = activity.get("macros", {})
+        cast = activity["devices"]
+        devices = self._rooms[self._room_id]["devices"]
+        errors = {}
+        if user_input is not None:
+            operation, macro_id = user_input.get("operation"), user_input.get("macro")
+            if operation == "create" and user_input.get("device") in cast:
+                self._macro_create_device = user_input["device"]
+                return await self.async_step_macro_create()
+            if operation in ("edit", "remove") and macro_id in macros:
+                if operation == "remove":
+                    activity["macros"].pop(macro_id)
+                    return await self.async_step_review()
+                self._script_phase = "macro:" + macro_id
+                return await self.async_step_script_step()
+            errors["base"] = "selection_changed"
+        return self.async_show_form(step_id="macro_manage", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("operation", default="create"):
+                    vol.In({"create": "New named shortcut",
+                            "edit": "Edit ordered shortcut steps",
+                            "remove": "Remove shortcut"}),
+                vol.Required("macro", default=next(iter(macros), "__new__")):
+                    vol.In({"__new__": "New", **{
+                        key: macro["name"] for key, macro in macros.items()}}),
+                vol.Required("device", default=cast[0]):
+                    vol.In({key: devices[key].get("name", key) for key in cast}),
+            }))
+
+    async def async_step_macro_create(self, user_input=None):
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        macros = activity.get("macros", {})
+        device_key = self._macro_create_device
+        device = self._rooms[self._room_id]["devices"][device_key]
+        keys = self._script_native_keys(device)
+        routes = source_lists(self.hass, device["entity"])["source_list"]
+        if not keys and not routes:
+            return self.async_show_form(step_id="macro_create",
+                errors={"base": "selection_changed"}, data_schema=vol.Schema({}))
+        choices = {"remote_key:" + key: "Remote · " + key for key in keys}
+        choices.update({"source:" + source: "Input · " + source for source in routes})
+        errors = {}
+        if user_input is not None:
+            name = str(user_input.get("name", "")).strip()
+            macro_id = _slug(name)
+            command = user_input.get("first_action")
+            if (not 0 < len(name) <= 80 or command not in choices or
+                    macro_id in macros or len(macros) >= 24):
+                errors["base"] = "selection_changed"
+            else:
+                kind, value = command.split(":", 1)
+                step = ({"device": device_key, "type": "remote_key", "value": value}
+                        if kind == "remote_key" else
+                        {"device": device_key, "type": "source", "candidates": [value]})
+                activity.setdefault("macros", {})[macro_id] = {"name": name, "steps": [step]}
+                return await self.async_step_review()
+        return self.async_show_form(step_id="macro_create", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("name"): str,
+                vol.Required("first_action"): vol.In(choices),
+            }))
+
+    async def async_step_script_step(self, user_input=None):
+        """One script editor over the existing Options Flow, not a new writer."""
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        errors = {}
+        phases = {"steps": "Start / switch steps", "stop_steps": "Stop steps",
+                  **{"macro:" + key: "Shortcut · " + macro["name"]
+                     for key, macro in activity.get("macros", {}).items()}}
+        selected_phase = (self._script_phase if getattr(self, "_script_phase", None) in phases
+                          else "steps")
+        if user_input is not None:
+            phase = user_input.get("phase")
+            operation = user_input.get("operation")
+            if phase not in phases or operation not in (
+                    "add", "insert", "edit", "remove", "up", "down"):
+                errors["base"] = "selection_changed"
+            else:
+                steps = self._script_steps(activity, phase)
+                try:
+                    index = int(user_input.get("index", 0))
+                except (TypeError, ValueError):
+                    index = -1
+                if operation == "add":
+                    index = len(steps)
+                if operation == "insert" and index == len(steps):
+                    operation = "add"
+                if (index < 0 or index >= len(steps)
+                        and operation not in ("add", "insert")):
+                    errors["base"] = "selection_changed"
+                elif operation == "remove":
+                    if phase.startswith("macro:") and len(steps) == 1:
+                        errors["base"] = "selection_changed"
+                    else:
+                        steps.pop(index)
+                        return await self.async_step_review()
+                elif operation in ("up", "down"):
+                    other = index + (-1 if operation == "up" else 1)
+                    if not 0 <= other < len(steps):
+                        errors["base"] = "selection_changed"
+                    else:
+                        steps[index], steps[other] = steps[other], steps[index]
+                        return await self.async_step_review()
+                else:
+                    self._script_phase = phase
+                    self._script_operation = operation
+                    self._script_index = index
+                    return await self.async_step_script_detail()
+        # Do not allow a user to select step 20 while editing a 3-step script.
+        current_steps = self._script_steps(activity, selected_phase)
+        indices = {str(i): f"{i + 1} · {step.get('device')} / {step.get('type')}"
+                   for i, step in enumerate(current_steps)}
+        if not indices:
+            indices = {"0": "New first step"}
+        return self.async_show_form(step_id="script_step", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("phase", default=selected_phase): vol.In(phases),
+                vol.Required("operation", default="add"): vol.In({
+                    "add": "Append step", "insert": "Insert before step",
+                    "edit": "Edit step", "remove": "Remove step",
+                    "up": "Move step up", "down": "Move step down"}),
+                vol.Required("index", default="0"): vol.In({
+                    str(i): f"Step {i + 1}" for i in range(len(current_steps) or 1)})
+            }))
+
+    async def async_step_script_detail(self, user_input=None):
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        original = (self._script_steps(activity, self._script_phase)[self._script_index]
+                    if self._script_operation == "edit" else {})
+        cast = activity["devices"]
+        devices = self._rooms[self._room_id]["devices"]
+        errors = {}
+        if user_input is not None:
+            device, action = user_input.get("device"), user_input.get("type")
+            if device not in cast or action not in (
+                    "remote_key", "source", "sound_mode", "volume", "play",
+                    "pause", "delay", "wait_until"):
+                errors["base"] = "selection_changed"
+            else:
+                self._script_device = device
+                self._script_type = action
+                return await self.async_step_script_arguments()
+        return self.async_show_form(step_id="script_detail", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("device", default=original.get("device", cast[0])):
+                    vol.In({key: devices[key].get("name", key) for key in cast}),
+                vol.Required("type", default=original.get("type", "remote_key")):
+                    vol.In({"remote_key": "Native remote command", "source": "Input / HDMI",
+                            "sound_mode": "Sound mode", "volume": "Volume",
+                            "play": "Play", "pause": "Pause", "delay": "Sleep / Delay",
+                            "wait_until": "Wait until native device state"})
+            }))
+
+    def _script_native_keys(self, device):
+        """Provider key vocabulary, not an unchecked user service payload."""
+        from .adapter import REMOTE_KEYSETS, WEBOS_KEYS
+        current, _ = av_sources(self.hass)
+        matches = [src for src in current
+                   if src.concept == device.get("foundation_concept")
+                   and src.entity_id == device.get("entity")
+                   and src.candidate_id == device.get("foundation_candidate_id")]
+        if len(matches) != 1:
+            return []
+        provider = matches[0].provider
+        if provider == "webostv" and device["entity"].startswith("media_player."):
+            return list(WEBOS_KEYS)
+        if provider in REMOTE_KEYSETS:
+            return list(REMOTE_KEYSETS[provider])
+        return []
+
+    async def async_step_script_arguments(self, user_input=None):
+        activity = self._rooms[self._room_id]["activities"][self._editing_activity]
+        device = self._rooms[self._room_id]["devices"][self._script_device]
+        kind = self._script_type
+        original = (self._script_steps(activity, self._script_phase)[self._script_index]
+                    if self._script_operation == "edit" else {})
+        args = {}
+        default_policy = "override" if "delay_ms" in original else "inherit"
+        errors = {}
+        if kind == "remote_key":
+            keys = self._script_native_keys(device)
+            if not keys:
+                return self.async_show_form(step_id="script_arguments", errors={"base": "selection_changed"},
+                                            data_schema=vol.Schema({}))
+            args[vol.Required("value", default=original.get("value", keys[0]))] = vol.In({
+                key: key for key in keys})
+        elif kind in ("source", "sound_mode"):
+            offered = source_lists(self.hass, device["entity"])[kind + "_list"]
+            if not offered:
+                return self.async_show_form(step_id="script_arguments", errors={"base": "route_changed"},
+                                            data_schema=vol.Schema({}))
+            selected = original.get("candidates", [offered[0]])[0]
+            if selected not in offered:
+                selected = offered[0]
+            args[vol.Required("value", default=selected)] = vol.In({
+                value: value for value in offered})
+        elif kind == "volume":
+            args[vol.Required("value", default=original.get("level", .5))] = (
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=0, max=1, step=.01, mode=selector.NumberSelectorMode.BOX)))
+        elif kind == "delay":
+            args[vol.Required("milliseconds", default=original.get("milliseconds", 1000))] = (
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)))
+        elif kind == "wait_until":
+            states = ("on", "off", "idle", "playing", "paused", "standby", "buffering")
+            initial = original.get("states", ["on"])[0]
+            args[vol.Required("state", default=initial)] = vol.In({
+                state: state for state in states})
+            args[vol.Required("timeout", default=original.get("timeout", 15))] = (
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=1, max=300, step=1, mode=selector.NumberSelectorMode.BOX)))
+        if kind not in ("delay", "wait_until"):
+            args[vol.Required("delay_policy", default=default_policy)] = vol.In({
+                "inherit": "Use standard delay", "override": "Override after this step"})
+            args[vol.Required("delay_ms", default=original.get("delay_ms", self._original_step_delay_ms))] = (
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)))
+        if user_input is not None:
+            try:
+                step = {"device": self._script_device, "type": kind}
+                if kind == "remote_key":
+                    if user_input.get("value") not in self._script_native_keys(device):
+                        raise ValueError("Unknown native remote command")
+                    step["value"] = user_input["value"]
+                elif kind in ("source", "sound_mode"):
+                    value = user_input.get("value")
+                    if value not in source_lists(self.hass, device["entity"])[kind + "_list"]:
+                        raise ValueError("Native route changed")
+                    step["candidates"] = [value]
+                elif kind == "volume":
+                    value = user_input.get("value")
+                    if type(value) not in (int, float) or not 0 <= value <= 1:
+                        raise ValueError("Invalid volume")
+                    step["level"] = value
+                elif kind == "delay":
+                    step["milliseconds"] = validate_step_delay(user_input.get("milliseconds"))
+                elif kind == "wait_until":
+                    state = user_input.get("state")
+                    timeout = user_input.get("timeout")
+                    if state not in ("on", "off", "idle", "playing", "paused", "standby", "buffering") or (
+                            type(timeout) not in (int, float) or not 0 < timeout <= 300):
+                        raise ValueError("Invalid wait target")
+                    step.update(states=[state], timeout=timeout)
+                if kind not in ("delay", "wait_until"):
+                    policy = user_input.get("delay_policy")
+                    if policy == "override":
+                        step["delay_ms"] = validate_step_delay(user_input.get("delay_ms"))
+                    elif policy != "inherit":
+                        raise ValueError("Invalid delay policy")
+            except (ValueError, TypeError, KeyError):
+                errors["base"] = "selection_changed"
+            else:
+                steps = self._script_steps(activity, self._script_phase)
+                if self._script_operation == "edit":
+                    steps[self._script_index] = step
+                else:
+                    steps.insert(self._script_index, step)
+                return await self.async_step_review()
+        return self.async_show_form(step_id="script_arguments", errors=errors,
+                                    data_schema=vol.Schema(args))
 
     def _quick_edit_source_roles(self):
         """Selected room players only; leave complex legacy multi-source casts to full edit."""
@@ -1585,6 +2035,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 if not errors:
                     candidate = deepcopy(activity)
                     candidate["name"] = name
+                    if user_input.get("favorite", activity.get("favorite", False)) is True:
+                        candidate["favorite"] = True
+                    else:
+                        candidate.pop("favorite", None)
                     if changing_source:
                         # Keep semantic activity type coherent with the edited cast.
                         # A player-based watch_source becoming HDMI-only must no
@@ -1611,7 +2065,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     self._rooms[self._room_id]["activities"][self._editing_activity] = candidate
                     self._editing_activity = None
                     return await self.async_step_review()
-        fields = {vol.Required("activity_name", default=activity.get("name", self._editing_activity)): str}
+        fields = {vol.Required("activity_name", default=activity.get("name", self._editing_activity)): str,
+                  vol.Optional("favorite", default=activity.get("favorite", False)): bool}
         if sources:
             fields[vol.Required("primary_source", default=current_source)] = vol.In({
                 NONE: "HDMI route only / no native player", **sources})
@@ -1624,6 +2079,25 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "devices": ", ".join(devices[key]["entity"] for key in activity["devices"]),
             })
 
+    async def async_step_script_defaults(self, user_input=None):
+        """One household default; individual script steps may override it."""
+        errors = {}
+        if user_input is not None:
+            try:
+                self._yaml_step_delay_ms = validate_step_delay(
+                    user_input.get("default_step_delay_ms"))
+            except ValueError:
+                errors["base"] = "yaml_invalid"
+            else:
+                return await self.async_step_review()
+        return self.async_show_form(step_id="script_defaults", errors=errors,
+            data_schema=vol.Schema({
+                vol.Required("default_step_delay_ms",
+                             default=self._original_step_delay_ms):
+                    selector.NumberSelector(selector.NumberSelectorConfig(
+                        min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX))
+            }))
+
     async def async_step_frontend(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(title="", data={**self._entry.options, **user_input})
@@ -1635,4 +2109,6 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                    "dell_displays": self._dell_displays}
         if self._yaml_enable_ux is not None:
             options["enable_ux"] = self._yaml_enable_ux
+        if self._yaml_step_delay_ms is not None:
+            options["default_step_delay_ms"] = self._yaml_step_delay_ms
         return self.async_create_entry(title="", data=options)

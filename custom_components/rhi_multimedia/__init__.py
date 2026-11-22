@@ -21,7 +21,7 @@ from .const import EVENT_UPDATE
 from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
-from .validation import validate_rooms
+from .validation import validate_rooms, validate_step_delay
 from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation, unregister_visuals_with_foundation
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,7 +70,8 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     # revalidates the exact Foundation selection before every native write.
     store = Store(hass, STORE_VERSION, f"rhi_multimedia_{entry.entry_id}")
     adapter = HAAdapter(hass, store)
-    engine = ActivityEngine(rooms, adapter)
+    delay_ms = validate_step_delay(entry.options.get("default_step_delay_ms", 0))
+    engine = ActivityEngine(rooms, adapter, default_step_delay_ms=delay_ms)
     previous = await store.async_load() or {}
     if not isinstance(previous, dict):
         previous = {}
@@ -204,6 +205,12 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
             quality_of(current["devices"][key]) == "provider_optimistic"
             for key in cast if key in current.get("devices", {})
         )
+        # Native remote-key scripts cannot confirm the target device UI
+        # merely by completing a Home Assistant service call.
+        definition = current.get("activities", {}).get(activity, {}) if activity else {}
+        scripted_unverified = any(step.get("type") == "remote_key"
+                                  for step in definition.get("steps", []))
+        provider_optimistic = provider_optimistic or scripted_unverified
         try:
             operation = (engine.command(room, activity, fix_it=True)
                          if service == "recover_activity"
@@ -248,6 +255,18 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
             result = "cancelled"
         return {**response, "result": result}
 
+    async def press_button(call: ServiceCall) -> dict:
+        room, button = call.data["room"], call.data["button"]
+        result = await adapter.with_context(call.context, engine.press_button(room, button))
+        return {"room": room, "service": "press_activity_button",
+                "button": button, "result": result}
+
+    async def run_macro(call: ServiceCall) -> dict:
+        room, macro = call.data["room"], call.data["macro"]
+        result = await adapter.with_context(call.context, engine.run_macro(room, macro))
+        return {"room": room, "service": "run_activity_macro",
+                "macro": macro, "result": result}
+
     async def inspect(call: ServiceCall) -> None:
         room = call.data["room"]
         if room not in rooms:
@@ -259,6 +278,10 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
         "stop_activity": (stop, vol.Schema({vol.Required("room"): str})),
         "recover_activity": (recover, vol.Schema({vol.Required("room"): str})),
         "inspect_room": (inspect, vol.Schema({vol.Required("room"): str})),
+        "press_activity_button": (press_button, vol.Schema({
+            vol.Required("room"): str, vol.Required("button"): str})),
+        "run_activity_macro": (run_macro, vol.Schema({
+            vol.Required("room"): str, vol.Required("macro"): str})),
         "control_device": (control, vol.Schema({vol.Required("room"): str, vol.Required("device"): str,
                                                 vol.Required("action"): str, vol.Optional("value"): object})),
     }
@@ -288,7 +311,8 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
             task.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
-    for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room", "control_device"):
+    for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room",
+                 "control_device", "press_activity_button", "run_activity_macro"):
         hass.services.async_remove(DOMAIN, name)
     hass.data.pop(DOMAIN, None)
     unregister_visuals_with_foundation(hass)

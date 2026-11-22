@@ -45,7 +45,8 @@
         "data": {
           "activity_type": "Type activiteit",
           "activity_name": "Activiteitsnaam",
-          "primary_source": "Primaire mediabron"
+          "primary_source": "Primaire mediabron",
+          "favorite": "Favoriet · activiteit of kanaal met één druk"
         }
       },
       "route": {
@@ -224,7 +225,8 @@
         "data": {
           "activity_name": "Naam van de activiteit",
           "primary_source": "Deelnemende native mediaspeler (optioneel)",
-          "confirm_source_steps": "Bevestig verwijdering van opdrachten voor de ontkoppelde speler"
+          "confirm_source_steps": "Bevestig verwijdering van opdrachten voor de ontkoppelde speler",
+          "favorite": "Favoriet · activiteit of kanaal met één druk"
         }
       },
       "existing_dell": {

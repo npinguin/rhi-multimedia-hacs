@@ -45,7 +45,8 @@
         "data": {
           "activity_type": "Type d’activité",
           "activity_name": "Nom de l’activité",
-          "primary_source": "Source multimédia principale"
+          "primary_source": "Source multimédia principale",
+          "favorite": "Favori · activité ou chaîne en un geste"
         }
       },
       "route": {
@@ -224,7 +225,8 @@
         "data": {
           "activity_name": "Nom de l'activité",
           "primary_source": "Lecteur multimédia natif participant (facultatif)",
-          "confirm_source_steps": "Confirmer la suppression des commandes du lecteur retiré"
+          "confirm_source_steps": "Confirmer la suppression des commandes du lecteur retiré",
+          "favorite": "Favori · activité ou chaîne en un geste"
         }
       },
       "existing_dell": {

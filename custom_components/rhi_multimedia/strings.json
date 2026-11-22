@@ -45,7 +45,8 @@
         "data": {
           "activity_type": "Activity type",
           "activity_name": "Activity name",
-          "primary_source": "Primary media source"
+          "primary_source": "Primary media source",
+          "favorite": "Favorite · one-tap activity / channel preset"
         }
       },
       "route": {
@@ -224,7 +225,8 @@
         "data": {
           "activity_name": "Activity name",
           "primary_source": "Participating native media player (optional)",
-          "confirm_source_steps": "Confirm removal of commands belonging to the disconnected player"
+          "confirm_source_steps": "Confirm removal of commands belonging to the disconnected player",
+          "favorite": "Favorite · one-tap activity / channel preset"
         }
       },
       "existing_dell": {

@@ -57,3 +57,29 @@ control_device:
       description: Optional source, sound mode, remote key, volume (0–1), mute boolean, or offered native group peer.
       selector:
         object:
+
+press_activity_button:
+  name: Press assigned activity button
+  description: Uses the configured native device for one activity button; never starts another activity.
+  fields:
+    room:
+      required: true
+      selector:
+        text: {}
+    button:
+      required: true
+      selector:
+        text: {}
+
+run_activity_macro:
+  name: Run activity shortcut
+  description: Runs a validated one-touch sequence through the active Multimedia engine.
+  fields:
+    room:
+      required: true
+      selector:
+        text: {}
+    macro:
+      required: true
+      selector:
+        text: {}
