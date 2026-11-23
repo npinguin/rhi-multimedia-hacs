@@ -276,7 +276,6 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-remote-tabs button[aria-pressed=true]{background:#e9f3ff;border-color:#9bc6ed;color:#1259a5;font-weight:700}
 .mm-remote-numbers{display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:6px;max-width:220px;margin:10px auto}
 .mm-remote-numbers button{min-height:44px;border:1px solid #d5e4f1;border-radius:9px;background:#fff;font:inherit;cursor:pointer}
-@media(max-width:1080px){.mm-cockpit{grid-template-columns:minmax(180px,1fr) minmax(250px,1.7fr)}.mm-cockpit-devices{grid-column:1/-1}}
 @media(max-width:700px){.mm-cockpit{grid-template-columns:1fr}.mm-cockpit-devices{grid-column:auto}.mm-floor-room-select{align-items:start;flex-direction:column}.mm-cockpit-device-heading{grid-template-columns:minmax(0,1fr) auto}.mm-cockpit-device-heading .mm-native-media-link{grid-column:1/-1;justify-self:start}}
 
 .mm-remote-text-input{display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:8px 0}

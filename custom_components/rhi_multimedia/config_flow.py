@@ -1,8 +1,9 @@
-"""RHI Multimedia semantic wizard. Foundation alone selects integrations/devices.
+"""RHI Multimedia semantic setup over supported Foundation technical discovery.
 
-Flow scope: room -> selected display -> optional audio -> selected media sources
--> logical activities -> exact physical routes -> atomic review/save.
-No JSON entry, duplicate entity selection or guessed hardware connections.
+Flow: discovered logical AV devices -> optional multiple rooms -> activities
+-> exact physical routes -> existing atomic HA Options Flow Review/Save.
+Discovery and saved read-only assignments never grant command authority.
+No second scanner, state store or guessed hardware connections.
 """
 from __future__ import annotations
 
@@ -17,7 +18,9 @@ from homeassistant.helpers import selector
 from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
 from .dell_c8621qt import valid_host
 from .foundation import selected_native_macs
-from .source_discovery import area_choices, av_sources, source_lists, speech_player_eligible, tts_choices
+from .source_discovery import (area_choices, av_sources, discovered_av_sources,
+                               logical_av_catalog, source_lists, speech_player_eligible,
+                               tts_choices)
 from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
                          native_state, cec_links_for_activity, route_status, validate_action,
                          validate_rooms, validate_step_delay)
@@ -73,7 +76,7 @@ def _select_many(options: dict[str, str]):
 
 
 def _sources(flow, concept: str, area_id: str | None = None) -> dict[str, str]:
-    available, _ = av_sources(flow.hass)
+    available, _ = discovered_av_sources(flow.hass)
     entries = [x for x in available if x.concept == concept]
     entries.sort(key=lambda x: (x.area_id != area_id, not x.available, x.entity_id))
     # A source's registered HA area is NOT its consumption room or a verified
@@ -104,9 +107,11 @@ def _sources(flow, concept: str, area_id: str | None = None) -> dict[str, str]:
         return f" · {assigned_text}: {', '.join(names)}" if names else f" · {unassigned_text}"
 
     choices = {x.entity_id: f"{friendly_label(x.entity_id)} ({x.provider})"
+               + f" · {x.logical_type.replace('_', ' ')}"
                + (f" · HA area: {area_names.get(x.area_id, x.area_id)}" if x.area_id
                   else " · HA area unknown")
                + assignment(x.candidate_id)
+               + (" · command approval pending" if not x.approved else "")
                + (" · currently unavailable" if not x.available else "")
                for x in entries}
     for device in (flow._previous_room or {}).get("devices", {}).values():
@@ -119,7 +124,7 @@ def _area_default(flow, concept: str, area_id: str | None) -> str:
     """Suggest only one unambiguous Foundation-selected endpoint in this HA area."""
     if not area_id:
         return NONE
-    available, _ = av_sources(flow.hass)
+    available, _ = discovered_av_sources(flow.hass)
     matches = [source.entity_id for source in available if source.concept == concept
                and source.area_id == area_id and source.available]
     return matches[0] if len(matches) == 1 else NONE
@@ -139,7 +144,7 @@ def _remapped_device(device: dict, entity_id: str) -> dict:
 
 
 def _source_ref(flow, entity_id: str, concept: str) -> dict:
-    matches, _ = av_sources(flow.hass)
+    matches, _ = discovered_av_sources(flow.hass)
     candidate = next((x for x in matches if x.entity_id == entity_id and x.concept == concept), None)
     old = (flow._previous_room or {}).get("devices", {})
     previous = next((dev for dev in old.values()
@@ -148,7 +153,7 @@ def _source_ref(flow, entity_id: str, concept: str) -> dict:
     if previous is not None:
         return deepcopy(previous)
     if candidate is None:
-        raise ValueError(f"{entity_id}: no longer selected in Foundation/{concept}")
+        raise ValueError(f"{entity_id}: not in supported Foundation/{concept} discovery")
     renamed = [dev for dev in old.values() if dev.get("foundation_concept") == concept
                and dev.get("foundation_candidate_id") == candidate.candidate_id]
     if len(renamed) == 1:
@@ -586,14 +591,19 @@ class _Wizard:
         if self._rooms:
             validate_rooms(self._rooms)
         current, _ = av_sources(self.hass)
+        supported, _ = discovered_av_sources(self.hass)
         selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
+        # Ambiguous technical identity is visible for repair but cannot be
+        # saved as a new semantic binding until Foundation resolves it.
+        discovered = {(s.concept, s.entity_id, s.candidate_id) for s in supported
+                      if s.review_reason != "ambiguous_candidate_identity"}
         for room_id, room in self._rooms.items():
             previous = self._original_rooms.get(room_id, {})
             for key, device in room["devices"].items():
                 if ((device.get("foundation_concept"), device.get("entity"),
-                     device.get("foundation_candidate_id")) not in selected
+                     device.get("foundation_candidate_id")) not in discovered
                         and previous.get("devices", {}).get(key) != device):
-                    raise ValueError("New or changed device not selected")
+                    raise ValueError("New or changed device not in Foundation-supported discovery")
                 tts_id = device.get("speech_tts_registry_id")
                 if tts_id and tts_id != previous.get("devices", {}).get(key, {}).get("speech_tts_registry_id"):
                     approved_speech = next((source for source in current
@@ -603,22 +613,37 @@ class _Wizard:
                     if (room.get("harmony_controller") or not speech_player_eligible(
                             self.hass, device, approved_speech) or tts_id not in tts_choices(self.hass)):
                         raise ValueError("Speech requires an exact selected Cast source and native TTS provider")
-                # YAML cannot bypass the same native MAC/selected-LG guard
-                # that the dedicated TV Wake Options Flow already enforces.
+                # The visual whole-home editor and scoped/global YAML share
+                # the exact native MAC + approved source gate. A read-only
+                # discovered device is never authorized for Wake-on-LAN.
                 wol = device.get("power_on", {})
                 prior_wol = previous.get("devices", {}).get(key, {}).get("power_on")
                 if (isinstance(wol, dict)
                         and wol.get("action") == "wake_on_lan.send_magic_packet"
                         and wol != prior_wol):
                     approved_wol = next((source for source in current
-                                         if source.concept == "display"
-                                         and source.provider == "webostv"
+                                         if source.concept == device.get("foundation_concept")
                                          and source.entity_id == device.get("entity")
                                          and source.candidate_id == device.get("foundation_candidate_id")), None)
-                    if (approved_wol is None or
-                            str(wol.get("data", {}).get("mac", "")).lower()
+                    if (approved_wol is None
+                            or approved_wol.provider == "harmony"
+                            or not device["entity"].startswith(("media_player.", "remote."))
+                            or str(wol.get("data", {}).get("mac", "")).lower()
                             not in selected_native_macs(self.hass, approved_wol)):
-                        raise ValueError("Wake-on-LAN MAC must belong to the selected native LG device")
+                        raise ValueError("Wake-on-LAN MAC must belong to the authorized native device")
+                # A physical AV device has one wake destination across all
+                # consuming rooms. Existing unchanged legacy settings remain
+                # readable, but newly edited WOL cannot diverge by room.
+                if (wol != (prior_wol or {})
+                        and (wol.get("action") == "wake_on_lan.send_magic_packet"
+                             or (isinstance(prior_wol, dict)
+                                 and prior_wol.get("action") == "wake_on_lan.send_magic_packet"))):
+                    physical = device.get("physical_id", device["entity"])
+                    if any(other.get("power_on", {}) != wol
+                           for spec in self._rooms.values()
+                           for other in spec["devices"].values()
+                           if other.get("physical_id", other["entity"]) == physical):
+                        raise ValueError("Shared physical device has conflicting Wake-on-LAN settings")
             for activity_id, activity in room["activities"].items():
                 prior = previous.get("activities", {}).get(activity_id, {})
                 if activity == prior:
@@ -627,7 +652,7 @@ class _Wizard:
                     device = room["devices"][key]
                     if (device.get("foundation_concept"), device["entity"],
                             device.get("foundation_candidate_id")) not in selected:
-                        raise ValueError("Changed activity includes a revoked source")
+                        raise ValueError("Changed activity includes revoked source or pending command approval")
                 # Expert/global YAML and Assisted must enforce the same actual
                 # native input/sound-mode choices. A name-only edit retains
                 # existing routes even if their native source is currently
@@ -981,7 +1006,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                    "remove_activity": "Remove activity",
                    "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card",
                    "harmony_owner": "Harmony / Premium control ownership",
-                   "tv_wake": "TV Wake-on-LAN destination",
+                   "tv_wake": "Device Wake-on-LAN (MAC / IP)",
                    "speech_endpoint": "Speaker speech notifications",
                    "cec_device": "HDMI-CEC setting per selected device",
                    "cec_activity": "HDMI-CEC relationship and activity actions",
@@ -1057,9 +1082,20 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
     async def _complete_setup_form(self, text=None, errors=None):
         from .validation import native_state
         areas = area_choices(self.hass)
+        discovered, discovery_origin = discovered_av_sources(self.hass)
+        logical_devices, _ = logical_av_catalog(self.hass, self._rooms)
+        asset_by_candidate = {
+            (row["concept"], row["candidate_id"], row["entity_id"]): asset["asset_id"]
+            for asset in logical_devices for row in asset["candidates"]
+        }
         approved, _ = av_sources(self.hass)
+        approved_macs = {
+            (source.concept, source.candidate_id, source.entity_id):
+                sorted(selected_native_macs(self.hass, source))
+            for source in approved
+        }
         sources = []
-        for src in approved:
+        for src in discovered:
             if src.concept not in ("display", "amplifier", "source"):
                 continue
             state = native_state(self.hass, src.entity_id)
@@ -1071,6 +1107,17 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "concept": src.concept,
                 "provider": src.provider,
                 "available": src.available,
+                "approved": src.approved,
+                "verified_macs": approved_macs.get(
+                    (src.concept, src.candidate_id, src.entity_id), []),
+                "review_reason": src.review_reason,
+                "logical_type": src.logical_type,
+                "logical_asset_id": asset_by_candidate.get(
+                    (src.concept, src.candidate_id, src.entity_id)),
+                "native_device_id": src.device_registry_id,
+                "manufacturer": src.manufacturer,
+                "model": src.model,
+                "related_entities": list(src.related_entities),
                 "area_id": src.area_id,
                 "label": label if isinstance(label, str) and label.strip()
                          else src.entity_id,
@@ -1097,8 +1144,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             description_placeholders={
                 "areas_json": json.dumps(areas, ensure_ascii=False),
                 "sources_json": json.dumps(sources, ensure_ascii=False),
-                "note": "One draft, one Review/Save; HA Areas and Foundation "
-                        "candidate registry are authoritative. Cancel discards all.",
+                "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
+                "discovery_origin": discovery_origin,
+                "note": "Supported-domain discovery defaults to Select All when Foundation "
+                        "publishes it. Classify and assign without prior Foundation wizard. "
+                        "Read-only pending candidates may be saved but Premium physical "
+                        "commands remain blocked until exact authorization. "
+                        "One draft and native Review/Save; Cancel discards all.",
             })
 
     async def async_step_assisted(self, user_input=None):
@@ -1115,7 +1167,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             "quick_edit_activity": "Activities · quick edit name and real HDMI input",
             "remove_activity": "Activities · remove an activity",
             "harmony_owner": "Advanced · Harmony / Premium command ownership",
-            "tv_wake": "Advanced · TV Wake-on-LAN",
+            "tv_wake": "Advanced · Device Wake-on-LAN",
             "speech_endpoint": "Notifications · Native speech for idle speakers",
             "cec_device": "Advanced · HDMI-CEC device settings",
             "cec_activity": "Advanced · HDMI-CEC activity relationship",
@@ -1456,57 +1508,106 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             vol.Required("room"): vol.In(choices)}))
 
     async def async_step_tv_wake(self, user_input=None):
-        """Bind directed WOL only to a Foundation-selected LG screen and native MAC."""
-        screen = self._rooms[self._room_id]["devices"].get("screen")
+        """Optional per-device WOL, bound to one exact Foundation-approved native MAC.
+
+        The existing action ID is retained for old flows. No physical command
+        is sent during editing. Shared physical sources receive one power policy.
+        """
+        room = self._rooms[self._room_id]
         selected, _ = av_sources(self.hass)
-        approved = next((source for source in selected
-                         if screen and source.concept == "display" and source.provider == "webostv"
-                         and source.entity_id == screen["entity"]
-                         and source.candidate_id == screen.get("foundation_candidate_id")), None)
-        macs = sorted(selected_native_macs(self.hass, approved))
-        if not macs:
-            return self.async_show_form(step_id="tv_wake",
-                errors={"base": "wake_unavailable"}, data_schema=vol.Schema({}))
-        current = screen.get("power_on", {})
-        wol = current if current.get("action") == "wake_on_lan.send_magic_packet" else {}
-        prior = wol.get("data", {})
+        approvals = {
+            (source.concept, source.entity_id, source.candidate_id): source
+            for source in selected
+        }
+        choices = {}
+        macs_by_key = {}
+        for key, device in room["devices"].items():
+            if not device["entity"].startswith(("media_player.", "remote.")):
+                continue
+            approved = approvals.get((
+                device.get("foundation_concept"), device["entity"],
+                device.get("foundation_candidate_id")))
+            # Harmony owns its activity and power commands. Existing stale
+            # overrides remain removable, but may never be newly authorized.
+            if approved is not None and approved.provider == "harmony":
+                approved = None
+            macs = sorted(selected_native_macs(self.hass, approved)) if approved else []
+            # A previously configured WOL override must remain removable,
+            # even after Foundation revokes its approval or native MAC evidence.
+            existing = device.get("power_on", {})
+            if macs or existing.get("action") == "wake_on_lan.send_magic_packet":
+                choices[key] = f"{device.get('name') or key} · {device['entity']}"
+                macs_by_key[key] = macs
+        if not choices:
+            return self.async_show_form(
+                step_id="tv_wake", errors={"base": "wake_unavailable"},
+                data_schema=vol.Schema({}))
+        chosen = (user_input or {}).get("device") or next(iter(choices))
         errors = {}
-        if user_input is not None:
+        if chosen not in choices:
+            errors["base"] = "wake_invalid_target"
+            chosen = next(iter(choices))
+        device = room["devices"][chosen]
+        configured = device.get("power_on", {})
+        wol = configured if configured.get("action") == "wake_on_lan.send_magic_packet" else {}
+        prior = wol.get("data", {})
+        macs = macs_by_key[chosen]
+        if user_input is not None and not errors:
             mode = user_input.get("mode")
             if mode == "keep":
                 return await self.async_step_review()
-            if mode == "clear":
-                if wol:
-                    screen.pop("power_on", None)
-                return await self.async_step_review()
-            if mode == "directed":
-                action = {"action": "wake_on_lan.send_magic_packet", "data": {
-                    "mac": str(user_input.get("mac", "")).lower(),
-                    "broadcast_address": user_input.get("broadcast_address", ""),
-                    "broadcast_port": user_input.get("broadcast_port", 9)}}
-                try:
-                    validate_action(action, screen["entity"], True)
-                    if action["data"]["mac"] not in macs:
-                        raise ValueError("MAC not on selected HA device")
-                except (TypeError, ValueError):
-                    errors["base"] = "wake_invalid_target"
-                else:
-                    screen["power_on"] = action
-                    return await self.async_step_review()
+            if mode in ("clear", "directed"):
+                proposed = deepcopy(self._rooms)
+                physical = device.get("physical_id", device["entity"])
+                action = None
+                if mode == "directed":
+                    data = {
+                        "mac": str(user_input.get("mac", "")).strip().replace("-", ":").lower(),
+                        "broadcast_port": user_input.get("broadcast_port", 9),
+                    }
+                    ip = str(user_input.get("broadcast_address") or "").strip()
+                    if ip:
+                        data["broadcast_address"] = ip
+                    action = {"action": "wake_on_lan.send_magic_packet", "data": data}
+                    try:
+                        validate_action(action, device["entity"], True)
+                        if data["mac"] not in macs:
+                            raise ValueError("MAC is not registered on the selected native device")
+                    except (ValueError, TypeError):
+                        errors["base"] = "wake_invalid_target"
+                if not errors:
+                    for spec in proposed.values():
+                        for target in spec["devices"].values():
+                            if target.get("physical_id", target["entity"]) == physical:
+                                if mode == "directed":
+                                    target["power_on"] = deepcopy(action)
+                                elif target.get("power_on", {}).get("action") == "wake_on_lan.send_magic_packet":
+                                    target.pop("power_on", None)
+                    try:
+                        validate_rooms(proposed)
+                    except ValueError:
+                        errors["base"] = "wake_invalid_target"
+                    else:
+                        self._rooms = proposed
+                        return await self.async_step_review()
             else:
                 errors["base"] = "wake_invalid_target"
-        default_mac = str(prior.get("mac", "")).lower()
-        return self.async_show_form(step_id="tv_wake", errors=errors,
+        current_mac = str(prior.get("mac", "")).lower()
+        suggested = current_mac if current_mac else (macs[0] if macs else "")
+        return self.async_show_form(
+            step_id="tv_wake", errors=errors,
             data_schema=vol.Schema({
+                vol.Required("device", default=chosen): vol.In(choices),
                 vol.Required("mode", default="keep"): vol.In({
-                    "keep": "Keep existing power-on action",
-                    "directed": "Use directed Wake-on-LAN destination",
-                    "clear": "Clear existing WOL override"}),
-                vol.Required("mac", default=default_mac if default_mac in macs else macs[0]):
-                    vol.In({mac: mac for mac in macs}),
+                    "keep": "Keep this device's current power action",
+                    "directed": "Use Wake-on-LAN (MAC / optional LAN IP)",
+                    "clear": "Remove this device's WOL override",
+                }),
+                vol.Required("mac", default=suggested): str,
                 vol.Optional("broadcast_address", default=prior.get("broadcast_address", "")): str,
                 vol.Optional("broadcast_port", default=prior.get("broadcast_port", 9)): int,
-            }), description_placeholders={"screen": screen["entity"]})
+            }),
+            description_placeholders={"screen": device["entity"], "device": device["entity"]})
 
     async def async_step_speech_endpoint(self, user_input=None):
         """Explicit opt-in, one native destination per asset, same Options Flow."""

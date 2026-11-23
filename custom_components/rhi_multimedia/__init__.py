@@ -52,8 +52,13 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         dell_configured = bool(entry.options.get("dell_displays", entry.data.get("dell_displays", {})))
         hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration",
                              "dell_prepared": dell_configured}
+        # Supported logical AV devices are read-only HA projections even
+        # before the first room/activity. No command service or activity engine
+        # is registered by this empty-configuration path.
+        presentations = [Platform.SENSOR]
         if dell_configured:
-            await hass.config_entries.async_forward_entry_setups(entry, [Platform.MEDIA_PLAYER])
+            presentations.insert(0, Platform.MEDIA_PLAYER)
+        await hass.config_entries.async_forward_entry_setups(entry, presentations)
         _register_entry_listeners(hass, entry)
         return True
     rooms = validate_rooms(configured)

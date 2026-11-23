@@ -9,15 +9,30 @@ function rhiMmWholeFromStep(step){
   const context=step.description_placeholders||{};
   const areas=JSON.parse(context.areas_json||'{}');
   const sources=JSON.parse(context.sources_json||'[]');
+  const logicalDevices=JSON.parse(context.logical_devices_json||'[]');
   const room=Object.keys(doc.rooms)[0]||'';
-  return {doc,areas,sources,room,device:'',activity:'',tab:'rooms',dirty:false,
-    error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
+  return {doc,areas,sources,logicalDevices,room,device:'',activity:'',tab:'discovery',
+    catalogFilter:'all',catalogQuery:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
     newActivity:'',newType:'watch_tv'};
 }
 function rhiMmWholeSlug(name){
   return String(name||'').normalize('NFKD').toLowerCase()
     .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_')
     .replace(/^_+|_+$/g,'');
+}
+function rhiMmWholeForPhysical(d,device,mutate){
+  const physical=device.physical_id||device.entity;
+  for(const room of Object.values(d.doc.rooms||{})){
+    for(const current of Object.values(room.devices||{})){
+      if((current.physical_id||current.entity)===physical)mutate(current);
+    }
+  }
+}
+function rhiMmWholeVerifiedMacs(d,device){
+  const source=d.sources.find(s=>s.entity===device?.entity&&
+    s.concept===device?.foundation_concept&&
+    s.candidate===device?.foundation_candidate_id&&s.approved===true);
+  return source?.verified_macs||[];
 }
 function rhiMmWholeCurrent(d){
   const room=d.doc.rooms[d.room];
@@ -43,6 +58,7 @@ function rhiMmWholeRender(d,t,escape){
     items.map(([id,label])=>`<option value='${e(id)}' ${value===id?'selected':''}>${e(label)}</option>`).join('')+
     '</select>';
   const sections=[
+    ['discovery','Discovered devices','mdi:devices'],
     ['rooms',t('settings_floor_rooms'),'mdi:floor-plan'],
     ['devices',t('devices'),'mdi:television'],
     ['activities',t('activities'),'mdi:play-box-multiple-outline']
@@ -50,7 +66,7 @@ function rhiMmWholeRender(d,t,escape){
   const rooms=Object.entries(d.doc.rooms);
   const {room,device,activity}=rhiMmWholeCurrent(d);
   const roomButtons=rooms.map(([id,r])=>entry(id,r.name||id,id===d.room,'select_room')).join('');
-  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.entity} · ${s.provider}${s.available?'':' · unavailable'}`]);
+  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · pending command approval'}${s.review_reason?' · needs review: '+s.review_reason:''}${s.available?'':' · unavailable'}`]);
   const deviceRows=Object.entries(room?.devices||{});
   const activityRows=Object.entries(room?.activities||{});
   const roomAreas=Object.entries(room?.room_areas||{});
@@ -59,6 +75,9 @@ function rhiMmWholeRender(d,t,escape){
   const currentActivity=d.activity&&room?.activities?.[d.activity]?d.activity:activityRows[0]?.[0]||'';
   const selectedDevice=room?.devices?.[currentDevice];
   const selectedActivity=room?.activities?.[currentActivity];
+  const currentWake=selectedDevice?.power_on?.action==='wake_on_lan.send_magic_packet'
+    ?selectedDevice.power_on.data||{}:null;
+  const verifiedMacs=rhiMmWholeVerifiedMacs(d,selectedDevice);
   const sameNativeCandidates=d.sources.filter(s=>s.entity===selectedDevice?.entity&&
     s.concept===selectedDevice?.foundation_concept);
   const currentCandidate=selectedDevice?.foundation_candidate_id||'';
@@ -67,8 +86,55 @@ function rhiMmWholeRender(d,t,escape){
     ...(!bindingCurrent&&selectedDevice?[ [currentCandidate,currentCandidate+' · no longer selected in Foundation'] ]:[]),
     ...sameNativeCandidates.map(s=>[s.candidate,s.label+' · '+s.provider])
   ];
+  const discovered=(d.logicalDevices||[]).map(asset=>{
+    const linkedRooms=rooms.filter(([,r])=>Object.values(r.devices||{}).some(x=>
+      // The configured logical asset is stable even when Foundation reissues
+      // a candidate or HA renames its entity. Never infer a link by label.
+      (x.asset_id&&x.asset_id===asset.asset_id)||
+      (x.physical_id&&x.physical_id===asset.asset_id)||
+      (asset.candidates||[]).some(c=>x.foundation_concept===c.concept&&
+        (x.foundation_candidate_id===c.candidate_id||
+         x.entity===c.entity_id))
+    )).map(([id,r])=>r.name||id);
+    return {...asset,linkedRooms};
+  }).filter(asset=>{
+    if(d.catalogFilter==='unassigned'&&asset.linkedRooms.length)return false;
+    if(d.catalogFilter==='classified'&&asset.classification_status!=='classified')return false;
+    if(d.catalogFilter==='review'&&!asset.needs_review)return false;
+    const q=(d.catalogQuery||'').trim().toLowerCase();
+    return !q||[asset.name,asset.logical_type,asset.model,
+      ...(asset.candidates||[]).map(x=>x.entity_id),
+      ...(asset.source_entities||[]).map(x=>x.entity_id)].join(' ').toLowerCase().includes(q);
+  });
   let content='';
-  if(d.tab==='rooms'){
+  if(d.tab==='discovery'){
+    content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
+      <h4>Supported Multimedia devices · ${d.logicalDevices?.length||0}</h4>
+      <p>Automatically classified from Foundation-supported discovery. No room setup required.</p>
+      <label>Filter ${select('catalog_filter',d.catalogFilter,
+        [['all','All supported'],['classified','Classified'],['unassigned','Unassigned'],['review','Needs classification / approval']])}</label>
+      <label>Search ${field('catalog_query',d.catalogQuery)}</label>
+      <small>Filtering changes only this view. Technical identities and room links stay intact.</small>
+      ${!d.logicalDevices?.length?'<p>No supported candidates have been published by Foundation yet.</p>':''}
+    </section><section class='mm-wh-panel'>
+      <h4>Logical devices</h4>
+      ${discovered.map(asset=>`<article class='mm-wh-source'>
+        <strong>${e(asset.model||asset.name)}</strong>
+        <small> · ${e((asset.logical_type||'media_player').replaceAll('_',' '))}${asset.classification_status==='needs_classification'?' · Needs classification':''}</small>
+        <p>${asset.linkedRooms.length?'Rooms: '+e(asset.linkedRooms.join(', ')):'Unassigned'}
+          · ${asset.approved_candidates||0}/${asset.candidates?.length||0} approved bindings
+          ${(asset.review_reasons||[]).length?' · Needs review: '+e(asset.review_reasons.join(', ')):''}</p>
+        <details><summary>${asset.source_entities?.length||0} related source entities</summary>
+          ${(asset.source_entities||[]).map(x=>`<div><code>${e(x.entity_id)}</code>
+            <small> · ${e(x.provider||x.domain||'native')} · ${e(x.availability)}</small></div>`).join('')}
+        </details>
+        <button type='button' data-wh-action='assign_catalog' data-wh-id='${e(asset.asset_id)}'
+          ${room?'':'disabled'}>Assign to selected room</button>
+      </article>`).join('')||'<p>No devices match the filter.</p>'}
+      <p>${room?'Target room: '+e(room.name||d.room)+'. Shared devices keep one identity.':
+        'Create a room before assigning devices; discovery remains available.'}</p>
+    </section></div>`;
+  }else if(d.tab==='rooms'){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
       <h4>Rooms <small>HA Floor / Area</small></h4>
       <div class='mm-wh-list'>${roomButtons||'<p>No rooms configured</p>'}</div>
@@ -99,11 +165,11 @@ function rhiMmWholeRender(d,t,escape){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
       <h4>Devices · ${e(room?.name||'No room')}</h4>
       <div class='mm-wh-list'>${deviceRows.map(([id,x])=>entry(id,x.name||id,id===currentDevice,'select_device')).join('')}</div>
-      <h4>Add approved device</h4>
-      <label>Foundation selection${select('new_source',d.newSource,
-        [['','Choose a real selected device'],...sourceRows])}</label>
-      <button type='button' data-wh-action='add_device' ${d.newSource===''?'disabled':''}>Add device</button>
-      <small>Only Foundation-approved native entity + candidate identity is selectable. Selection never sends a command.</small>
+      <h4>Assign supported device</h4>
+      <label>Foundation supported source${select('new_source',d.newSource,
+        [['','Choose a discovered source'],...sourceRows])}</label>
+      <button type='button' data-wh-action='add_device' ${d.newSource===''||!room?'disabled':''}>Assign device</button>
+      <small>Pending sources can be assigned read-only. Premium actions remain blocked until exact Foundation command approval.</small>
     </section><section class='mm-wh-panel'>
       <h4>${e(selectedDevice?.name||'Select a device')}</h4>
       ${selectedDevice?`<small>${e(selectedDevice.entity||'')} · ${e(selectedDevice.foundation_concept||'')} · ${e(currentDevice)}</small>
@@ -111,17 +177,41 @@ function rhiMmWholeRender(d,t,escape){
         <label>Foundation candidate for this exact native entity
           ${select('device_candidate',currentCandidate,nativeBindingChoices,
             sameNativeCandidates.length?'':'disabled')}</label>
-        ${!bindingCurrent?`<p class='mm-room-error'>Current Foundation selection is invalid.
-          Choose the newly approved candidate for the same native entity.
-          A different device must be added separately, never silently substituted.</p>`:''}
+        ${!bindingCurrent?`<p class='mm-room-error'>Native source no longer present in
+          Foundation-supported discovery. Review this exact binding.</p>`:
+          sameNativeCandidates.every(x=>!x.approved)?
+          '<p class="mm-room-error">Discovered source · command approval pending.</p>':''}
+        <details><summary>Related native source entities</summary>
+          ${(d.sources.find(x=>x.entity===selectedDevice.entity&&
+            x.candidate===selectedDevice.foundation_candidate_id)?.related_entities||[])
+            .map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.provider||x.domain||'native')}
+              · ${e(x.availability)}</div>`).join('')}
+        </details>
         <label>Role${select('device_role',selectedDevice.role||'player',
-          [['display','TV / Display'],['receiver','Receiver / Audio zone'],['player','Media player']])}</label>
+          [['display','TV / Display'],['receiver','Receiver / Audio zone'],['player','Media player'],['remote','Remote / Hub']])}</label>
         ${roomAreas.length?`<label>Room Area (optional)${select('device_room_area',selectedDevice.room_area||'',roomAreaChoices)}</label>`:''}
         <label>Power behaviour${select('device_power',selectedDevice.power_mode||'native',
-          [['native','Native HA Power On/Off'],['passive','Passive (observe only)']])}</label>
-        <label class='mm-wh-check'>HDMI-CEC verified/enabled ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>
+          [['native','Automatic · use configured WoL for Power On'],['passive','Passive (observe only)']])}</label>
+        <label class='mm-wh-check'>HDMI-CEC enabled for this device ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>
         <label>After power-on (ms)${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
-        <small>Existing WoL, device identity, CEC relationships and advanced native settings remain unchanged. Power commands are verified by the backend.</small>
+        <details class='mm-wh-device-wol' ${currentWake?'open':''}>
+          <summary>Wake-on-LAN · optional per device</summary>
+          <label>Power-on method${select('device_wol_mode',currentWake?'directed':'native',
+            [['native','Use native HA power-on (no WoL override)'],['directed','Wake-on-LAN · MAC + optional LAN IPv4']])}</label>
+          ${currentWake?`<label>MAC address (native registered)
+            ${field('device_wol_mac',currentWake.mac||'')}</label>
+            <label>Destination IPv4 (optional)
+            ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
+            <label>UDP port ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
+          <small>Verified MACs: ${e(verifiedMacs.join(', ')||'none published by native HA')}.
+            WOL is used automatically by the ordinary On button and activity startup if
+            configured and approved. There is no separate wake button. Off stays native.
+            Save never sends a packet. Actual wake requires HA Wake-on-LAN service
+            and fresh readback.</small>
+          ${selectedDevice.power_mode==='passive'?
+            '<small>Passive mode disables direct power-on. Choose Native power behaviour to use WOL.</small>':''}
+        </details>
+        <small>HDMI-CEC and Wake-on-LAN are separate options. Shared physical devices keep a single power and CEC policy.</small>
         <button type='button' class='danger' data-wh-action='delete_device'>Remove device</button>`:''}
     </section></div>`;
   }else{
@@ -185,7 +275,7 @@ function rhiMmWholeRender(d,t,escape){
   }
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
     <header class='mm-wh-header'><div><h2>Configure Multimedia</h2>
-      <p>Floors / Rooms → Devices → Activities · one Review and Save</p></div>
+      <p>Discover → Rooms → Activities · one Review and Save</p></div>
       <span class='mm-wh-draft'>${d.dirty?'Unsaved changes':'Current saved configuration'}</span></header>
     <nav class='mm-wh-tabs' aria-label='Multimedia configuration'>
       ${sections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
@@ -240,6 +330,8 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(key==='new_room_area')d.newRoomArea=value;
   else if(key==='new_area')d.newArea=value;
   else if(key==='new_source')d.newSource=value;
+  else if(key==='catalog_filter')d.catalogFilter=value;
+  else if(key==='catalog_query')d.catalogQuery=value;
   else if(key==='new_activity')d.newActivity=value;
   else if(key==='new_type')d.newType=value;
   else if(key==='default_step_delay_ms'){
@@ -268,9 +360,64 @@ function rhiMmWholeChange(d,key,value,checked=false){
     device.foundation_candidate_id=approved.candidate;d.dirty=true;
   }
   else if(key==='device_role'&&device){device.role=value;d.dirty=true;}
-  else if(key==='device_power'&&device){device.power_mode=value;d.dirty=true;}
-  else if(key==='device_cec'&&device){device.hdmi_cec_enabled=checked;d.dirty=true;}
-  else if(key==='device_delay'&&device){if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');device.post_power_on_delay_ms=int;d.dirty=true;}
+  else if(key==='device_power'&&device){
+    if(!['native','passive'].includes(value))return fail('Unknown power behaviour');
+    rhiMmWholeForPhysical(d,device,x=>{x.power_mode=value;});d.dirty=true;
+  }
+  else if(key==='device_cec'&&device){
+    rhiMmWholeForPhysical(d,device,x=>{x.hdmi_cec_enabled=checked;});d.dirty=true;
+  }
+  else if(key==='device_delay'&&device){
+    if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');
+    rhiMmWholeForPhysical(d,device,x=>{x.post_power_on_delay_ms=int;});d.dirty=true;
+  }
+  else if(key==='device_wol_mode'&&device){
+    if(!['native','directed'].includes(value))return fail('Unknown Wake-on-LAN mode');
+    if(value==='native'){
+      rhiMmWholeForPhysical(d,device,x=>{
+        if(x.power_on?.action==='wake_on_lan.send_magic_packet')delete x.power_on;
+      });
+    }else{
+      if(!device.entity.startsWith('media_player.')&&!device.entity.startsWith('remote.'))
+        return fail('WOL requires an authorized native media device');
+      if(d.sources.some(x=>x.entity===device.entity&&
+          x.candidate===device.foundation_candidate_id&&x.provider==='harmony'))
+        return fail('Harmony keeps exclusive control of this device');
+      const macs=rhiMmWholeVerifiedMacs(d,device);
+      if(!macs.length)return fail('No approved native MAC address for this device');
+      const existing=device.power_on?.action==='wake_on_lan.send_magic_packet'
+        ?device.power_on.data:{};
+      const mac=macs.includes(existing?.mac)?existing.mac:macs[0];
+      const action={action:'wake_on_lan.send_magic_packet',
+        data:{mac,broadcast_port:existing?.broadcast_port??9,
+          ...(existing?.broadcast_address?{broadcast_address:existing.broadcast_address}:{})}};
+      rhiMmWholeForPhysical(d,device,x=>{x.power_on=JSON.parse(JSON.stringify(action));});
+    }
+    d.dirty=true;
+  }
+  else if(key==='device_wol_mac'&&device){
+    const mac=String(value||'').trim().replaceAll('-',':').toLowerCase();
+    if(!rhiMmWholeVerifiedMacs(d,device).includes(mac))
+      return fail('MAC must match this exact authorized native device');
+    if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
+    rhiMmWholeForPhysical(d,device,x=>{x.power_on.data.mac=mac;});d.dirty=true;
+  }
+  else if(key==='device_wol_ip'&&device){
+    const ip=String(value||'').trim();
+    const parts=ip.split('.');
+    if(ip&&!(parts.length===4&&parts.every(p=>/^(?:0|[1-9][0-9]{0,2})$/.test(p)&&Number(p)<=255)&&ip!=='0.0.0.0'))
+      return fail('Enter a valid IPv4 destination or leave empty for default broadcast');
+    if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
+    rhiMmWholeForPhysical(d,device,x=>{
+      if(ip)x.power_on.data.broadcast_address=ip;
+      else delete x.power_on.data.broadcast_address;
+    });d.dirty=true;
+  }
+  else if(key==='device_wol_port'&&device){
+    if(!Number.isInteger(int)||int<1||int>65535)return fail('UDP port must be 1–65535');
+    if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
+    rhiMmWholeForPhysical(d,device,x=>{x.power_on.data.broadcast_port=int;});d.dirty=true;
+  }
   else if(key==='activity_name'&&activity){activity.name=value;d.dirty=true;}
   else if(key==='activity_room_area'&&activity){
     if(value&&!room?.room_areas?.[value])return fail('Choose a defined Room Area');
@@ -331,8 +478,22 @@ function rhiMmWholeAction(d,action,id,phase,index){
       d.device='';d.activity='';d.dirty=true;d.error='';return true;
     }catch(_){return fail('Advanced configuration must be valid JSON');}
   }
-  if(action==='tab'){if(!['rooms','devices','activities'].includes(id))return false;d.tab=id;d.error='';return true;}
+  if(action==='tab'){if(!['discovery','rooms','devices','activities'].includes(id))return false;d.tab=id;d.error='';return true;}
   if(action==='select_room'){if(!d.doc.rooms[id])return false;d.room=id;d.device='';d.activity='';d.error='';return true;}
+  if(action==='assign_catalog'){
+    if(!room){d.tab='rooms';return fail('Create a room before assigning a source');}
+    const asset=(d.logicalDevices||[]).find(x=>x.asset_id===id);
+    if(!asset)return fail('Unknown logical device');
+    const candidate=(asset.candidates||[]).find(x=>x.entity_id.startsWith('media_player.'))||
+      asset.candidates?.[0];
+    const index=d.sources.findIndex(s=>s.entity===candidate?.entity_id&&
+      s.candidate===candidate?.candidate_id&&s.concept===candidate?.concept);
+    if(index<0)return fail('Foundation source identity changed; reopen configuration');
+    d.newSource=String(index);
+    const assigned=rhiMmWholeAction(d,'add_device');
+    if(assigned)d.tab='devices';
+    return assigned;
+  }
   if(action==='select_device'){if(!room?.devices?.[id])return false;d.device=id;d.error='';return true;}
   if(action==='select_activity'){if(!room?.activities?.[id])return false;d.activity=id;d.error='';return true;}
   if(action==='add_room'){
@@ -365,7 +526,9 @@ function rhiMmWholeAction(d,action,id,phase,index){
   }else if(action==='add_device'){
     if(!room)return fail('Select a room first');
     const source=d.sources[Number(d.newSource)];
-    if(!source||!source.entity||!source.candidate)return fail('Choose a Foundation-approved device');
+    if(!source||!source.entity||!source.candidate)return fail('Choose a Foundation-supported source');
+    if(source.review_reason==='ambiguous_candidate_identity')
+      return fail('Conflicting Foundation candidates for this native entity. Review the source in Foundation before linking.');
     if(Object.values(room.devices||{}).some(x=>x.entity===source.entity))
       return fail('This native device is already assigned to the room');
     // Preserve the canonical identity of a shared AVR/TV already configured
@@ -376,9 +539,11 @@ function rhiMmWholeAction(d,action,id,phase,index){
     let key=base,n=2;while(Object.prototype.hasOwnProperty.call(room.devices,key))key=base+'_'+n++;
     room.devices[key]={name:source.label,entity:source.entity,
       foundation_concept:source.concept,foundation_candidate_id:source.candidate,
-      physical_id:existing?.physical_id||source.entity,
-      asset_id:existing?.asset_id||existing?.physical_id||source.entity,
-      role:source.concept==='display'?'display':source.concept==='amplifier'?'receiver':'player'};
+      physical_id:existing?.physical_id||source.logical_asset_id||source.entity,
+      asset_id:existing?.asset_id||existing?.physical_id||source.logical_asset_id||source.entity,
+      role:source.concept==='display'?'display':source.concept==='amplifier'?'receiver':
+        source.entity.startsWith('remote.')?'remote':'player',
+      power_mode:source.entity.startsWith('remote.')?'passive':'native'};
     d.device=key;d.newSource='';
   }else if(action==='delete_device'){
     if(!room?.devices?.[d.device])return false;
@@ -390,7 +555,7 @@ function rhiMmWholeAction(d,action,id,phase,index){
     const key=rhiMmWholeSlug(d.newActivity);
     if(!/^[a-z][a-z0-9_]*$/.test(key)||key.length>80)return fail('Enter an activity name');
     if(room.activities[key])return fail('Activity already exists');
-    if(!Object.keys(room.devices).length)return fail('Add approved devices first');
+    if(!Object.keys(room.devices).length)return fail('Assign devices first');
     room.activities[key]={name:d.newActivity.trim(),activity_type:d.newType,
       devices:[],steps:[],stop_steps:[]};
     d.activity=key;d.newActivity='';

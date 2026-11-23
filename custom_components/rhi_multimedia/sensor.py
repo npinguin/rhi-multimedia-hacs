@@ -3,25 +3,100 @@ from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, EVENT_UPDATE
 from .experience import VERSION, build_room, logical_asset_id
-from .foundation import selected_index
+from .foundation import selected_index, SELECTION_CHANGED_EVENT
+from .source_discovery import logical_source_type, related_source_entities, logical_av_catalog
 from .validation import native_state
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    """Publish both configured AV rooms and read-only discovered logical devices.
+
+    A Foundation structural event may add devices. Native runtime state updates
+    only invalidate property values; neither requires a second HA source scan.
+    """
     context = hass.data[DOMAIN]
-    rooms = context["engine"].rooms
+    engine = context.get("engine")
+    rooms = engine.rooms if engine else {}
+    context.setdefault("hass", hass)
     assets = logical_asset_projection_specs(hass, rooms)
-    async_add_entities([RoomSensor(context, entry.entry_id, room, kind)
-                        for room in rooms for kind in ("status", "sources")]
-                       + [LogicalAssetSensor(context, entry.entry_id, key, value)
-                          for key, value in sorted(assets.items())]
-                       + [PlanningTargetsSensor(context, entry.entry_id)])
+    projected = {
+        key: LogicalAssetSensor(context, entry.entry_id, key, value)
+        for key, value in sorted(assets.items())
+    }
+    room_sensors = [RoomSensor(context, entry.entry_id, room, kind)
+                    for room in rooms for kind in ("status", "sources")]
+    planning = [PlanningTargetsSensor(context, entry.entry_id)] if engine else []
+    async_add_entities(room_sensors + list(projected.values()) + planning)
+
+    # A no-room setup still receives bounded native state readback for its
+    # supported, discovered logical AV devices. Configured rooms already
+    # subscribe to their owned sources in the existing integration runtime.
+    watched_ids: tuple[str, ...] = ()
+    cancel_watch = None
+
+    @callback
+    def source_changed(_event):
+        async_dispatcher_send(hass, EVENT_UPDATE, "*")
+
+    def refresh_watch():
+        nonlocal watched_ids, cancel_watch
+        # Configured primary endpoints are already watched by the activity
+        # engine. Watch only other bounded native companions here; no scan.
+        engine_watched = set()
+        if engine:
+            adapter = context.get("adapter")
+            for room in rooms.values():
+                for device in room.get("devices", {}).values():
+                    engine_watched.add(device["entity"])
+                    remote = adapter.paired_remote(device) if adapter else None
+                    if remote:
+                        engine_watched.add(remote["entity"])
+        ids = tuple(sorted(({asset.device["entity"] for asset in projected.values()}
+                            | {rel["entity_id"] for asset in projected.values()
+                               for rel in asset.related_entities}) - engine_watched))
+        if ids == watched_ids:
+            return
+        if cancel_watch is not None:
+            cancel_watch()
+        watched_ids = ids
+        cancel_watch = (async_track_state_change_event(hass, ids, source_changed)
+                        if ids else None)
+
+    @callback
+    def foundation_changed(event):
+        if event.data.get("domain_id") != "multimedia":
+            return
+        current = logical_asset_projection_specs(hass, rooms)
+        additions = []
+        for asset_id, spec in current.items():
+            if asset_id in projected:
+                projected[asset_id].update_spec(spec)
+            else:
+                entity = LogicalAssetSensor(context, entry.entry_id, asset_id, spec)
+                projected[asset_id] = entity
+                additions.append(entity)
+        if additions:
+            async_add_entities(additions)
+        # Keep stable native HA entity/device identity when a published
+        # candidate disappears. No registry deletion or runtime rebuild.
+        for asset_id, entity in projected.items():
+            if asset_id not in current:
+                entity.mark_unpublished()
+        refresh_watch()
+        async_dispatcher_send(hass, EVENT_UPDATE, "*")
+
+    refresh_watch()
+    if getattr(hass, "bus", None) is not None:
+        entry.async_on_unload(hass.bus.async_listen(
+            SELECTION_CHANGED_EVENT, foundation_changed))
+    entry.async_on_unload(lambda: cancel_watch() if cancel_watch else None)
 
 
 def logical_asset_projection_specs(hass, rooms: dict) -> dict:
@@ -36,13 +111,84 @@ def logical_asset_projection_specs(hass, rooms: dict) -> dict:
         for device in spec["devices"].values():
             entity_id = device["entity"]
             if not entity_id.startswith("media_player."):
-                continue  # Remote companions/passive HDMI routes are relationships.
+                continue  # Native remotes remain related source entities, not duplicate HA devices.
             registered = registry.async_get(entity_id)
             if registered is not None and getattr(registered, "platform", None) == DOMAIN:
                 continue
             key = logical_asset_id(device)
-            item = assets.setdefault(key, {"device": device, "rooms": set()})
+            native_device_id = getattr(registered, "device_id", None)
+            logical_type = logical_source_type(
+                device.get("foundation_concept", ""),
+                str(getattr(registered, "platform", "") or ""),
+                entity_id,
+            )
+            item = assets.setdefault(key, {
+                "device": device, "rooms": set(),
+                "native_device_id": native_device_id,
+                "logical_type": logical_type, "source_entities": (),
+            })
+            # One stale physical ID must not silently fuse different HA sources.
+            if item["device"]["entity"] != entity_id:
+                item["conflicted_identity"] = True
             item["rooms"].add(room_id)
+            if not item["source_entities"]:
+                item["source_entities"] = related_source_entities(
+                    hass, native_device_id, entity_id)
+    # Publish logical devices from the read-only supported-domain catalog even
+    # before a room is configured. Configured assets always retain their
+    # historical IDs; the same native device cannot create another RHI wrapper.
+    discovered, _ = logical_av_catalog(hass, rooms)
+    configured_sources = {
+        (device.get("foundation_concept"), device["entity"]): device
+        for row in rooms.values() for device in row.get("devices", {}).values()
+    }
+    for asset in discovered:
+        candidates = asset.get("candidates") or []
+        if not candidates:
+            continue
+        configured = next(
+            (configured_sources[(c["concept"], c["entity_id"])] for c in candidates
+             if (c["concept"], c["entity_id"]) in configured_sources), None)
+        # A configured media_player already owns a stable logical projection.
+        # A standalone configured remote does not: retain its historical asset
+        # ID when publishing the same native remote's read-only status.
+        if configured and configured["entity"].startswith("media_player."):
+            continue
+        primary = next(
+            (c for c in candidates if c["entity_id"].startswith("media_player.")),
+            None)
+        if primary is None:
+            primary = next(
+                (c for c in candidates if c["entity_id"].startswith("remote.")),
+                None)
+        if primary is None:
+            continue
+        registered = registry.async_get(primary["entity_id"])
+        if registered is not None and getattr(registered, "platform", None) == DOMAIN:
+            continue
+        key = logical_asset_id(configured) if configured else asset["asset_id"]
+        if key in assets:
+            continue
+        projected = configured or {
+            "entity": primary["entity_id"],
+            "name": asset.get("model") or primary["entity_id"],
+            "role": ("remote" if primary["entity_id"].startswith("remote.") else
+                     "display" if primary["concept"] == "display" else
+                     "receiver" if primary["concept"] == "amplifier" else "player"),
+            "foundation_concept": primary["concept"],
+            "foundation_candidate_id": primary["candidate_id"],
+            "asset_id": key,
+            "physical_id": key,
+            "source_integration": primary["provider"],
+        }
+        assets[key] = {
+            "device": projected,
+            "rooms": set(asset.get("room_ids") or ()),
+            "native_device_id": asset.get("native_device_id"),
+            "logical_type": asset["logical_type"],
+            "source_entities": tuple(asset.get("source_entities") or ()),
+            "discovered_only": configured is None,
+        }
     return assets
 
 
@@ -53,26 +199,40 @@ class LogicalAssetSensor(SensorEntity):
     _attr_should_poll = False
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _unrecorded_attributes = frozenset({"source_entity_id", "native_device_id",
-                                       "source_integration", "rooms", "foundation_candidate_id"})
+                                       "source_integration", "rooms", "foundation_candidate_id",
+                                       "source_entities", "normalized_properties"})
 
     def __init__(self, context, entry_id: str, asset_id: str, spec: dict):
         self.context = context
         self.asset_id = asset_id
-        self.device = spec["device"]
-        self.room_ids = tuple(sorted(spec["rooms"]))
+        self.update_spec(spec)
         self._attr_unique_id = f"{entry_id}:asset:{asset_id}:status"
         self._attr_name = "Status"
-        state = native_state(context["adapter"].hass, self.device["entity"])
+        state = native_state(context.get("hass") or context["adapter"].hass,
+                             self.device["entity"])
         attrs = getattr(state, "attributes", {}) if state else {}
         name = attrs.get("friendly_name") or self.device.get("name")
         if not isinstance(name, str) or not name.strip():
             name = self.device["entity"].rsplit(".", 1)[-1].replace("_", " ").title()
-        label = {"display": "Display", "amplifier": "Audio zone",
-                 "source": "Media player"}.get(self.device.get("foundation_concept"), "Multimedia asset")
+        label = self.logical_type.replace("_", " ").title()
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"asset:{entry_id}:{asset_id}")},
             manufacturer="Robotix", model=f"Logical {label}", name=name,
         )
+
+    def update_spec(self, spec: dict) -> None:
+        self.source_published = True
+        self.native_device_id = spec.get("native_device_id")
+        self.device = spec["device"]
+        self.room_ids = tuple(sorted(spec["rooms"]))
+        self.logical_type = spec.get("logical_type", "media_player")
+        self.related_entities = tuple(spec.get("source_entities") or ())
+        self.conflicted_identity = bool(spec.get("conflicted_identity"))
+        self.discovered_only = bool(spec.get("discovered_only"))
+
+    def mark_unpublished(self) -> None:
+        """Tombstone the read-only view without changing its HA identity."""
+        self.source_published = False
 
     async def async_added_to_hass(self):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
@@ -89,32 +249,95 @@ class LogicalAssetSensor(SensorEntity):
         state = native_state(self.hass, self.device["entity"])
         return source if approved else None, state
 
+    @staticmethod
+    def _fresh_native(state) -> bool:
+        return bool(state is not None and state.state not in ("unknown", "unavailable")
+                    and not (getattr(state, "attributes", {}) or {}).get("restored"))
+
     @property
     def available(self):
-        source, state = self._evidence()
-        return bool(source and state is not None
-                    and state.state not in ("unknown", "unavailable"))
+        _source, state = self._evidence()
+        # A restored HA state is a stale observation, not confirmed playback.
+        return bool(self.source_published and not self.conflicted_identity
+                    and self._fresh_native(state))
 
     @property
     def native_value(self):
-        source, state = self._evidence()
-        return state.state if source and state and state.state not in (
-            "unknown", "unavailable") else None
+        _source, state = self._evidence()
+        return state.state if self.source_published and not self.conflicted_identity and (
+            self._fresh_native(state)) else None
+
+    def _native_restored(self, entity_id: str) -> bool:
+        """Diagnostic-only restored marker; never usable as native readback."""
+        raw = self.hass.states.get(entity_id)
+        return bool((getattr(raw, "attributes", {}) or {}).get("restored"))
+
+    def _related_native_entity(self, link: dict) -> dict:
+        """Refresh read-only runtime state for one exact known source endpoint."""
+        if not self.source_published:
+            status = "source_unpublished"
+        elif link.get("availability") == "disabled":
+            status = "disabled"
+        else:
+            observed = native_state(self.hass, link["entity_id"])
+            if self._fresh_native(observed):
+                status = "available"
+            elif self._native_restored(link["entity_id"]):
+                status = "restored"
+            else:
+                status = "unavailable"
+        return {**link, "availability": status}
 
     @property
     def extra_state_attributes(self):
-        source, _state = self._evidence()
+        source, state = self._evidence()
+        attrs = getattr(state, "attributes", {}) if state else {}
+        properties = {}
+        if self.source_published and not self.conflicted_identity and self._fresh_native(state):
+            properties["playback_state"] = state.state
+            for name in ("source", "sound_mode", "media_title", "media_artist",
+                         "media_content_type"):
+                value = attrs.get(name)
+                if isinstance(value, str) and value.strip():
+                    properties[name] = value
+            volume = attrs.get("volume_level")
+            if type(volume) in (float, int) and 0 <= volume <= 1:
+                properties["volume_percent"] = round(volume * 100, 1)
+            if type(attrs.get("is_volume_muted")) is bool:
+                properties["muted"] = attrs["is_volume_muted"]
+            for name in ("media_position", "media_duration"):
+                value = attrs.get(name)
+                if type(value) in (int, float) and 0 <= value <= 86400:
+                    properties[name + "_seconds"] = float(value)
         return {
             "owner_domain": DOMAIN, "asset_id": self.asset_id,
             "rooms": list(self.room_ids),
+            "logical_type": self.logical_type,
             "role": self.device.get("role"),
             "concept": self.device.get("foundation_concept"),
-            "foundation_approved": bool(source),
+            "foundation_approved": bool(source) and self.source_published
+                                   and not self.conflicted_identity,
             "foundation_candidate_id": self.device.get("foundation_candidate_id"),
             "source_entity_id": self.device["entity"],
-            "source_integration": getattr(source, "integration", None) if source else None,
-            "native_device_id": getattr(source, "device_registry_id", None) if source else None,
-            "readback": "native_ha_state" if source else "unapproved_or_missing_source",
+            "source_entities": [
+                self._related_native_entity(link) for link in self.related_entities
+            ],
+            "normalized_properties": properties,
+            "source_integration": (getattr(source, "integration", None) if source
+                                   else self.device.get("source_integration")),
+            "native_device_id": (getattr(source, "device_registry_id", None) if source
+                                 else self.native_device_id),
+            "discovery_status": ("published" if self.source_published else "source_unpublished"),
+            "discovered_only": self.discovered_only,
+            "command_authorization": ("source_unpublished" if not self.source_published
+                                      else "approved" if source and not self.conflicted_identity
+                                      else "pending_or_revoked"),
+            "readback": ("source_unpublished" if not self.source_published
+                         else "conflicting_physical_identity" if self.conflicted_identity
+                         else "native_state_restored" if self._native_restored(
+                             self.device["entity"])
+                         else "native_ha_state" if self._fresh_native(state)
+                         else "native_state_unavailable"),
         }
 
 

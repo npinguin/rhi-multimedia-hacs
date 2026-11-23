@@ -210,12 +210,13 @@
         }
       },
       "tv_wake": {
-        "title": "Destination Wake-on-LAN du téléviseur",
-        "description": "Configurez la commande native d’allumage de l’écran LG webOS sélectionné. Seules les adresses MAC de cet appareil Home Assistant sont autorisées.",
+        "title": "Wake-on-LAN par appareil (MAC/IP)",
+        "description": "Configurez Wake-on-LAN en option pour chaque appareil multimédia natif approuvé par Foundation. Seule l’adresse MAC enregistrée sur cet appareil HA est acceptée. L’adresse IPv4 et le port UDP sont facultatifs. L’enregistrement n’envoie aucun paquet.",
         "data": {
           "mode": "Commande d’allumage",
-          "mac": "Adresse MAC du téléviseur sélectionné",
-          "broadcast_address": "Adresse IPv4 de destination",
+          "device": "Appareil multimédia",
+          "mac": "Adresse MAC native vérifiée",
+          "broadcast_address": "Destination IPv4 (facultatif)",
           "broadcast_port": "Port UDP"
         }
       },
@@ -328,8 +329,8 @@
       "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
       "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
       "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils.",
-      "wake_unavailable": "Sélectionnez dans Foundation un téléviseur LG webOS doté d’une adresse MAC native vérifiée.",
-      "wake_invalid_target": "L’adresse MAC, l’adresse IPv4 ou le port UDP est invalide pour ce téléviseur.",
+      "wake_unavailable": "Sélectionnez un appareil multimédia natif approuvé par Foundation avec une adresse MAC enregistrée.",
+      "wake_invalid_target": "L’appareil, l’adresse MAC enregistrée, l’adresse IPv4 ou le port UDP est invalide.",
       "dell_invalid_host": "Saisissez une adresse IPv4 privée valide. Les URL, les adresses publiques et localhost sont interdits.",
       "dell_duplicate_host": "Un autre écran Dell configuré utilise déjà cette adresse.",
       "dell_host_immutable": "L'identité réseau ne peut pas être remplacée silencieusement. Dissociez l'écran avant d'en enregistrer un autre.",

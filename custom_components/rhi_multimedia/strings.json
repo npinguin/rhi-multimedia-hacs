@@ -210,12 +210,13 @@
         }
       },
       "tv_wake": {
-        "title": "TV Wake-on-LAN destination",
-        "description": "Configure the selected LG webOS screen's existing native power-on action. Only MAC addresses from the selected Home Assistant device are allowed.",
+        "title": "Device Wake-on-LAN (MAC / IP)",
+        "description": "Optionally configure WOL per Foundation-approved native media device. Use a MAC registered on that exact HA device; the destination IPv4 and UDP port are optional. Save never sends a packet.",
         "data": {
           "mode": "Power-on action",
-          "mac": "Selected TV network MAC",
-          "broadcast_address": "Destination IPv4 address",
+          "device": "Media device",
+          "mac": "Verified native MAC",
+          "broadcast_address": "Destination IPv4 (optional)",
           "broadcast_port": "UDP port"
         }
       },
@@ -328,8 +329,8 @@
       "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
       "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
       "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints.",
-      "wake_unavailable": "Select an LG webOS screen in Foundation with a verified native network MAC before configuring WOL.",
-      "wake_invalid_target": "The selected MAC, IPv4 destination or UDP port is invalid for this TV.",
+      "wake_unavailable": "Select a Foundation-approved native media device with a registered MAC before configuring WOL.",
+      "wake_invalid_target": "The selected device, registered MAC, IPv4 destination or UDP port is invalid.",
       "dell_invalid_host": "Use a valid private LAN IPv4 address; public addresses, URLs and localhost are not supported.",
       "dell_duplicate_host": "Another configured Dell display already uses this address.",
       "dell_host_immutable": "A linked display's network identity cannot be replaced. Unbind and register a new display.",

@@ -210,12 +210,13 @@
         }
       },
       "tv_wake": {
-        "title": "TV inschakelen via Wake-on-LAN",
-        "description": "Stel de bestaande native inschakelactie van de geselecteerde LG webOS-tv in. Alleen MAC-adressen van het gekozen Home Assistant-apparaat zijn toegestaan.",
+        "title": "Wake-on-LAN per apparaat (MAC/IP)",
+        "description": "Configureer optioneel Wake-on-LAN per goedgekeurd native media-apparaat. Alleen een MAC-adres uit het exacte HA-apparaatregister is toegestaan. IPv4-bestemming en UDP-poort zijn optioneel. Opslaan verstuurt geen pakket.",
         "data": {
           "mode": "Inschakelactie",
-          "mac": "MAC-adres van geselecteerde tv",
-          "broadcast_address": "Bestemmings-IP (IPv4)",
+          "device": "Media-apparaat",
+          "mac": "Geverifieerd native MAC-adres",
+          "broadcast_address": "Bestemmings-IPv4 (optioneel)",
           "broadcast_port": "UDP-poort"
         }
       },
@@ -328,8 +329,8 @@
       "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
       "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
       "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt.",
-      "wake_unavailable": "Selecteer in Foundation een LG webOS-tv met een bevestigd native MAC-adres.",
-      "wake_invalid_target": "Het MAC-adres, bestemmings-IP of de UDP-poort is ongeldig voor deze tv.",
+      "wake_unavailable": "Selecteer een in Foundation goedgekeurd media-apparaat met een geregistreerd MAC-adres.",
+      "wake_invalid_target": "Het gekozen apparaat, geregistreerde MAC-adres, IPv4-bestemming of de UDP-poort is ongeldig.",
       "dell_invalid_host": "Vul een geldig privé-IPv4-adres in. Publieke IP-adressen, URL's en localhost zijn niet toegestaan.",
       "dell_duplicate_host": "Een ander Dell-scherm gebruikt dit adres al.",
       "dell_host_immutable": "Je kunt de netwerkidentiteit niet stilzwijgend vervangen. Ontkoppel en registreer het andere scherm opnieuw.",

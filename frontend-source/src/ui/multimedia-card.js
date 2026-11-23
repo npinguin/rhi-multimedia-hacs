@@ -406,6 +406,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._wholeHomeFlow=wholeHome;
       this._optionsStep=step;this._optionsData=rhiMmOptionDefaults(step);
       this._wholeHome=step.step_id==='complete_setup'?rhiMmWholeFromStep(step):null;
+      // Contextual Device Settings reuses the single Options Flow draft.
+      if(this._wholeHome&&room&&this._wholeHome.doc.rooms[room]){
+        this._wholeHome.room=room;this._wholeHome.tab='devices';
+        if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
+          this._wholeHome.device=device;
+      }
     }catch(_){
       if(epoch===this._optionsEpoch){this._wholeHomeFlow=false;this._optionsError=this.t('setup_flow_failed');}
     }finally{
@@ -722,7 +728,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const content={
       overview:()=>this.overview(model),rooms:()=>this.rooms(model,roomId),activities:()=>this.activities(model),
       settings:()=>this.settings(model),insights:()=>this.insights(model),
-      devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model),
+      devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model,roomId),
     }[view]||(()=>this.overview(model));
     const editor=''; // Editors live exclusively in Settings and its configuration workspaces.
     return rhiUxPageTemplate({hero,status,content:editor+(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
@@ -1024,8 +1030,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
     // The backend owns media_focus and only publishes activity-eligible
     // native playback. This visual never discovers/rebinds an HA player.
     // Keep the central media experience present for HDMI-only and idle rooms.
-    const e=rhiUxEscape,media=room.now_playing||null,focus=room.media_focus||{};
-    const player=media?(room.devices||[]).find(d=>d.key===media.device_key):null;
+    const e=rhiUxEscape,reported=room.now_playing||null,focus=room.media_focus||{};
+    const player=reported?(room.devices||[]).find(d=>d.key===reported.device_key):null;
+    // A stale native playback projection must not outlive its approval or
+    // availability. Neither name nor visual can authorize a media source.
+    const media=player?.foundation_approved===true&&player?.available===true?reported:null;
     const audio=(room.devices||[]).find(d=>d.key===room.audio?.device_key);
     const readyAudio=audio?.available===true&&audio?.foundation_approved===true;
     const enabled=action=>player?.foundation_approved===true&&
@@ -1063,14 +1072,30 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const transport=action('previous','mdi:skip-previous')+action('play','mdi:play')+
       action('pause','mdi:pause')+action('stop','mdi:stop')+action('next','mdi:skip-next');
     const nativePlayer=player?this.nativeMediaPlayerAction(player):'';
-    const focusLabel=focus.device_name||room.activity_name||this.t('media_ready');
+    const devices=room.devices||[];
+    const selectedActivity=(room.activities||[]).find(a=>a.id===room.activity_id);
+    const cast=new Set(selectedActivity?.device_keys||[]);
+    // A disabled optional room source cannot make a healthy active HDMI
+    // activity look broken. Without an activity, show room-level setup truth.
+    const relevant=cast.size?devices.filter(d=>cast.has(d.key)):devices;
+    const needsApproval=relevant.some(d=>d.foundation_approved===false);
+    const unavailable=relevant.some(d=>d.available===false);
+    const runnable=relevant.some(d=>d.foundation_approved===true&&d.available===true&&
+      Object.values(d.controls||{}).some(c=>c?.enabled===true));
+    const idleState=needsApproval?this.t('media_needs_configuration'):
+      unavailable?this.t('diag_device_unavailable'):
+      runnable?this.t('media_ready'):this.t('no_playback');
+    const blocked=!media&&(needsApproval||unavailable);
+    const focusLabel=blocked?idleState:
+      focus.device_name||room.activity_name||idleState;
     const sourceLabel=focus.source||media?.source||player?.source||'';
     const hasPlayback=!!media;
+    const stateLabel=hasPlayback?rhiMmStateLabel(this._hass,media.state||player?.state):
+      blocked?idleState:focus.kind==='source'?this.t('no_playback'):
+      room.activity_name?rhiMmRoomStatus(room,this._hass):idleState;
     return `<article class='mm-surface mm-now-playing' aria-label='${this.t('now_playing')}'>
       <div class='mm-media-head'><h3>${this.t('now_playing')}</h3>
-        <span class='mm-media-state'>${e(hasPlayback?
-          rhiMmStateLabel(this._hass,media.state||player?.state):
-          room.activity_name?rhiMmRoomStatus(room,this._hass):this.t('media_ready'))}</span>
+        <span class='mm-media-state'>${e(stateLabel)}</span>
       </div>
       <div class='mm-media-stage ${audioKind?'mm-media-stage-audio':'mm-media-stage-video'}'>
         ${artwork?`<img class='mm-media-backdrop' src='${e(artwork)}'
@@ -1122,7 +1147,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
     // One obvious HA-like TV power control, not a disappearing pair of icons.
     // Never manufacture a missing native power capability: a blocked button
     // explains the issue and leads admins to the exact device configuration.
-    const shouldShowPower=!!device.entity_id?.startsWith('media_player.')||
+    // Any actually offered device power action uses the SAME resident On/Off
+    // control. The domain's power gateway chooses verified WoL when configured;
+    // the card never exposes a second wake button or bypasses approval.
+    const shouldShowPower=!!c.power_on||!!c.power_off||
+      !!device.entity_id?.startsWith('media_player.')||
       device.role==='display'||device.concept==='display';
     const off=['off','unknown','unavailable'].includes(device.state);
     const powerAction=off?'power_on':'power_off';
@@ -1333,15 +1362,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
         data-mm-settings-pick="${esc(item.id)}" aria-pressed="${selected?.id===item.id}">
         <strong>${esc(item.label)}</strong><small>${esc(item.subtitle)}</small></button>`).join('');
     const classes=[
-      ['profiles',this.t('settings_profiles'),true],
-      ['locations',this.t('settings_floor_rooms'),false],
-      ['devices',this.t('devices'),false],
-      ['activities',this.t('activities'),false],
+      ['locations',this.t('settings_floor_rooms')],
+      ['devices',this.t('devices')],
+      ['activities',this.t('activities')],
     ];
-    const menu=classes.map(([key,label,disabled])=>`<button type="button"
-      data-mm-settings-category="${esc(key)}" ${disabled?'disabled':''}
+    const menu=classes.map(([key,label])=>`<button type="button"
+      data-mm-settings-category="${esc(key)}"
       class="mm-settings-nav ${category===key?'active':''}" aria-pressed="${category===key}">
-      ${esc(label)}${disabled?`<small>${this.t('settings_later')}</small>`:''}</button>`).join('');
+      ${esc(label)}</button>`).join('');
     const scopeButton=selected&&manage?`<button type="button" class="mm-settings-yaml"
       data-mm-option-action="expert_yaml" data-mm-option-room="${esc(selected.room.id)}"
       data-mm-option-scope="${esc(selected.scope)}" data-mm-option-id="${esc(selected.objectId)}">
@@ -1527,8 +1555,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         <p>HDMI-CEC: ${selectedDevice.hdmi_cec_enabled?this.t('enabled'):this.t('not_confirmed')}</p>
         <p>${this.t('settings_post_power_delay')}: ${esc(selectedDevice.post_power_on_delay_ms??0)} ms</p>
         ${this.roomAvailableControls(selectedDevice)}</div>
-${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-action="cec_device"
-          data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_cec_devices')}</button>
+${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-action="complete_setup"
+          data-mm-option-room="${esc(selected.room.id)}" data-mm-option-device="${esc(selected.objectId)}">Device HDMI-CEC &amp; Wake-on-LAN (MAC/IP)</button>
           <button type="button" data-mm-option-action="edit_room"
           data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_edit_devices')}</button>
         </div>`:''}`:
@@ -1728,6 +1756,8 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
       const target=room.target_state;
       const misses=(target?.targets||[]).filter(item=>item.status!=='observed');
       const offline=(room.devices||[]).filter(d=>d.available===false||d.foundation_approved===false);
+      const unapproved=offline.filter(d=>d.foundation_approved===false);
+      const unavailable=offline.filter(d=>d.foundation_approved===true&&d.available===false);
       const attention=room.attention===true;
       // A provider failure may contain internal keys and entity names.
       // Present a user explanation on D0; keep exact messages folded under
@@ -1736,7 +1766,8 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
       const invalidSelection=offline.find(d=>d.foundation_approved===false);
       const message=room.phase==='starting'||room.phase==='stopping'?
         this.t('waiting'):
-        offline.length?`${affected?.name||room.name}: ${this.t('insights_unavailable')}`:
+        unapproved.length?`${unapproved.length} ${this.t('insights_devices_not_approved')}`:
+        unavailable.length?`${unavailable.length} ${this.t('insights_devices_offline')}`:
         attention&&misses.length?`${affected?.name||room.name}: ${this.t('insights_target_mismatch')}`:
         attention?this.t('insights_attention'):
         this.t('insights_no_issue');
@@ -1753,9 +1784,11 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
           <span>${this.t('settings_expected')}: ${esc(expected??this.t('not_published'))}</span>
           <span>${this.t('target_actual')}: ${esc(item.actual??this.t('not_published'))}</span></div>`;
       }).join('');
-      const devices=offline.map(d=>`<div class="mm-insight-target"><b>${esc(d.name)}</b>
-        <span>${esc(d.foundation_approved===false?this.t('diag_not_selected'):this.t('diag_device_unavailable'))}</span>
-      </div>`).join('');
+      const group=(rows,label)=>rows.length?`<div class="mm-insight-target">
+        <b>${esc(label)} · ${rows.length}</b>
+        <span>${esc(rows.map(d=>d.name).join(', '))}</span></div>`:'';
+      const devices=group(unapproved,this.t('diag_not_selected'))+
+        group(unavailable,this.t('diag_device_unavailable'));
       const fix=rhiMmCanRun(room,'recover_activity')?`<button type="button"
           class="mm-insight-fix" data-action="recover_activity" data-room="${esc(room.id)}">
           <ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:'';
@@ -1772,21 +1805,24 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         ${invalidSelection?`<p class='mm-source-repair-hint'>${esc(this.t('source_repair_hint'))}</p>`:''}
         <div class="mm-insight-actions">${repairAction}${fix}
           <button type="button" data-nav="overview" data-room="${esc(room.id)}">
-            ${this.t('insights_open_room')}</button></div>
+            ${this.t('insights_open_room')}</button>
+          <button type="button" data-nav="diagnostics" data-room="${esc(room.id)}">
+            ${this.t('diagnostics')}</button></div>
         ${this.feedback(room.id)}
         <details data-persist="${esc(more)}" ${this._expanded.has(more)?'open':''}>
           <summary>${this.t('insights_details')}</summary>
           ${latest?`<div class="mm-diag-status">
             <span>${this.t('last_attempt')}</span>
             <b>${esc(latest.kind||this.t('unknown'))} · ${esc(latest.result||this.t('unknown'))}</b>
-            ${latest.failed_at?`<small>${this.t('failed_step')}: ${esc(latest.failed_at)}</small>`:''}
+            ${this._hass?.user?.is_admin===true&&latest.failed_at?`<small>${this.t('failed_step')}: ${esc(latest.failed_at)}</small>`:''}
           </div>`:''}
           ${room.last_control?`<div class="mm-diag-status">
             <span>${this.t('last_control')}</span>
             <b>${esc(room.last_control.action||this.t('unknown'))} · ${esc(room.last_control.result||this.t('unknown'))}</b></div>`:''}
           ${!open?`<div class="mm-insight-affected">${targeted}</div>`:''}
-          ${room.error?`<p class="mm-room-error">${esc(room.error)}</p>`:''}
-          ${(room.warnings||[]).map(warning=>`<p class="mm-room-error">${esc(warning)}</p>`).join('')}
+          ${this._hass?.user?.is_admin===true&&room.error?`<p class="mm-room-error">${esc(room.error)}</p>`:''}
+          ${this._hass?.user?.is_admin===true?[...new Set(room.warnings||[])]
+            .map(warning=>`<p class="mm-room-error">${esc(warning)}</p>`).join(''):''}
           ${(room.activities||[]).flatMap(a=>(a.routes||[]).map(route=>{
             const d=room.devices?.find(x=>x.key===route.device_key);
             return `<div class="mm-diag-route"><b>${esc(a.name)}</b>
@@ -1797,20 +1833,20 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         </details>
       </article>`;
     }).join('');
-    return `<section class="mm-section mm-insights"><div class="mm-heading">
-        <div><h2>${this.t('insights')}</h2>
-          <p>${this.t('insights_explainer')}</p></div></div>
+    return `<section class="mm-section mm-insights">
       <div class="mm-insights-list">${cards||rhiUxState({
         state:'empty',title:this.t('no_rooms'),detail:this.t('setup_help')})}</div>
     </section>`;
   }
 
-  diagnostics(model){
+  diagnostics(model,roomId=''){
     // Insights projects real runtime facts only: no synthetic availability,
     // historical averages, latency or counters. Expose route readback and
     // actionable recovery using the existing typed backend command.
     const escape=rhiUxEscape;
-    const cards=model.rooms.map(room=>{
+    const manage=this._hass?.user?.is_admin===true;
+    const visible=roomId?model.rooms.filter(room=>room.id===roomId):model.rooms;
+    const cards=visible.map(room=>{
       const devices=room.devices||[];
       const offline=devices.filter(d=>!d.available||!d.foundation_approved);
       const routes=(room.activities||[]).flatMap(activity=>
@@ -1866,17 +1902,17 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
             </div>`;
           }).join('')}</div></details>`:''}
         ${room.last_attempt?`<div class="mm-diag-status"><span>${this.t('last_attempt')}</span><b>${escape(room.last_attempt.kind)} · ${escape(room.last_attempt.result)}</b></div>`:''}
-        ${traceDetail}
+        ${manage?traceDetail:''}
         ${room.last_control?`<div class="mm-diag-status"><span>${this.t('last_control')}</span><b>${escape(room.last_control.action)} · ${escape(room.last_control.result)}</b></div>`:''}
-        ${room.error?`<p class="mm-room-error">${escape(room.error)}</p>`:''}
-        ${room.warnings?.length?`<p class="mm-room-error">${room.warnings.map(escape).join('; ')}</p>`:''}
+        ${manage&&room.error?`<p class="mm-room-error">${escape(room.error)}</p>`:''}
+        ${manage&&room.warnings?.length?`<p class="mm-room-error">${[...new Set(room.warnings)].map(escape).join('; ')}</p>`:''}
         ${health?`<section class="mm-diag-explain"><h4>${this.t('diag_devices_attention')}</h4>${health}</section>`:''}
         ${routes.length?`<details class="mm-diag-explain" data-persist="${escape(room.id+':routes')}" ${this._expanded.has(room.id+':routes')?'open':''}>
           <summary>${this.t('routes')} (${routes.length})</summary>
           <div class="mm-diag-routes">${routeRows}</div></details>`:''}
         ${rhiMmCanRun(room,'recover_activity')?`<button type="button" class="mm-link mm-recover" data-room="${escape(room.id)}" data-action="recover_activity"><ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:''}
         ${this.feedback(room.id)}
-        <details data-persist="${escape(room.id)}:technical" ${this._expanded.has(room.id+':technical')?'open':''}>
+        ${manage?`<details data-persist="${escape(room.id)}:technical" ${this._expanded.has(room.id+':technical')?'open':''}>
           <summary>${this.t('technical')}</summary>
           <div class="mm-tech">${devices.map(d=>`<p><b>${escape(d.name)}</b>
               <small>${this.t('diag_asset_id')}: ${escape(d.asset_id||d.physical_id||this.t('not_published'))}</small>
@@ -1891,10 +1927,11 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
               ${Object.entries(d.controls||{}).map(([action,cap])=>`<small>${escape(action)}:
                 ${cap.enabled?this.t('diag_command_allowed'):this.t('diag_command_blocked')}
                 ${cap.reason?' · '+escape(cap.reason):''}</small>`).join('')}</p>`).join('')}</div>
-        </details>
+        </details>`:''}
       </article>`;
     }).join('');
-    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div></div>
+    return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div>
+      <button type="button" class="mm-link" data-nav="insights">${this.t('insights')}</button></div>
       <div class="mm-diag-grid">${cards}</div></section>`;
   }
 }
