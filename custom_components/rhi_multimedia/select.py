@@ -6,7 +6,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN, EVENT_UPDATE
-from .device_preferences import LogicalDeviceSetting, configured_logical_specs, POWER_MODES, ROLES
+from .device_preferences import LogicalDeviceSetting, configured_logical_specs, verified_asset_macs, POWER_MODES, ROLES
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -18,6 +18,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for asset_id, spec in sorted(configured_logical_specs(hass, engine.rooms).items()):
         entities.append(LogicalSettingSelect(context, entry.entry_id, asset_id, spec,
                                              "power_mode", "Power mode", sorted(POWER_MODES)))
+        entities.append(LogicalWakeMacSelect(context, entry.entry_id, asset_id, spec))
         if sum(1 for room in engine.rooms.values() for device in room.get("devices", {}).values()
                if device.get("asset_id", device.get("physical_id", device["entity"])) == asset_id) == 1:
             entities.append(LogicalSettingSelect(context, entry.entry_id, asset_id, spec,
@@ -76,4 +77,31 @@ class LogicalSettingSelect(LogicalDeviceSetting, SelectEntity):
     async def async_select_option(self, option: str):
         if option not in self._attr_options:
             raise ValueError("Unsupported Multimedia device option")
+        await self._set(option)
+
+
+class LogicalWakeMacSelect(LogicalDeviceSetting, SelectEntity):
+    """Exact native MAC selection, not a free-text address or second writer."""
+
+    _attr_icon = "mdi:lan-connect"
+
+    def __init__(self, context, entry_id, asset_id, spec):
+        super().__init__(context, entry_id, asset_id, spec, "wol_mac", "Wake MAC")
+
+    @property
+    def options(self):
+        return sorted(verified_asset_macs(self.hass, self.context, self.asset_id))
+
+    @property
+    def available(self):
+        return bool(self.context.get("engine") and self.options)
+
+    @property
+    def current_option(self):
+        value = self._value()
+        return value if value in self.options else None
+
+    async def async_select_option(self, option: str):
+        if option not in self.options:
+            raise ValueError("Select a verified MAC from this exact native device")
         await self._set(option)

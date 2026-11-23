@@ -598,11 +598,19 @@ class _Wizard:
         # single native Multimedia Options Flow. Verify exact current
         # Foundation/native identity BEFORE accepting this one Save. Discovery
         # alone never activates a device or weakens the runtime command guard.
-        for proposed_room in self._rooms.values():
-            for device in proposed_room.get("devices", {}).values():
+        for room_id, proposed_room in self._rooms.items():
+            previous_devices = self._original_rooms.get(room_id, {}).get("devices", {})
+            for device_key, device in proposed_room.get("devices", {}).items():
                 if device.get("control_approved") is not True:
                     continue
-                if reviewed_native_source(self.hass, device) is None:
+                # Keep a previously saved, unchanged stale source as an
+                # explicitly NON-executable HOLD. Its own runtime authorization
+                # remains fail-closed; it must not prevent unrelated room or
+                # single-device edits from reaching the same atomic Save.
+                approved_source = authorized_source(self.hass, device)
+                if approved_source is None:
+                    if previous_devices.get(device_key) == device:
+                        continue
                     raise ValueError("Reviewed native control binding is no longer valid")
                 match = next((source for source in supported
                               if source.concept == device.get("foundation_concept")
@@ -610,6 +618,8 @@ class _Wizard:
                               and source.candidate_id == device.get("foundation_candidate_id")
                               and source.review_reason is None), None)
                 if match is None:
+                    if previous_devices.get(device_key) == device:
+                        continue
                     raise ValueError("Reviewed native control is not in supported discovery")
                 key = (match.concept, match.entity_id, match.candidate_id)
                 selected.add(key)

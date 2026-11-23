@@ -25,7 +25,7 @@ from .validation import validate_rooms, validate_step_delay
 from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation, unregister_visuals_with_foundation
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR, Platform.SELECT, Platform.SWITCH, Platform.NUMBER, Platform.BUTTON, Platform.NOTIFY]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR, Platform.SELECT, Platform.SWITCH, Platform.NUMBER, Platform.TEXT, Platform.BUTTON, Platform.NOTIFY]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 

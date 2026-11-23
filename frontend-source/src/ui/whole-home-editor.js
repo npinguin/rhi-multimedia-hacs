@@ -32,6 +32,33 @@ function rhiMmWholeForPhysical(d,device,mutate){
     }
   }
 }
+// Deliberate re-approval of a currently registered exact source; no new
+// scanner, store, writer or physical command outside the native Options Flow.
+function rhiMmWholeRepairable(d){
+  const rows=[];
+  for(const [roomId,room] of Object.entries(d.doc.rooms||{})){
+    for(const [key,device] of Object.entries(room.devices||{})){
+      if(device.control_approved===false)continue;
+      const candidates=d.sources.filter(src=>src.entity===device.entity&&
+        src.concept===device.foundation_concept&&!src.review_reason&&
+        src.entity_registry_id&&src.config_entry_id&&src.provider&&src.candidate);
+      if(candidates.length!==1)continue;
+      const src=candidates[0];
+      if((device.foundation_entity_registry_id&&device.foundation_entity_registry_id!==src.entity_registry_id)||
+         (device.foundation_config_entry_id&&device.foundation_config_entry_id!==src.config_entry_id)||
+         (device.foundation_device_registry_id!=null&&device.foundation_device_registry_id!==src.native_device_id)||
+         (device.foundation_provider&&device.foundation_provider!==src.provider))continue;
+      const metadata={foundation_candidate_id:src.candidate,
+        foundation_entity_registry_id:src.entity_registry_id,
+        foundation_config_entry_id:src.config_entry_id,
+        foundation_device_registry_id:src.native_device_id??null,
+        foundation_provider:src.provider,control_approved:true};
+      if(Object.entries(metadata).some(([name,value])=>device[name]!==value))
+        rows.push({roomId,key,metadata});
+    }
+  }
+  return rows;
+}
 function rhiMmWholeVerifiedMacs(d,device){
   const source=d.sources.find(s=>s.entity===device?.entity&&
     s.concept===device?.foundation_concept&&
@@ -67,6 +94,11 @@ function rhiMmWholeRender(d,t,escape){
     ['devices',t('devices'),'mdi:television'],
     ['activities',t('activities'),'mdi:play-box-multiple-outline']
   ];
+  // The main product tabs already select Discovery vs Settings. Only Settings
+  // needs the Rooms/Devices/Activities *object categories* as local navigation.
+  // No second competing Discovery tab in the whole-home editor.
+  const localSections=d.workspace==='discovery'?[]:
+    d.workspace==='settings'?sections.filter(x=>x[0]!=='discovery'):sections;
   const rooms=Object.entries(d.doc.rooms);
   const {room,device,activity}=rhiMmWholeCurrent(d);
   const floorRooms=new Map();
@@ -133,13 +165,21 @@ function rhiMmWholeRender(d,t,escape){
     const currentBinding=assigned?.[1];
     const connected=d.sources.find(x=>x.entity===currentBinding?.entity&&x.candidate===currentBinding?.foundation_candidate_id);
     const wol=currentBinding?.power_on?.action==='wake_on_lan.send_magic_packet';
+    const enabledWol=wol&&currentBinding?.wol_enabled!==false;
     const assets=discovered;
+    const repairs=rhiMmWholeRepairable(d);
+    const selectedRepair=repairs.find(x=>x.roomId===d.bulkRoom&&x.key===assigned?.[0]);
     const types=[...new Set((d.logicalDevices||[]).map(x=>x.logical_type).filter(Boolean))].sort();
     content=`<div class='mm-wh-grid mm-wh-discovery'><section class='mm-wh-panel'>
       <div class='mm-wh-heading'><div><h4>Device discovery &amp; assignment</h4>
         <p>Found ${(d.logicalDevices||[]).length} supported devices · ${(d.logicalDevices||[]).filter(x=>!x.room_ids?.length).length} unassigned</p></div>
-        <button type='button' data-wh-action='apply_proposals'
-          ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>Review proposed home setup (${Object.keys(d.proposedRooms||{}).length} rooms)</button></div>
+        <div class='mm-wh-step-actions'>
+          <button type='button' data-wh-action='repair_bindings'
+            ${repairs.length?'':'disabled'}>Review ${repairs.length} saved device link${repairs.length===1?'':'s'}</button>
+          <button type='button' data-wh-action='apply_proposals'
+            ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>Review proposed home setup (${Object.keys(d.proposedRooms||{}).length} rooms)</button>
+        </div></div>
+        ${repairs.length?'<p class="mm-muted">Review exact native links without replacing rooms or starting devices.</p>':''}
       <div class='mm-wh-searchfilters'>
         <label>Search ${field('catalog_query',d.catalogQuery)}</label>
         <label>Type ${select('catalog_type',d.catalogType,[['all','All device types'],...types.map(x=>[x,x.replaceAll('_',' ')])])}</label>
@@ -189,6 +229,9 @@ function rhiMmWholeRender(d,t,escape){
           ${e(d.areas[d.doc.rooms[d.bulkRoom].area_id]||'Not assigned')} · Floor:
           ${e(d.floors[d.areaFloors[d.doc.rooms[d.bulkRoom].area_id]]||'Not published')}</small>`:''}
         ${currentBinding?`
+          ${selectedRepair?`<button type='button' data-wh-action='repair_binding'
+            data-wh-id='${e(selectedRepair.roomId+':'+selectedRepair.key)}'>
+            Review this device link (one-device test)</button>`:''}
           <label>Display name ${field('device_name',currentBinding.name||'')}</label>
           <label>Role ${select('device_role',currentBinding.role||'player',
             [['display','TV / Display'],['receiver','Receiver / Audio zone'],['player','Media player'],['remote','Remote / Hub']])}</label>
@@ -199,11 +242,12 @@ function rhiMmWholeRender(d,t,escape){
           <label>Power ${select('device_power',currentBinding.power_mode||'native',
             [['native','Native / configured wake'],['passive','Passive · observe only']])}</label>
           <label class='mm-wh-check'>HDMI-CEC ${field('device_cec',currentBinding.hdmi_cec_enabled===true,'checkbox')}</label>
-          <label>Wake-on-LAN ${select('device_wol_mode',wol?'directed':'native',
+          <label>Wake-on-LAN ${select('device_wol_mode',enabledWol?'directed':'native',
             [['native','Native power-on'],['directed','Use verified native MAC']])}</label>
-          ${wol?`<label>Native MAC ${select('device_wol_mac',currentBinding.power_on.data.mac,
-            rhiMmWholeVerifiedMacs(d,currentBinding).map(m=>[m,m]))}</label>
-            <label>Destination IPv4 ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
+          <label>Native MAC ${select('device_wol_mac',
+            wol?currentBinding.power_on.data.mac:'',[['','Choose exact native MAC'],
+              ...rhiMmWholeVerifiedMacs(d,currentBinding).map(m=>[m,m])])}</label>
+          ${wol?`<label>Destination IPv4 ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
             <label>UDP port ${field('device_wol_port',currentBinding.power_on.data.broadcast_port??9,'number','min="1" max="65535"')}</label>`:''}
           <label>After power-on (ms) ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
           <details><summary>Native identity and related entities</summary>
@@ -285,17 +329,17 @@ function rhiMmWholeRender(d,t,escape){
         <label>After power-on (ms)${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
         <details class='mm-wh-device-wol' ${currentWake?'open':''}>
           <summary>Wake-on-LAN · optional per device</summary>
-          <label>Power-on method${select('device_wol_mode',currentWake?'directed':'native',
+          <label>Power-on method${select('device_wol_mode',currentWake&&selectedDevice.wol_enabled!==false?'directed':'native',
             [['native','Use native HA power-on (no WoL override)'],['directed','Wake-on-LAN · MAC + optional LAN IPv4']])}</label>
-          ${currentWake?`<label>MAC address (native registered)
-            ${field('device_wol_mac',currentWake.mac||'')}</label>
-            <label>Destination IPv4 (optional)
+          <label>MAC address (verified native) ${select('device_wol_mac',
+            currentWake?.mac||'',[['','Choose exact native MAC'],...verifiedMacs.map(mac=>[mac,mac])])}</label>
+          ${currentWake?`<label>Destination IPv4 (optional)
             ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
             <label>UDP port ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
           <small>Verified MACs: ${e(verifiedMacs.join(', ')||'none published by native HA')}.
             WOL is used automatically by the ordinary On button and activity startup if
-            configured and approved. There is no separate wake button. Off stays native.
-            Save never sends a packet. Actual wake requires HA Wake-on-LAN service
+            configured and approved. Test Wake-on-LAN is on the native logical HA Device.
+            Save never sends a packet; Off stays native. Actual wake requires HA Wake-on-LAN service
             and fresh readback.</small>
           ${selectedDevice.power_mode==='passive'?
             '<small>Passive mode disables direct power-on. Choose Native power behaviour to use WOL.</small>':''}
@@ -388,27 +432,26 @@ function rhiMmWholeRender(d,t,escape){
   }
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
     <header class='mm-wh-header'><div><h2>Configure Multimedia</h2>
-      <p>Discover → Rooms → Activities · one Review and Save</p></div>
+      <p>Discover → Rooms → Devices → Activities · one Review and Save</p></div>
       <span class='mm-wh-draft'>${d.dirty?'Unsaved changes':'Current saved configuration'}</span></header>
-    <nav class='mm-wh-tabs' aria-label='Multimedia configuration'>
-      ${sections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
+    ${localSections.length?`<nav class='mm-wh-tabs' aria-label='Multimedia object categories'>
+      ${localSections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
         data-wh-id='${id}' aria-pressed='${d.tab===id}'>
         <ha-icon icon='${icon}'></ha-icon>${e(label)}</button>`).join('')}
-    </nav>
+    </nav>`:''}
     ${d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>Room
       ${select('room_select',d.room,rooms.map(([id,r])=>[id,r.name||id]))}</label></div>`:''}
     ${d.error?`<p class='mm-room-error' role='alert'>${e(d.error)}</p>`:''}
-    <div class='mm-wh-global'>
-      <label>Default inter-step delay (ms)
-        ${field('global_delay',d.doc.default_step_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
-      <label class='mm-wh-check'>Enable Multimedia UX
-        ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
-    </div>
     ${content}
-    <div class='mm-wh-global'><label>Default delay between activity steps (ms)
-      ${field('default_step_delay_ms',d.doc.default_step_delay_ms??0,'number',
-        'min="0" max="30000" step="1"')}</label></div>
-    <details class='mm-wh-expert'><summary>Advanced complete configuration · all CEC, WoL, macros and vendor fields</summary>
+    <details class='mm-wh-expert'>
+      <summary>Advanced preferences and complete configuration</summary>
+      <div class='mm-wh-global'>
+        <label>Default delay between activity steps (ms)
+          ${field('global_delay',d.doc.default_step_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
+        <label class='mm-wh-check'>Enable Multimedia UX
+          ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
+      </div>
+      <h4>Expert configuration · HDMI-CEC, WOL, macros and native fields</h4>
       <p>Use only when needed. Edits remain in this session until native Review/Save.
          The current full configuration is shown; no separate settings file is created.</p>
       <textarea data-wh-raw spellcheck='false' rows='15'
@@ -515,9 +558,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(key==='device_wol_mode'&&device){
     if(!['native','directed'].includes(value))return fail('Unknown Wake-on-LAN mode');
     if(value==='native'){
-      rhiMmWholeForPhysical(d,device,x=>{
-        if(x.power_on?.action==='wake_on_lan.send_magic_packet')delete x.power_on;
-      });
+      rhiMmWholeForPhysical(d,device,x=>{x.wol_enabled=false;});
     }else{
       if(!device.entity.startsWith('media_player.')&&!device.entity.startsWith('remote.'))
         return fail('WOL requires an authorized native media device');
@@ -528,11 +569,15 @@ function rhiMmWholeChange(d,key,value,checked=false){
       if(!macs.length)return fail('No approved native MAC address for this device');
       const existing=device.power_on?.action==='wake_on_lan.send_magic_packet'
         ?device.power_on.data:{};
+      if(!macs.includes(existing?.mac)&&macs.length!==1)
+        return fail('Choose an exact verified native MAC before enabling WOL');
       const mac=macs.includes(existing?.mac)?existing.mac:macs[0];
       const action={action:'wake_on_lan.send_magic_packet',
         data:{mac,broadcast_port:existing?.broadcast_port??9,
           ...(existing?.broadcast_address?{broadcast_address:existing.broadcast_address}:{})}};
-      rhiMmWholeForPhysical(d,device,x=>{x.power_on=JSON.parse(JSON.stringify(action));});
+      rhiMmWholeForPhysical(d,device,x=>{
+        x.power_on=JSON.parse(JSON.stringify(action));x.wol_enabled=true;
+      });
     }
     d.dirty=true;
   }
@@ -540,8 +585,12 @@ function rhiMmWholeChange(d,key,value,checked=false){
     const mac=String(value||'').trim().replaceAll('-',':').toLowerCase();
     if(!rhiMmWholeVerifiedMacs(d,device).includes(mac))
       return fail('MAC must match this exact authorized native device');
-    if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
-    rhiMmWholeForPhysical(d,device,x=>{x.power_on.data.mac=mac;});d.dirty=true;
+    rhiMmWholeForPhysical(d,device,x=>{
+      if(x.power_on?.action!=='wake_on_lan.send_magic_packet')
+        x.power_on={action:'wake_on_lan.send_magic_packet',data:{mac,broadcast_port:9}};
+      else x.power_on.data.mac=mac;
+      x.wol_enabled=true;
+    });d.dirty=true;
   }
   else if(key==='device_wol_ip'&&device){
     const ip=String(value||'').trim();
@@ -644,6 +693,16 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!changed)return fail('Existing setup preserved; review the listed source exceptions');
     d.room=Object.keys(d.doc.rooms)[0]||'';d.bulkRoom=d.room;d.device='';d.activity='';
     d.tab='rooms';d.dirty=true;d.error='';return true;
+  }
+  if(action==='repair_bindings'||action==='repair_binding'){
+    const repairs=rhiMmWholeRepairable(d);
+    const selected=action==='repair_binding'
+      ?repairs.filter(row=>row.roomId+':'+row.key===id):repairs;
+    if(!selected.length)return fail('No exact current native link can be safely reviewed. Inspect device/provider in Discovery.');
+    for(const row of selected)
+      Object.assign(d.doc.rooms[row.roomId].devices[row.key],row.metadata);
+    d.room=selected[0].roomId;d.bulkRoom=d.room;d.device=selected[0].key;
+    d.tab='devices';d.dirty=true;d.error='';return true;
   }
   if(action==='tab'){if(!['discovery','rooms','devices','activities'].includes(id))return false;d.tab=id;d.error='';return true;}
   if(action==='select_room'){if(!d.doc.rooms[id])return false;d.room=id;d.bulkRoom=id;d.device='';d.activity='';d.error='';return true;}

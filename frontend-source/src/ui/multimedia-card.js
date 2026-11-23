@@ -128,9 +128,25 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._activitySettingsStage='devices';this._wholeHomeFlow=false;this._wholeHome=null;
     this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
     this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
-    this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;
+    this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;this._pendingNavigation=null;
     this._onLocation=()=>{
-      if(!['settings','discovery','activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
+      const route=this.currentRoute();
+      if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)&&
+         !['settings','discovery'].includes(route.view)&&
+         (this._wholeHome?.dirty||this._optionsStep?.step_id==='review'||this._optionsBusy)){
+        this._pendingNavigation=route;
+        // Browser Back must not silently discard a dirty native HA draft.
+        const url=new URL(window.location.href);
+        url.searchParams.set('multimedia_view',this._view||'discovery');
+        if(this._room)url.searchParams.set('multimedia_room',this._room);
+        else url.searchParams.delete('multimedia_room');
+        if(this._floor)url.searchParams.set('multimedia_floor',this._floor);
+        else url.searchParams.delete('multimedia_floor');
+        window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+        this._optionRefresh();return;
+      }
+      if(!['settings','discovery','activities','devices'].includes(route.view)&&
+         (this._optionsStep||this._optionsBusy)){
         void this.cancelOptions();
       }else{this._lastSignature='';this.render();}
     };
@@ -199,10 +215,41 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
         const room=openSettings.getAttribute('data-room')||'';
         const key=openSettings.getAttribute('data-device')||'';
+        const activity=openSettings.getAttribute('data-activity')||'';
         if(category==='devices'&&room&&key)
           this._settingsSelections.set('devices',room+':'+key);
+        if(category==='activities'&&room&&activity)
+          this._settingsSelections.set('activities',room+':'+activity);
         this._settingsCategory=category;
-        this.navigate('settings');
+        this.navigate('settings',room,
+          (rhiMmRooms(this._hass).rooms||[]).find(r=>r.id===room)?.floor_id||'__unassigned__');
+      }
+      return;
+    }
+    const leave=event.target?.closest?.('[data-mm-leave-action]');
+    if(leave){
+      event.preventDefault();
+      const choice=leave.getAttribute('data-mm-leave-action');
+      if(choice==='keep'){
+        this._pendingNavigation=null;this._optionsError='';
+        if(this._wholeHomeFlow&&this._optionsStep?.step_id==='review'){
+          // Keep editing means returning to the editable draft, not trapping
+          // the user in HA's final confirmation screen.
+          this._optionsData.return_to_setup=true;this._optionsData.confirm=false;
+          await this.submitOptions();
+        }else this._optionRefresh();
+      }else if(choice==='discard'&&this._pendingNavigation){
+        const target=this._pendingNavigation;
+        await this.cancelOptions();
+        this.navigate(target.view,target.room,target.floor);
+      }else if(choice==='review'&&this._pendingNavigation){
+        if(this._optionsBusy)return;
+        if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
+          this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+          await this.submitOptions();
+        }else if(this._optionsStep?.step_id==='review'){
+          await this.submitOptions();
+        }
       }
       return;
     }
@@ -238,9 +285,16 @@ class HomeBrainMultimediaCard extends HTMLElement {
       // native Options Flow transaction for a different configuration scope.
       // End the old transaction before showing the newly selected object.
       if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
-      this._settingsSelections.set(this._settingsCategory,settingsPick.getAttribute('data-mm-settings-pick'));
+      const picked=settingsPick.getAttribute('data-mm-settings-pick');
+      this._settingsSelections.set(this._settingsCategory,picked);
       this._activitySettingsStage='devices';
-      this._lastSignature='';this.render();return;
+      // Settings selection and room URL are one object context. Resolve from
+      // actual published room IDs, never a label or a guessed key prefix.
+      const owner=(rhiMmRooms(this._hass).rooms||[]).find(room=>
+        picked===room.id||picked.startsWith(room.id+':'));
+      if(owner)this.navigate('settings',owner.id,owner.floor_id||'__unassigned__');
+      else{this._lastSignature='';this.render();}
+      return;
     }
     const remoteTab=event.target?.closest?.('[data-remote-tab]');
     if(remoteTab){
@@ -279,6 +333,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         rhiMmWholeAction(this._wholeHome,action,id,
           wholeAction.getAttribute('data-phase')||'',
           Number(wholeAction.getAttribute('data-index')));
+        if(action==='tab'&&['rooms','devices','activities'].includes(id))
+          this._wholeHome.settingsTab=id;
         this._optionRefresh();
       }
       return;
@@ -301,10 +357,51 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const cancelOption=event.target?.closest?.('[data-mm-option-cancel]');
     if(cancelOption){event.preventDefault();await this.cancelOptions();return;}
     const nav=event.target?.closest?.('[data-nav]');
-    if(nav){event.preventDefault();if(this.blockWholeHomeNavigation())return;
-      if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
+    if(nav){
+      event.preventDefault();
       const next=nav.getAttribute('data-nav');
-      this.navigate(next,nav.getAttribute('data-room')||'');
+      if(!RHI_MM_VIEWS.includes(next))return;
+      const requested=nav.getAttribute('data-room')!=null?
+        (nav.getAttribute('data-room')||''):this.currentRoute().room;
+      const owner=(rhiMmRooms(this._hass).rooms||[]).find(r=>r.id===requested);
+      const room=owner?.id||'';
+      const floor=owner?(owner.floor_id||'__unassigned__'):undefined;
+      if(next==='settings'&&room&&this.currentRoute().view!=='settings'){
+        for(const category of ['locations','devices','activities']){
+          const selected=this._settingsSelections.get(category);
+          if(selected&&selected!==room&&!selected.startsWith(room+':'))
+            this._settingsSelections.delete(category);
+        }
+      }
+      // Settings and Discovery are two object views of ONE native Options
+      // Flow. Reuse its flow ID, draft, and full editor; never reopen a writer.
+      if(this._wholeHomeFlow&&this._optionsStep&&
+         ['settings','discovery'].includes(next)&&
+         ['complete_setup','review'].includes(this._optionsStep.step_id)){
+        if(this._wholeHome){
+          if(this._wholeHome.workspace==='settings'&&
+             ['rooms','devices','activities'].includes(this._wholeHome.tab))
+            this._wholeHome.settingsTab=this._wholeHome.tab;
+          this._wholeHome.workspace=next;
+          if(next==='discovery')this._wholeHome.tab='discovery';
+          if(next==='settings'&&this._wholeHome.tab==='discovery')
+            this._wholeHome.tab=this._wholeHome.settingsTab||'rooms';
+        }
+        this._pendingNavigation=null;this._optionsError='';
+        this.navigate(next,room,floor);return;
+      }
+      if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)){
+        if(this._optionsBusy){
+          this._optionsError=this.t('whole_home_busy');
+          this._optionRefresh();return;
+        }
+        if(this._wholeHome?.dirty||this._optionsStep?.step_id==='review'){
+          this._pendingNavigation={view:next,room,floor};
+          this._optionRefresh();return;
+        }
+      }
+      if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
+      this.navigate(next,room,floor);
       if(next==='discovery'&&this._hass?.user?.is_admin===true)
         await this.openOptions({action:'complete_setup'});
       return;}
@@ -394,6 +491,20 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     return false;
   }
+  leaveDecision(){
+    const pending=this._pendingNavigation;
+    if(!pending)return '';
+    const esc=rhiUxEscape,tab=this.t(pending.view);
+    return `<section class="mm-surface mm-leave-decision" role="alertdialog"
+      aria-label="${esc(this.t('whole_home_leave_title'))}">
+      <b>${esc(this.t('whole_home_leave_title'))}: ${esc(tab)}</b>
+      <p>${esc(this.t('whole_home_leave_warning'))}</p>
+      <div class="mm-setup-actions">
+        <button type="button" data-mm-leave-action="keep">${esc(this.t('whole_home_keep_editing'))}</button>
+        <button type="button" data-mm-leave-action="discard">${esc(this.t('whole_home_discard_open'))}: ${esc(tab)}</button>
+        <button type="button" data-mm-leave-action="review" ${this._optionsBusy?'disabled':''}>${esc(this.t('whole_home_review_save'))}</button>
+      </div></section>`;
+  }
   async openOptions({action,room='',activity='',scope='',id='',
     phase='',operation='',index=null,device='',stepType=''}) {
     if(!this._hass?.user?.is_admin||this._optionsBusy)return;
@@ -424,9 +535,15 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._wholeHomeFlow=wholeHome;
       this._optionsStep=step;this._optionsData=rhiMmOptionDefaults(step);
       this._wholeHome=step.step_id==='complete_setup'?rhiMmWholeFromStep(step):null;
+      if(this._wholeHome){
+        this._wholeHome.workspace=this.currentRoute().view==='discovery'?'discovery':'settings';
+        this._wholeHome.tab=this._wholeHome.workspace==='discovery'?'discovery':'rooms';
+        this._wholeHome.settingsTab='rooms';
+      }
       // Contextual Device Settings reuses the single Options Flow draft.
       if(this._wholeHome&&room&&this._wholeHome.doc.rooms[room]){
         this._wholeHome.room=room;this._wholeHome.tab='devices';
+        this._wholeHome.settingsTab='devices';
         if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
           this._wholeHome.device=device;
       }
@@ -451,6 +568,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
         this._optionsStep=null;this._optionsData={};this._wholeHomeFlow=false;this._wholeHome=null;
         this._optionsNotice=this.t('setup_saved');
         if(this._settingsCategory==='activities')this._activitySettingsStage='tune';
+        if(this._pendingNavigation){
+          const destination=this._pendingNavigation;
+          this._pendingNavigation=null;
+          this.navigate(destination.view,destination.room,destination.floor);
+        }
       }else if(response?.type==='form'){
         this._optionsStep=response;
         if(response.step_id!==step.step_id)this._optionsData=rhiMmOptionDefaults(response);
@@ -472,7 +594,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const step=this._optionsStep;
     ++this._optionsEpoch;
     this._optionsStep=null;this._optionsData={};this._optionsBusy=false;this._wholeHomeFlow=false;
-    this._wholeHome=null;
+    this._wholeHome=null;this._pendingNavigation=null;
     this._optionsError='';this._optionsNotice='';this._optionRefresh();
     if(step){try{await rhiMmOptionsCancel(this._hass,step);}catch(_){}}
   }
@@ -529,7 +651,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
       try{this._wholeHome=rhiMmWholeFromStep(step);}
       catch(_){return `<p class='mm-room-error'>${this.t('setup_flow_failed')}</p>`;}
     }
-    return rhiMmWholeRender(this._wholeHome,key=>this.t(key),rhiUxEscape);
+    return `${this._optionsError?`<p class="mm-room-error" role="alert">${rhiUxEscape(this._optionsError)}</p>`:''}
+      ${this.leaveDecision()}${rhiMmWholeRender(this._wholeHome,key=>this.t(key),rhiUxEscape)}`;
   }
   renderOptionsEditor(){
     // HA's actual administrator permission remains authoritative on every
@@ -550,7 +673,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const guidance=description||step?.description_placeholders?.note;
     const stageTitle=step?.step_id==='activity_devices'?this.t('choose_devices'):
       step?.step_id==='activity_device_order'?this.t('tune_actions'):null;
-    return `<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
+    return `${this.leaveDecision()}<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
       <h3>${escape(stageTitle||label||this.t('setup_editor'))}</h3>
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
       ${base?`<p role="alert" class="mm-room-error">${escape(base)}</p>`:''}
@@ -735,8 +858,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(!model.ready){
       // A first-time installer must be able to reach the authoritative
       // Options Flow even before any room sensor exists.
-      const firstSetup=['settings','discovery'].includes(view)&&this._hass?.user?.is_admin?
-        this.settings({rooms:[]}):view==='activities'&&this._hass?.user?.is_admin?
+      const firstSetup=view==='settings'&&this._hass?.user?.is_admin?
+        this.settings({rooms:[]}):view==='discovery'&&this._hass?.user?.is_admin?
+        this.discovery({rooms:[]}):view==='insights'?this.insights({rooms:[]}):
+        view==='activities'&&this._hass?.user?.is_admin?
         this.activities({rooms:[]}):'';
       const editor=''; // Editors live exclusively in Settings and its configuration workspaces.
       return rhiUxPageTemplate({hero,content:editor+this.unavailable(model)+firstSetup});
@@ -749,8 +874,19 @@ class HomeBrainMultimediaCard extends HTMLElement {
       settings:()=>this.settings(model),discovery:()=>this.discovery(model),insights:()=>this.insights(model),
       devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model,roomId),
     }[view]||(()=>this.overview(model));
+    // A compact object locator, not another dashboard or repeated status KPI.
+    // The object is preserved across operational, configuration and D4 tabs.
+    const selectedRoom=model.rooms.find(room=>room.id===roomId);
+    const context=selectedRoom&&['settings','discovery','insights','diagnostics','devices','activities'].includes(view)?
+      `<nav class="mm-object-context" aria-label="${this.t('room')}">
+        <span class="mm-object-context-name"><ha-icon icon="mdi:home-outline"></ha-icon>
+          ${rhiUxEscape(selectedRoom.name)}</span>
+        <span class="mm-object-context-status">${rhiUxEscape(rhiMmRoomStatus(selectedRoom,this._hass))}</span>
+        <button type="button" class="mm-link" data-nav="overview"
+          data-room="${rhiUxEscape(selectedRoom.id)}">${this.t('room_control')}</button>
+      </nav>`:'';
     const editor=''; // Editors live exclusively in Settings and its configuration workspaces.
-    return rhiUxPageTemplate({hero,status,content:editor+(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
+    return rhiUxPageTemplate({hero,status,content:context+editor+(model.unavailable?`<p role="status" class="mm-room-error">${this.t('partial_rooms')}</p>`:'')+content(),className:'mm-page'});
   }
   overview(model){
     // Exact HA floor/area registry values come from the domain backend.
@@ -841,28 +977,32 @@ class HomeBrainMultimediaCard extends HTMLElement {
       </details>`:'';
     const renderDevice=d=>{
       const key=room.id+':device:'+d.key;
-      const unavailable=!d.available||!d.foundation_approved;
+      const needsBinding=d.foundation_approved!==true;
+      const unavailable=d.available!==true;
       const advanced=['play','pause','stop','previous','next','remote_key','sound_mode']
         .some(action=>d.controls?.[action]?.enabled===true);
-      return `<div class="mm-cockpit-device">
+      const nativeAction=this.nativeMediaPlayerAction(d);
+      const stateLabel=needsBinding?this.t('media_needs_configuration'):
+        unavailable?this.t('device_unavailable'):rhiMmStateLabel(this._hass,d.state);
+      return `<div class="mm-cockpit-device ${needsBinding?'mm-device-unbound':''}">
         <div class="mm-cockpit-device-heading">
-          <span>${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}<b>${escape(d.name)}</b></span>
-          <small class="${unavailable?'mm-room-error':''}">${unavailable?
-            this.t('device_unavailable'):escape(rhiMmStateLabel(this._hass,d.state))}</small>
-          ${this.nativeMediaPlayerAction(d)}
+          <span>${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}
+            <b title="${escape(d.name)}">${escape(d.name)}</b></span>
+          <small class="mm-cockpit-device-state">${escape(stateLabel)}</small>
         </div>
-        ${d.foundation_approved&&d.available&&d.media_title?
-          `<div class='mm-device-nowplaying'><ha-icon icon='mdi:play-circle-outline'></ha-icon>
-             <span><b>${escape(d.media_title)}</b>
-               ${d.media_artist?`<small>${escape(d.media_artist)}</small>`:''}
-               ${d.source?`<small>${this.t('input')}: ${escape(d.source)}</small>`:''}
-             </span></div>`:''}
-        ${this.roomDeviceBasicActions(room,d)}
+        ${needsBinding?
+          `<div class="mm-device-native-fallback">${nativeAction}</div>`:
+          this.roomDeviceBasicActions(room,d)}
         <details class="mm-cockpit-device-details" data-persist="${escape(key)}"
           ${this._expanded.has(key)?'open':''}>
           <summary>${this.t('details')}</summary>
           <div class="mm-cockpit-device-body">
             <small>${escape(rhiMmRoleLabel(this._hass,d.role))} ${d.shared?' · '+this.t('shared_source'):''}</small>
+            ${!needsBinding?nativeAction:''}
+            ${d.foundation_approved&&d.available&&d.media_title?
+              `<p class="mm-device-nowplaying">${escape(d.media_title)}
+                ${d.media_artist?' · '+escape(d.media_artist):''}
+                ${d.source?' · '+escape(d.source):''}</p>`:''}
             ${advanced?this.roomManualControls({...room,activities:[],devices:[d]},true,false,'advanced'):''}
             ${this.productSpecifications(d)}
             ${Object.entries(d.controls||{}).filter(([,cap])=>cap?.enabled===false&&typeof cap.reason==='string')
@@ -885,6 +1025,15 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const devices=roomAreas.length?
       groupedDevices+ungrouped.map(renderDevice).join(''):
       (room.devices||[]).map(renderDevice).join('');
+    const unbound=(room.devices||[]).filter(d=>d.foundation_approved!==true);
+    const bindingNotice=unbound.length?`<div class="mm-room-binding-notice" role="status">
+      <ha-icon icon="mdi:link-variant-off"></ha-icon>
+      <span><strong>${unbound.length} ${this.t('devices')}</strong> ·
+        ${this.t('media_needs_configuration')}</span>
+      ${this._hass?.user?.is_admin===true?
+        `<button type="button" class="mm-source-repair"
+          data-mm-option-action="complete_setup">${this.t('source_repair_action')}</button>`:''}
+    </div>`:'';
     const remote=this.roomFocusedRemote(room);
     const remoteKey=room.id+':remote';
     return `<section class="mm-section mm-overview">
@@ -906,7 +1055,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
             <summary>${this.t('remote_keys')} · ${escape(room.name)}</summary>${remote}</details>`:''}
         </div>
         <article class="mm-surface mm-cockpit-devices"><h3>${this.t('devices')}</h3>
-          ${devices||this.t('no_devices')}</article>
+          ${bindingNotice}${devices||this.t('no_devices')}</article>
       </div>
     </section>`;
   }
@@ -1112,7 +1261,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const stateLabel=hasPlayback?rhiMmStateLabel(this._hass,media.state||player?.state):
       blocked?idleState:focus.kind==='source'?this.t('no_playback'):
       room.activity_name?rhiMmRoomStatus(room,this._hass):idleState;
-    return `<article class='mm-surface mm-now-playing' aria-label='${this.t('now_playing')}'>
+    return `<article class='mm-surface mm-now-playing ${blocked?'mm-now-playing-blocked':''}' aria-label='${this.t('now_playing')}'>
       <div class='mm-media-head'><h3>${this.t('now_playing')}</h3>
         <span class='mm-media-state'>${e(stateLabel)}</span>
       </div>
@@ -1389,7 +1538,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
     };
     const entries=groups[category]||[];
     const remembered=this._settingsSelections.get(category);
-    const selected=entries.find(item=>item.id===remembered)||entries[0];
+    const rememberedEntry=entries.find(item=>item.id===remembered);
+    const contextualEntry=entries.find(item=>item.room.id===this._room);
+    // Follow the selected room from Overview/Insights, unless an explicit
+    // object choice within that same room is already remembered.
+    const selected=(rememberedEntry&&(!this._room||rememberedEntry.room.id===this._room)?
+      rememberedEntry:contextualEntry)||entries[0];
     const itemRows=entries.map(item=>`<button type="button" class="mm-settings-item ${selected?.id===item.id?'active':''}"
         data-mm-settings-pick="${esc(item.id)}" aria-pressed="${selected?.id===item.id}">
         <strong>${esc(item.label)}</strong><small>${esc(item.subtitle)}</small></button>`).join('');
@@ -1588,7 +1742,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         <p>${this.t('settings_post_power_delay')}: ${esc(selectedDevice.post_power_on_delay_ms??0)} ms</p>
         ${this.roomAvailableControls(selectedDevice)}</div>
 ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-action="complete_setup"
-          data-mm-option-room="${esc(selected.room.id)}" data-mm-option-device="${esc(selected.objectId)}">Device HDMI-CEC &amp; Wake-on-LAN (MAC/IP)</button>
+          data-mm-option-room="${esc(selected.room.id)}" data-mm-option-device="${esc(selected.objectId)}">${selectedDevice.foundation_approved?this.t('settings_device_native_settings'):this.t('source_repair_action')}</button>
           <button type="button" data-mm-option-action="edit_room"
           data-mm-option-room="${esc(selected.room.id)}">${this.t('setup_edit_devices')}</button>
         </div>`:''}`:
@@ -1782,7 +1936,11 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
     // No summary counters or invented event history; evidence belongs to the
     // existing native activity/target projection.
     const esc=rhiUxEscape;
-    const rooms=[...model.rooms].sort((a,b)=>Number(b.attention===true)-Number(a.attention===true)||
+    // A selected room leads its object workspace; the rest of the house
+    // remains reachable, with attention first among the other rooms.
+    const rooms=[...model.rooms].sort((a,b)=>
+      Number(b.id===this._room)-Number(a.id===this._room)||
+      Number(b.attention===true)-Number(a.attention===true)||
       String(a.name).localeCompare(String(b.name)));
     const cards=rooms.map(room=>{
       const target=room.target_state;
@@ -1804,10 +1962,30 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         attention?this.t('insights_attention'):
         this.t('insights_no_issue');
       const latest=room.last_attempt;
-      const repairAction=invalidSelection&&this._hass?.user?.is_admin===true?
+      const manage=this._hass?.user?.is_admin===true;
+      const repairAction=invalidSelection&&manage?
         `<button type='button' data-mm-settings-open='devices'
           data-room='${esc(room.id)}' data-device='${esc(invalidSelection.key)}'>
           ${this.t('source_repair_action')}</button>`:'';
+      // Source approval, offline native provider and incorrect AV route are
+      // distinct faults with distinct exact-owning-object repair destinations.
+      const nativeOffline=unavailable[0];
+      const offlineAction=nativeOffline&&manage?
+        `<button type='button' data-mm-settings-open='devices'
+          data-room='${esc(room.id)}' data-device='${esc(nativeOffline.key)}'>
+          ${this.t('insights_review_device')}</button>`:'';
+      const mismatchActivities=(room.activities||[]).filter(a=>
+        (!room.activity_id||a.id===room.activity_id)&&
+        (a.routes||[]).some(route=>
+          misses.some(item=>item.device_key===route.device_key)&&
+          route.status&&!['confirmed','observed'].includes(route.status)));
+      // More than one plausible route requires a human selection; do not
+      // silently open an arbitrary activity or invent physical input identity.
+      const mismatchedActivity=mismatchActivities.length===1?mismatchActivities[0]:null;
+      const routeAction=misses.length&&mismatchedActivity&&manage?
+        `<button type='button' data-mm-settings-open='activities'
+          data-room='${esc(room.id)}' data-activity='${esc(mismatchedActivity.id)}'>
+          ${this.t('insights_review_route')}</button>`:'';
       const more=room.id+':insights:details';
       const targeted=misses.map(item=>{
         const name=(room.devices||[]).find(d=>d.key===item.device_key)?.name||item.device_key;
@@ -1835,7 +2013,9 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         <p class="mm-insight-summary ${attention?'mm-room-error':''}">${esc(message)}</p>
         ${open?`<div class="mm-insight-affected">${devices}${targeted}</div>`:''}
         ${invalidSelection?`<p class='mm-source-repair-hint'>${esc(this.t('source_repair_hint'))}</p>`:''}
-        <div class="mm-insight-actions">${repairAction}${fix}
+        ${!invalidSelection&&unavailable.length?`<p class='mm-source-repair-hint'>${esc(this.t('insights_native_offline_help'))}</p>`:''}
+        ${!invalidSelection&&!unavailable.length&&misses.length?`<p class='mm-source-repair-hint'>${esc(this.t('insights_route_help'))}</p>`:''}
+        <div class="mm-insight-actions">${repairAction}${offlineAction}${routeAction}${fix}
           <button type="button" data-nav="overview" data-room="${esc(room.id)}">
             ${this.t('insights_open_room')}</button>
           <button type="button" data-nav="diagnostics" data-room="${esc(room.id)}">
@@ -1963,7 +2143,8 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
       </article>`;
     }).join('');
     return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div>
-      <button type="button" class="mm-link" data-nav="insights">${this.t('insights')}</button></div>
+      <button type="button" class="mm-link" data-nav="insights"
+        ${roomId?`data-room="${escape(roomId)}"`:''}>${this.t('insights')}</button></div>
       <div class="mm-diag-grid">${cards}</div></section>`;
   }
 }

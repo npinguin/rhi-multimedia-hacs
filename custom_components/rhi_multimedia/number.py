@@ -16,6 +16,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
         LogicalDelayNumber(context, entry.entry_id, asset_id, spec,
                            "post_power_on_delay_ms", "Power-on delay")
         for asset_id, spec in sorted(assets.items())
+    ] + [
+        LogicalWakePortNumber(context, entry.entry_id, asset_id, spec,
+                              "wol_port", "Wake UDP port")
+        for asset_id, spec in sorted(assets.items())
     ])
 
 
@@ -32,4 +36,22 @@ class LogicalDelayNumber(LogicalDeviceSetting, NumberEntity):
     async def async_set_native_value(self, value):
         if type(value) not in (int, float) or not float(value).is_integer():
             raise ValueError("Power-on delay must be integer milliseconds")
+        await self._set(int(value))
+
+
+class LogicalWakePortNumber(LogicalDeviceSetting, NumberEntity):
+    """Native WOL UDP destination port; no packet is sent by changing it."""
+
+    _attr_native_min_value = 1
+    _attr_native_max_value = 65535
+    _attr_native_step = 1
+    _attr_icon = "mdi:numeric"
+
+    @property
+    def native_value(self):
+        return self._value()
+
+    async def async_set_native_value(self, value):
+        if type(value) not in (int, float) or not float(value).is_integer():
+            raise ValueError("Wake UDP port must be an integer")
         await self._set(int(value))

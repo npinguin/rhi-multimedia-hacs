@@ -3,8 +3,20 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-shell{max-width:1290px;margin:auto;padding:12px 16px 20px}
 .mm-page{gap:0}.mm-page .rhiUxPageContent{margin-top:9px}
 .mm-shell .rhiUxDomainShell{margin-bottom:10px}
-/* Multimedia has three directly actionable modules and no second tab tier. */
+/* One primary tab row; no duplicated sub-navigation or skill-specific dashboard. */
 .mm-shell .rhiUxDomainShellBottom{display:none}
+/* Stable object locator between operational, configuration and diagnostic tabs.
+   Compact at iPad width; folds/technical evidence remain inside existing views. */
+.mm-object-context{display:flex;align-items:center;gap:9px;min-width:0;flex-wrap:wrap;
+  margin:0 0 9px;padding:7px 11px;border:1px solid #dce7f1;border-radius:11px;
+  background:#fff;color:#244863;font-size:12px}
+.mm-object-context-name{display:inline-flex;align-items:center;gap:6px;
+  min-width:0;max-width:100%;font-weight:700;overflow-wrap:anywhere}
+.mm-object-context-name ha-icon{--mdc-icon-size:17px;color:#266aa0}
+.mm-object-context-status{font-size:11px;color:#627e93;overflow-wrap:anywhere}
+.mm-object-context .mm-link{margin-left:auto;min-height:36px;font-size:11px}
+@media(max-width:430px){.mm-object-context{padding:7px 9px;gap:6px}
+  .mm-object-context .mm-link{margin-left:0}}
 .mm-native-media-link{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:40px;min-width:40px;padding:6px 9px;border:1px solid #d4e4f5;border-radius:9px;background:#f5f9ff;color:#175aa3;font:inherit;font-size:11px;font-weight:650;cursor:pointer}
 .mm-native-media-link ha-icon{--mdc-icon-size:17px}
 .mm-native-media-link:focus-visible{outline:2px solid #1267be;outline-offset:2px}
@@ -617,3 +629,42 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 
 .mm-wh-floor-group{display:grid;gap:7px;padding:9px;background:#f6f9fd;border:1px solid #d9e7f3;border-radius:10px}
 .mm-wh-floor-group>strong{font-size:12px;color:#254e74}
+
+
+/* Multimedia resident cockpit: quiet, compact object-first iPad presentation.
+   No new navigation tier or alternate control implementation. */
+.mm-shell .rhiUxModuleTabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mm-cockpit-activity-list{grid-template-columns:minmax(0,1fr)}
+.mm-cockpit-activity-list .mm-activity-choice{min-height:44px}
+.mm-cockpit-activity-list .mm-activity-choice span{overflow-wrap:normal;word-break:normal;hyphens:none}
+.mm-room-binding-notice{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 9px;border:1px solid #dce7f0;border-radius:9px;background:#f6f9fc;
+  color:#385d77;font-size:11px;line-height:1.4}
+.mm-room-binding-notice>ha-icon{--mdc-icon-size:18px;flex:none}
+.mm-room-binding-notice>span{flex:1 1 130px;min-width:0}
+.mm-room-binding-notice .mm-source-repair{min-height:40px;padding:6px 9px}
+.mm-cockpit-device{padding:7px 8px}
+.mm-cockpit-device-heading{display:flex;align-items:center;flex-wrap:wrap;gap:5px 8px;min-height:34px}
+.mm-cockpit-device-heading>span{flex:1 1 135px;min-width:0;align-items:flex-start}
+.mm-cockpit-device-heading .mm-device-art{width:36px;height:36px;border-radius:8px}
+.mm-cockpit-device-heading .mm-device-art ha-icon{--mdc-icon-size:21px}
+.mm-cockpit-device-heading b{line-height:1.3;overflow-wrap:normal;word-break:normal;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.mm-cockpit-device-state{font-size:10px;color:#657d92;white-space:normal;text-align:left;
+  max-width:100%;flex:0 1 auto}
+.mm-cockpit-device-details{margin-top:5px}
+.mm-cockpit-device-details>summary{min-height:40px}
+.mm-cockpit-device .mm-device-basic{margin-top:5px}
+.mm-device-native-fallback{display:flex;align-items:center;flex-wrap:wrap;margin-top:4px}
+.mm-device-native-fallback .mm-native-media-link{font-size:11px;min-height:40px;padding:5px 8px}
+.mm-now-playing-blocked .mm-media-stage{display:none}
+.mm-now-playing-blocked .mm-media-copy strong{font-size:14px}
+@media(max-width:700px){
+  .mm-cockpit-activity-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mm-cockpit-activity-list .mm-activity-choice span{overflow-wrap:normal;word-break:normal}
+  .mm-shell .rhiUxModuleTabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:430px){
+  .mm-shell .rhiUxModuleTab{font-size:11px;padding:7px 4px}
+  .mm-cockpit-device-heading>span{flex-basis:125px}
+}

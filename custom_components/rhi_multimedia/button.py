@@ -14,6 +14,10 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dis
 from .const import DOMAIN, EVENT_UPDATE
 from .experience import build_room
 from .foundation import selected_index
+from .device_preferences import (
+    LogicalDeviceSetting, configured_logical_specs, async_test_asset_wol,
+    asset_current_value, verified_asset_macs,
+)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -22,6 +26,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ActivityButton(context, entry.entry_id, room, activity)
         for room, spec in context["engine"].rooms.items()
         for activity in spec["activities"]
+    ] + [
+        LogicalWakeTestButton(context, entry.entry_id, asset_id, spec)
+        for asset_id, spec in sorted(configured_logical_specs(hass, context["engine"].rooms).items())
     ])
 
 
@@ -74,3 +81,47 @@ class ActivityButton(ButtonEntity):
     def extra_state_attributes(self):
         return {"rhi_multimedia_room": self.room, "activity_id": self.activity,
                 "readback_entity": "RHI Multimedia room status"}
+
+
+class LogicalWakeTestButton(LogicalDeviceSetting, ButtonEntity):
+    """Explicit single-packet test via the existing exact-source HA adapter.
+
+    Native HA state after submission is evidence only, not proof of power-on.
+    """
+    _attr_icon = "mdi:power-cycle"
+
+    def __init__(self, context, entry_id, asset_id, spec):
+        super().__init__(context, entry_id, asset_id, spec,
+                         "wol_enabled", "Test Wake-on-LAN")
+        # Keep entity ID stable and unique independently of the config toggle.
+        self._attr_unique_id = f"{entry_id}:asset:{asset_id}:wol_test"
+
+    @property
+    def available(self):
+        engine = self.context.get("engine")
+        return bool(engine and
+                    asset_current_value(engine.rooms, self.asset_id, "wol_enabled") is True and
+                    verified_asset_macs(self.hass, self.context, self.asset_id))
+
+    @property
+    def extra_state_attributes(self):
+        last = self.context.get("wol_tests", {}).get(self.asset_id, {})
+        return {
+            "result": last.get("result", "not_tested"),
+            "submitted_at": last.get("at"),
+            "native_before": last.get("native_before"),
+            "native_after_submit": last.get("native_after_submit"),
+            "native_readback_quality": last.get("native_readback_quality"),
+            "observation_window_seconds": last.get("observation_window_seconds"),
+            "note": "Native readback is not independent physical wake confirmation",
+        }
+
+    async def async_press(self):
+        if not self.available:
+            raise HomeAssistantError(
+                "Wake-on-LAN not enabled or native MAC/authorization missing; review Multimedia Settings")
+        result = await async_test_asset_wol(
+            self.hass, self.context, self.asset_id,
+            command_context=getattr(self, "_context", None))
+        self.async_write_ha_state()
+        return result
