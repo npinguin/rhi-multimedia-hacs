@@ -10,8 +10,10 @@ function rhiMmWholeFromStep(step){
   const areas=JSON.parse(context.areas_json||'{}');
   const sources=JSON.parse(context.sources_json||'[]');
   const logicalDevices=JSON.parse(context.logical_devices_json||'[]');
+  const proposedRooms=JSON.parse(context.proposed_rooms_json||'{}');
+  const proposalExceptions=JSON.parse(context.proposal_exceptions_json||'[]');
   const room=Object.keys(doc.rooms)[0]||'';
-  return {doc,areas,sources,logicalDevices,room,device:'',activity:'',tab:'discovery',
+  return {doc,areas,sources,logicalDevices,proposedRooms,proposalExceptions,room,device:'',activity:'',tab:'discovery',
     catalogFilter:'all',catalogQuery:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
     newActivity:'',newType:'watch_tv'};
 }
@@ -111,6 +113,11 @@ function rhiMmWholeRender(d,t,escape){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
       <h4>Supported Multimedia devices · ${d.logicalDevices?.length||0}</h4>
       <p>Automatically classified from Foundation-supported discovery. No room setup required.</p>
+      <button type='button' data-wh-action='apply_proposals'
+        ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>Review proposed home setup (${Object.keys(d.proposedRooms||{}).length} rooms)</button>
+      <small>Suggestions only. No physical action or saved change until Review &amp; Save.</small>
+      ${(d.proposalExceptions||[]).length?`<details><summary>${d.proposalExceptions.length} connections/roles need review</summary>
+        ${d.proposalExceptions.map(x=>`<div>${e(x)}</div>`).join('')}</details>`:''}
       <label>Filter ${select('catalog_filter',d.catalogFilter,
         [['all','All supported'],['classified','Classified'],['unassigned','Unassigned'],['review','Needs classification / approval']])}</label>
       <label>Search ${field('catalog_query',d.catalogQuery)}</label>
@@ -169,11 +176,13 @@ function rhiMmWholeRender(d,t,escape){
       <label>Foundation supported source${select('new_source',d.newSource,
         [['','Choose a discovered source'],...sourceRows])}</label>
       <button type='button' data-wh-action='add_device' ${d.newSource===''||!room?'disabled':''}>Assign device</button>
-      <small>Pending sources can be assigned read-only. Premium actions remain blocked until exact Foundation command approval.</small>
+      <small>Source binding and explicit control choice are reviewed together in one Multimedia Save; no separate Foundation wizard.</small>
     </section><section class='mm-wh-panel'>
       <h4>${e(selectedDevice?.name||'Select a device')}</h4>
       ${selectedDevice?`<small>${e(selectedDevice.entity||'')} · ${e(selectedDevice.foundation_concept||'')} · ${e(currentDevice)}</small>
         <label>Display name${field('device_name',selectedDevice.name||'')}</label>
+        <label class='mm-wh-check'>Enable native Premium controls after Review &amp; Save ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
+        <small>Allowed only for this exact currently registered Foundation/native identity; HA permissions and capabilities are rechecked before each command.</small>
         <label>Foundation candidate for this exact native entity
           ${select('device_candidate',currentCandidate,nativeBindingChoices,
             sameNativeCandidates.length?'':'disabled')}</label>
@@ -348,6 +357,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     room.area_id=value||null;d.dirty=true;
   }
   else if(key==='device_name'&&device){device.name=value;d.dirty=true;}
+  else if(key==='device_control_approved'&&device){device.control_approved=checked;d.dirty=true;}
   else if(key==='device_room_area'&&device){
     if(value&&!room?.room_areas?.[value])return fail('Choose a defined Room Area');
     if(value)device.room_area=value;else delete device.room_area;
@@ -357,7 +367,12 @@ function rhiMmWholeChange(d,key,value,checked=false){
     const approved=d.sources.find(s=>s.entity===device.entity&&s.concept===device.foundation_concept
       &&s.candidate===value);
     if(!approved)return fail('This exact native device is not selected in Foundation');
-    device.foundation_candidate_id=approved.candidate;d.dirty=true;
+    device.foundation_candidate_id=approved.candidate;
+    device.foundation_entity_registry_id=approved.entity_registry_id;
+    device.foundation_config_entry_id=approved.config_entry_id;
+    device.foundation_device_registry_id=approved.native_device_id;
+    device.foundation_provider=approved.provider;
+    device.control_approved=false;d.dirty=true;
   }
   else if(key==='device_role'&&device){device.role=value;d.dirty=true;}
   else if(key==='device_power'&&device){
@@ -478,6 +493,32 @@ function rhiMmWholeAction(d,action,id,phase,index){
       d.device='';d.activity='';d.dirty=true;d.error='';return true;
     }catch(_){return fail('Advanced configuration must be valid JSON');}
   }
+  if(action==='apply_proposals'){
+    const proposed=d.proposedRooms||{};
+    if(!Object.keys(proposed).length)return fail('No safe native room suggestions available');
+    let changed=0;
+    // Suggestions only: never overwrite an already edited user role, room,
+    // activity, physical identity or command policy.
+    for(const [roomId,suggestion] of Object.entries(proposed)){
+      const original=d.doc.rooms[roomId];
+      if(!original){
+        d.doc.rooms[roomId]=JSON.parse(JSON.stringify(suggestion));
+        changed++;continue;
+      }
+      if(original.area_id!==suggestion.area_id)continue;
+      for(const [key,device] of Object.entries(suggestion.devices||{})){
+        if(original.devices[key]||Object.values(original.devices).some(x=>x.entity===device.entity))continue;
+        original.devices[key]=JSON.parse(JSON.stringify(device));changed++;
+      }
+      for(const [key,activity] of Object.entries(suggestion.activities||{})){
+        if(original.activities[key]||!activity.devices.every(k=>original.devices[k]))continue;
+        original.activities[key]=JSON.parse(JSON.stringify(activity));changed++;
+      }
+    }
+    if(!changed)return fail('Existing setup preserved; review the listed source exceptions');
+    d.room=Object.keys(d.doc.rooms)[0]||'';d.device='';d.activity='';
+    d.tab='rooms';d.dirty=true;d.error='';return true;
+  }
   if(action==='tab'){if(!['discovery','rooms','devices','activities'].includes(id))return false;d.tab=id;d.error='';return true;}
   if(action==='select_room'){if(!d.doc.rooms[id])return false;d.room=id;d.device='';d.activity='';d.error='';return true;}
   if(action==='assign_catalog'){
@@ -539,6 +580,11 @@ function rhiMmWholeAction(d,action,id,phase,index){
     let key=base,n=2;while(Object.prototype.hasOwnProperty.call(room.devices,key))key=base+'_'+n++;
     room.devices[key]={name:source.label,entity:source.entity,
       foundation_concept:source.concept,foundation_candidate_id:source.candidate,
+      foundation_entity_registry_id:source.entity_registry_id,
+      foundation_config_entry_id:source.config_entry_id,
+      foundation_device_registry_id:source.native_device_id,
+      foundation_provider:source.provider,
+      control_approved:source.available===true&&!source.review_reason,
       physical_id:existing?.physical_id||source.logical_asset_id||source.entity,
       asset_id:existing?.asset_id||existing?.physical_id||source.logical_asset_id||source.entity,
       role:source.concept==='display'?'display':source.concept==='amplifier'?'receiver':

@@ -17,9 +17,9 @@ from homeassistant.helpers import selector
 
 from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
 from .dell_c8621qt import valid_host
-from .foundation import selected_native_macs
+from .foundation import authorized_source, reviewed_native_source, selected_native_macs
 from .source_discovery import (area_choices, av_sources, discovered_av_sources,
-                               logical_av_catalog, source_lists, speech_player_eligible,
+                               logical_av_catalog, proposed_room_setup, source_lists, speech_player_eligible,
                                tts_choices)
 from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
                          native_state, cec_links_for_activity, route_status, validate_action,
@@ -593,6 +593,29 @@ class _Wizard:
         current, _ = av_sources(self.hass)
         supported, _ = discovered_av_sources(self.hass)
         selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
+        command_sources = list(current)
+        # Reviewed semantic configuration is explicit control intent in the
+        # single native Multimedia Options Flow. Verify exact current
+        # Foundation/native identity BEFORE accepting this one Save. Discovery
+        # alone never activates a device or weakens the runtime command guard.
+        for proposed_room in self._rooms.values():
+            for device in proposed_room.get("devices", {}).values():
+                if device.get("control_approved") is not True:
+                    continue
+                if reviewed_native_source(self.hass, device) is None:
+                    raise ValueError("Reviewed native control binding is no longer valid")
+                match = next((source for source in supported
+                              if source.concept == device.get("foundation_concept")
+                              and source.entity_id == device.get("entity")
+                              and source.candidate_id == device.get("foundation_candidate_id")
+                              and source.review_reason is None), None)
+                if match is None:
+                    raise ValueError("Reviewed native control is not in supported discovery")
+                key = (match.concept, match.entity_id, match.candidate_id)
+                selected.add(key)
+                if not any((source.concept, source.entity_id, source.candidate_id) == key
+                           for source in command_sources):
+                    command_sources.append(match)
         # Ambiguous technical identity is visible for repair but cannot be
         # saved as a new semantic binding until Foundation resolves it.
         discovered = {(s.concept, s.entity_id, s.candidate_id) for s in supported
@@ -606,7 +629,7 @@ class _Wizard:
                     raise ValueError("New or changed device not in Foundation-supported discovery")
                 tts_id = device.get("speech_tts_registry_id")
                 if tts_id and tts_id != previous.get("devices", {}).get(key, {}).get("speech_tts_registry_id"):
-                    approved_speech = next((source for source in current
+                    approved_speech = next((source for source in command_sources
                                             if source.concept == device.get("foundation_concept")
                                             and source.entity_id == device["entity"]
                                             and source.candidate_id == device.get("foundation_candidate_id")), None)
@@ -621,7 +644,7 @@ class _Wizard:
                 if (isinstance(wol, dict)
                         and wol.get("action") == "wake_on_lan.send_magic_packet"
                         and wol != prior_wol):
-                    approved_wol = next((source for source in current
+                    approved_wol = next((source for source in command_sources
                                          if source.concept == device.get("foundation_concept")
                                          and source.entity_id == device.get("entity")
                                          and source.candidate_id == device.get("foundation_candidate_id")), None)
@@ -685,7 +708,7 @@ class _Wizard:
                         device = room["devices"][step["device"]]
                         if step.get("type") == "remote_key":
                             from .adapter import WEBOS_KEYS, REMOTE_KEYSETS
-                            source = next((selected_source for selected_source in current
+                            source = next((selected_source for selected_source in command_sources
                                            if selected_source.concept == device.get("foundation_concept")
                                            and selected_source.entity_id == device["entity"]
                                            and selected_source.candidate_id == device.get("foundation_candidate_id")), None)
@@ -719,7 +742,7 @@ class _Wizard:
                     continue
                 device = spec["devices"].get(controller, {})
                 entity = device.get("entity")
-                candidate = next((source for source in current if source.entity_id == entity
+                candidate = next((source for source in command_sources if source.entity_id == entity
                                   and source.candidate_id == device.get("foundation_candidate_id")
                                   and source.concept == "source" and source.provider == "harmony"), None)
                 state = native_state(self.hass, entity) if entity else None
@@ -809,19 +832,23 @@ class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
         # fresh installs where no Multimedia config entry exists yet.
         from .foundation import register_with_foundation
         register_with_foundation(self.hass)
-        selected, _ = av_sources(self.hass)
-        if not selected:
-            if user_input and user_input.get("confirm"):
-                await self.async_set_unique_id("rhi_multimedia_household")
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(title="Multimedia", data={CONF_TITLE: "Multimedia", CONF_ROOMS: {}})
-            return self.async_show_form(step_id="user", data_schema=vol.Schema({
-                vol.Required("confirm", default=False): bool}))
-        if user_input:
+        # New installations always start with one empty semantic Config Entry.
+        # The native Options Flow then shows complete supported discovery and
+        # a disposable room/activity proposal. Do not force the old room wizard
+        # merely because Foundation already approved a few native devices.
+        if user_input and user_input.get("confirm") is True:
+            await self.async_set_unique_id("rhi_multimedia_household")
+            self._abort_if_unique_id_configured()
+            return self.async_create_entry(
+                title="Multimedia",
+                data={CONF_TITLE: "Multimedia", CONF_ROOMS: {}},
+            )
+        if user_input and CONF_TITLE in user_input:
+            # Preserve a resumed legacy named wizard, not the default path.
             self._name = str(user_input.get(CONF_TITLE) or "Multimedia").strip()
             return await self.async_step_room()
         return self.async_show_form(step_id="user", data_schema=vol.Schema({
-            vol.Required(CONF_TITLE, default="Multimedia"): str}))
+            vol.Required("confirm", default=False): bool}))
 
     async def _finish(self):
         await self.async_set_unique_id("rhi_multimedia_household")
@@ -1084,15 +1111,27 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         areas = area_choices(self.hass)
         discovered, discovery_origin = discovered_av_sources(self.hass)
         logical_devices, _ = logical_av_catalog(self.hass, self._rooms)
+        proposals = proposed_room_setup(self.hass, self._rooms)
         asset_by_candidate = {
             (row["concept"], row["candidate_id"], row["entity_id"]): asset["asset_id"]
             for asset in logical_devices for row in asset["candidates"]
         }
         approved, _ = av_sources(self.hass)
+        from .foundation import discovered_sources
+        native_sources, _ = discovered_sources(self.hass)
+        # Native MAC evidence is read-only and can be shown before command
+        # consent; it authorizes no WoL packet without reviewed Save.
         approved_macs = {
             (source.concept, source.candidate_id, source.entity_id):
                 sorted(selected_native_macs(self.hass, source))
-            for source in approved
+            for source in native_sources
+        }
+        reviewed_keys = {
+            (device.get("foundation_concept"), device.get("entity"),
+             device.get("foundation_candidate_id"))
+            for room in self._original_rooms.values()
+            for device in room.get("devices", {}).values()
+            if authorized_source(self.hass, device) is not None
         }
         sources = []
         for src in discovered:
@@ -1107,7 +1146,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "concept": src.concept,
                 "provider": src.provider,
                 "available": src.available,
-                "approved": src.approved,
+                "approved": (src.approved or (src.concept, src.entity_id,
+                                               src.candidate_id) in reviewed_keys),
                 "verified_macs": approved_macs.get(
                     (src.concept, src.candidate_id, src.entity_id), []),
                 "review_reason": src.review_reason,
@@ -1115,6 +1155,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "logical_asset_id": asset_by_candidate.get(
                     (src.concept, src.candidate_id, src.entity_id)),
                 "native_device_id": src.device_registry_id,
+                "entity_registry_id": src.entity_registry_id,
+                "config_entry_id": src.config_entry_id,
                 "manufacturer": src.manufacturer,
                 "model": src.model,
                 "related_entities": list(src.related_entities),
@@ -1145,6 +1187,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "areas_json": json.dumps(areas, ensure_ascii=False),
                 "sources_json": json.dumps(sources, ensure_ascii=False),
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
+                "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),
+                "proposal_exceptions_json": json.dumps(proposals["exceptions"], ensure_ascii=False),
                 "discovery_origin": discovery_origin,
                 "note": "Supported-domain discovery defaults to Select All when Foundation "
                         "publishes it. Classify and assign without prior Foundation wizard. "
@@ -2191,14 +2235,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
     def _script_native_keys(self, device):
         """Provider key vocabulary, not an unchecked user service payload."""
         from .adapter import REMOTE_KEYSETS, WEBOS_KEYS
-        current, _ = av_sources(self.hass)
-        matches = [src for src in current
-                   if src.concept == device.get("foundation_concept")
-                   and src.entity_id == device.get("entity")
-                   and src.candidate_id == device.get("foundation_candidate_id")]
-        if len(matches) != 1:
+        source = authorized_source(self.hass, device)
+        if source is None:
             return []
-        provider = matches[0].provider
+        provider = source.integration
         if provider == "webostv" and device["entity"].startswith("media_player."):
             return list(WEBOS_KEYS)
         if provider in REMOTE_KEYSETS:

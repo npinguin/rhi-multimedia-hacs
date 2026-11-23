@@ -369,6 +369,19 @@ class HomeBrainMultimediaCard extends HTMLElement {
     else this._optionsData[key]=el.value;
   }
   _optionRefresh(){this._optionsRevision++;this._lastSignature='';this.render();}
+  settingsFlowFailure(error){
+    // Only map owned stable error categories. Raw HA/transport error messages
+    // may contain private entity identifiers, addresses or authentication data.
+    const reason=error?.message;
+    const key=reason==='Multimedia admin permission required'?'setup_permission_required':
+      reason==='Native HA configuration API unavailable'?'setup_api_unavailable':
+      reason==='Multimedia Options Flow unavailable'?'setup_missing_entry':
+      reason==='Unexpected Multimedia Options Flow step'||
+      reason==='Invalid configuration response'||
+      reason==='Unsupported Multimedia settings action'?'setup_flow_changed':
+      'setup_flow_failed';
+    return this.t(key);
+  }
   blockWholeHomeNavigation(){
     if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)){
       this._optionsError=this.t('whole_home_leave_warning');
@@ -412,8 +425,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
           this._wholeHome.device=device;
       }
-    }catch(_){
-      if(epoch===this._optionsEpoch){this._wholeHomeFlow=false;this._optionsError=this.t('setup_flow_failed');}
+    }catch(error){
+      if(epoch===this._optionsEpoch){this._wholeHomeFlow=false;this._optionsError=this.settingsFlowFailure(error);}
     }finally{
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }
@@ -444,8 +457,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         this._optionsStep=null;this._optionsData={};
         this._optionsError=this.t('setup_flow_failed');
       }
-    }catch(_){
-      if(epoch===this._optionsEpoch)this._optionsError=this.t('setup_flow_failed');
+    }catch(error){
+      if(epoch===this._optionsEpoch)this._optionsError=this.settingsFlowFailure(error);
     }finally{
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }

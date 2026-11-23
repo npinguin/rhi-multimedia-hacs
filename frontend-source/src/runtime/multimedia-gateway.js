@@ -154,9 +154,12 @@ const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
 ]));
 async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',
   phase='',operation='',index=null,device='',stepType=''}){
-  if(hass?.user?.is_admin!==true||typeof hass.callWS!=='function'||
-     typeof hass.callApi!=='function'||!RHI_MM_OPTION_ACTIONS.has(action))
-    throw new Error('Multimedia configuration is not authorized');
+  if(hass?.user?.is_admin!==true)
+    throw new Error('Multimedia admin permission required');
+  if(typeof hass.callWS!=='function'||typeof hass.callApi!=='function')
+    throw new Error('Native HA configuration API unavailable');
+  if(!RHI_MM_OPTION_ACTIONS.has(action))
+    throw new Error('Unsupported Multimedia settings action');
   const entries=await hass.callWS({type:'config_entries/get',domain:'rhi_multimedia'});
   const matched=Array.isArray(entries)?entries.filter(e=>
     e?.domain==='rhi_multimedia'&&e.supports_options===true&&
