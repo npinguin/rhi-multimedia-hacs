@@ -1109,6 +1109,16 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
     async def _complete_setup_form(self, text=None, errors=None):
         from .validation import native_state
         areas = area_choices(self.hass)
+        # Floor/Area ownership remains native HA. The editor renders a live
+        # read-only topology and links to HA's own Floor/Area manager for CRUD.
+        floors, area_floors = {}, {}
+        try:
+            from homeassistant.helpers import area_registry as ar, floor_registry as fr
+            floors = {f.floor_id: f.name for f in fr.async_get(self.hass).async_list_floors()}
+            area_floors = {a.id: getattr(a, "floor_id", None)
+                           for a in ar.async_get(self.hass).async_list_areas()}
+        except (ImportError, AttributeError, RuntimeError):
+            pass  # Optional fixture/old HA: never fabricate a physical floor.
         discovered, discovery_origin = discovered_av_sources(self.hass)
         logical_devices, _ = logical_av_catalog(self.hass, self._rooms)
         proposals = proposed_room_setup(self.hass, self._rooms)
@@ -1139,6 +1149,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 continue
             state = native_state(self.hass, src.entity_id)
             attrs = getattr(state, "attributes", {}) or {} if state else {}
+            from homeassistant.components.media_player import MediaPlayerEntityFeature
+            native_features = attrs.get("supported_features")
+            can_play = (type(native_features) is int
+                        and bool(native_features & MediaPlayerEntityFeature.PLAY))
             label = attrs.get("friendly_name")
             sources.append({
                 "entity": src.entity_id,
@@ -1165,6 +1179,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                          else src.entity_id,
                 "source_list": source_lists(self.hass, src.entity_id)["source_list"],
                 "sound_mode_list": source_lists(self.hass, src.entity_id)["sound_mode_list"],
+                "native_can_play": can_play,
             })
         if text is None:
             text = json.dumps({
@@ -1185,6 +1200,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             }),
             description_placeholders={
                 "areas_json": json.dumps(areas, ensure_ascii=False),
+                "floors_json": json.dumps(floors, ensure_ascii=False),
+                "area_floors_json": json.dumps(area_floors, ensure_ascii=False),
                 "sources_json": json.dumps(sources, ensure_ascii=False),
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
                 "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),

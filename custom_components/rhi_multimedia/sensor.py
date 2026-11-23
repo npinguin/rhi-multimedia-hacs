@@ -30,10 +30,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
         key: LogicalAssetSensor(context, entry.entry_id, key, value)
         for key, value in sorted(assets.items())
     }
+    native_links = {
+        key: NativeSourceSensor(context, entry.entry_id, key, value)
+        for key, value in sorted(assets.items())
+    }
     room_sensors = [RoomSensor(context, entry.entry_id, room, kind)
                     for room in rooms for kind in ("status", "sources")]
     planning = [PlanningTargetsSensor(context, entry.entry_id)] if engine else []
-    async_add_entities(room_sensors + list(projected.values()) + planning)
+    async_add_entities(room_sensors + list(projected.values()) +
+                       list(native_links.values()) + planning)
 
     # A no-room setup still receives bounded native state readback for its
     # supported, discovered logical AV devices. Configured rooms already
@@ -78,10 +83,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for asset_id, spec in current.items():
             if asset_id in projected:
                 projected[asset_id].update_spec(spec)
+                native_links[asset_id].update_spec(spec)
             else:
                 entity = LogicalAssetSensor(context, entry.entry_id, asset_id, spec)
+                native_link = NativeSourceSensor(context, entry.entry_id, asset_id, spec)
                 projected[asset_id] = entity
-                additions.append(entity)
+                native_links[asset_id] = native_link
+                additions.extend((entity, native_link))
         if additions:
             async_add_entities(additions)
         # Keep stable native HA entity/device identity when a published
@@ -89,6 +97,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         for asset_id, entity in projected.items():
             if asset_id not in current:
                 entity.mark_unpublished()
+                native_links[asset_id].mark_unpublished()
         refresh_watch()
         async_dispatcher_send(hass, EVENT_UPDATE, "*")
 
@@ -338,6 +347,68 @@ class LogicalAssetSensor(SensorEntity):
                              self.device["entity"])
                          else "native_ha_state" if self._fresh_native(state)
                          else "native_state_unavailable"),
+        }
+
+
+class NativeSourceSensor(SensorEntity):
+    """Diagnostic source identity on the logical HA device, never a clone.
+
+    Source and companion entities remain registered to their native vendor
+    HA device. This one diagnostic projection survives provider outages so the
+    owner can locate and repair the exact source without identity loss.
+    """
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _unrecorded_attributes = frozenset({"native_device_id", "related_source_entities"})
+
+    def __init__(self, context, entry_id: str, asset_id: str, spec: dict):
+        self.context = context
+        self.asset_id = asset_id
+        self.update_spec(spec)
+        self._attr_unique_id = f"{entry_id}:asset:{asset_id}:native_source"
+        self._attr_name = "Native source"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"asset:{entry_id}:{asset_id}")},
+            manufacturer="Robotix",
+            model="Logical " + spec.get("logical_type", "media_player").replace("_", " ").title(),
+            name=spec["device"].get("name") or spec["device"]["entity"].rsplit(".", 1)[-1],
+        )
+
+    def update_spec(self, spec):
+        self.source_published = True
+        self.source_entity_id = spec["device"]["entity"]
+        self.native_device_id = spec.get("native_device_id")
+        self.related_entities = tuple(spec.get("source_entities") or ())
+        self.room_ids = tuple(sorted(spec.get("rooms") or ()))
+
+    def mark_unpublished(self):
+        self.source_published = False
+
+    async def async_added_to_hass(self):
+        self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
+
+    @callback
+    def _changed(self, _room):
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self):
+        return self.source_entity_id if self.source_published else None
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "source_entity_id": self.source_entity_id,
+            "native_device_id": self.native_device_id,
+            "rooms": list(self.room_ids),
+            "related_source_entities": [
+                {"entity_id": x["entity_id"], "provider": x.get("provider"),
+                 "availability": x.get("availability")}
+                for x in self.related_entities
+            ],
+            "source_published": self.source_published,
         }
 
 

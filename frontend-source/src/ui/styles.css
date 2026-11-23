@@ -524,7 +524,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-wh-header p{font-size:12px;color:#5f7994}
 .mm-wh-draft{border:1px solid #c8d9ea;border-radius:9px;padding:7px 10px;
   background:#f0f7ff;color:#2e638f;font-weight:650;font-size:11px}
-.mm-wh-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mm-wh-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .mm-wh-tabs button{display:flex;justify-content:center;align-items:center;gap:8px;
   min-height:48px;padding:9px;border:1px solid #d2deeb;border-radius:9px;
   background:#fff;color:#315c80;font-size:12px;font-weight:700;cursor:pointer}
@@ -589,3 +589,31 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
   .mm-wh-step label{grid-column:2}
   .mm-wh-step-actions{grid-column:1/-1}
 }
+
+/* Dedicated native-discovery workspace reuses the single HA Options Flow. */
+.mm-wh-discovery{grid-template-columns:minmax(0,2.1fr) minmax(230px,1fr)}
+.mm-wh-searchfilters{display:grid;grid-template-columns:minmax(150px,1.5fr) repeat(2,minmax(110px,1fr));gap:8px}
+.mm-wh-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.mm-wh-heading h4{margin:0}
+.mm-wh-heading p{font-size:12px;color:#617b95}
+.mm-wh-tablewrap{overflow-x:auto;max-width:100%;border:1px solid #d9e5f1;border-radius:10px}
+.mm-wh-table{border-collapse:collapse;width:100%;min-width:650px;font-size:11px}
+.mm-wh-table th{background:#f1f6fc;text-align:left;color:#385c78;font-weight:700;padding:9px 8px}
+.mm-wh-table td{padding:9px 8px;border-top:1px solid #e4edf6;vertical-align:middle;color:#365a78}
+.mm-wh-table td button{min-height:36px!important;text-align:left}
+.mm-wh-table td small{display:block;font-size:10px;color:#67829e}
+.mm-wh-table tr.mm-wh-rowactive{background:#e9f3ff}
+.mm-wh-bulk{display:flex;align-items:end;gap:9px;flex-wrap:wrap;padding:10px;
+  background:#f1f6fc;border:1px solid #d8e6f3;border-radius:10px}
+.mm-wh-bulk label{flex:1;min-width:170px}
+.mm-wh-bulk strong{font-size:12px}
+.mm-wh-detail{min-height:250px}
+.mm-wh-native-link{display:inline-flex;align-items:center;min-height:40px;padding:7px 12px;
+  color:#185e99;font-size:12px;font-weight:700;border:1px solid #bcd5ef;border-radius:9px;
+  text-decoration:none;background:#f2f7ff}
+@media(max-width:1050px){.mm-wh-discovery{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){.mm-wh-searchfilters{grid-template-columns:1fr}
+  .mm-wh-table{min-width:600px}.mm-wh-bulk{align-items:stretch}.mm-wh-bulk label{width:100%}}
+
+.mm-wh-floor-group{display:grid;gap:7px;padding:9px;background:#f6f9fd;border:1px solid #d9e7f3;border-radius:10px}
+.mm-wh-floor-group>strong{font-size:12px;color:#254e74}

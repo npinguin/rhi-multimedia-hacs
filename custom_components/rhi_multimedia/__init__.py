@@ -25,7 +25,7 @@ from .validation import validate_rooms, validate_step_delay
 from .foundation import SELECTION_CHANGED_EVENT, register_with_foundation, unregister_visuals_with_foundation
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR, Platform.SELECT, Platform.BUTTON, Platform.NOTIFY]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR, Platform.SELECT, Platform.SWITCH, Platform.NUMBER, Platform.BUTTON, Platform.NOTIFY]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
@@ -55,9 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         # Supported logical AV devices are read-only HA projections even
         # before the first room/activity. No command service or activity engine
         # is registered by this empty-configuration path.
-        presentations = [Platform.SENSOR]
-        if dell_configured:
-            presentations.insert(0, Platform.MEDIA_PLAYER)
+        # The source-backed read-only logical players are also present before
+        # rooms are configured. Dell remains optional and independently native.
+        presentations = [Platform.MEDIA_PLAYER, Platform.SENSOR]
         await hass.config_entries.async_forward_entry_setups(entry, presentations)
         _register_entry_listeners(hass, entry)
         return True
@@ -300,8 +300,9 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     if hass.data.get(DOMAIN, {}).get("phase") in {
         "awaiting_foundation_configuration", "legacy_foundation_review_required"
     }:
-        prepared = bool(hass.data[DOMAIN].get("dell_prepared"))
-        if prepared and not await hass.config_entries.async_unload_platforms(entry, [Platform.MEDIA_PLAYER]):
+        if (hass.data[DOMAIN].get("phase") == "awaiting_foundation_configuration"
+                and not await hass.config_entries.async_unload_platforms(
+                    entry, [Platform.MEDIA_PLAYER, Platform.SENSOR])):
             return False
         hass.data.pop(DOMAIN, None)
         unregister_visuals_with_foundation(hass)

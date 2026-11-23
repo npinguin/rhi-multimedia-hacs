@@ -1,5 +1,5 @@
 // Existing native room status entities own the resident-facing properties.
-const RHI_MM_VIEWS = Object.freeze(['overview','settings','insights','rooms','activities','devices','diagnostics']);
+const RHI_MM_VIEWS = Object.freeze(['overview','settings','discovery','insights','rooms','activities','devices','diagnostics']);
 const RHI_MM_PHASES = ['idle','starting','active','partial','stopping','interrupted','error'];
 
 function rhiMmRooms(hass) {

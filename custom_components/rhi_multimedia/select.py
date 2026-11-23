@@ -6,12 +6,23 @@ from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN, EVENT_UPDATE
+from .device_preferences import LogicalDeviceSetting, configured_logical_specs, POWER_MODES, ROLES
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     context = hass.data[DOMAIN]
-    async_add_entities([RoomActivitySelect(context, entry.entry_id, room)
-                        for room in context["engine"].rooms])
+    engine = context.get("engine")
+    if not engine:
+        return
+    entities = [RoomActivitySelect(context, entry.entry_id, room) for room in engine.rooms]
+    for asset_id, spec in sorted(configured_logical_specs(hass, engine.rooms).items()):
+        entities.append(LogicalSettingSelect(context, entry.entry_id, asset_id, spec,
+                                             "power_mode", "Power mode", sorted(POWER_MODES)))
+        if sum(1 for room in engine.rooms.values() for device in room.get("devices", {}).values()
+               if device.get("asset_id", device.get("physical_id", device["entity"])) == asset_id) == 1:
+            entities.append(LogicalSettingSelect(context, entry.entry_id, asset_id, spec,
+                                                 "role", "Role", sorted(ROLES)))
+    async_add_entities(entities)
 
 
 class RoomActivitySelect(SelectEntity):
@@ -51,3 +62,18 @@ class RoomActivitySelect(SelectEntity):
             raise ValueError(f"Unknown activity: {option}")
         await self.context["adapter"].with_context(getattr(self, "_context", None),
             self.context["engine"].command(self.room, None if option == "off" else option))
+
+
+class LogicalSettingSelect(LogicalDeviceSetting, SelectEntity):
+    def __init__(self, context, entry_id, asset_id, spec, prop, label, options):
+        super().__init__(context, entry_id, asset_id, spec, prop, label)
+        self._attr_options = options
+
+    @property
+    def current_option(self):
+        return self._value()
+
+    async def async_select_option(self, option: str):
+        if option not in self._attr_options:
+            raise ValueError("Unsupported Multimedia device option")
+        await self._set(option)

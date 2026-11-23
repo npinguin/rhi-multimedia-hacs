@@ -55,6 +55,7 @@ const MM_MODULES = [
   // One screen per module: do not render a redundant second-level Overview.
   {id:'overview',label:'Overview',target:'overview',items:[]},
   {id:'settings',label:'Settings',target:'settings',items:[]},
+  {id:'discovery',label:'Discovery',target:'discovery',items:[]},
   {id:'insights',label:'Insights',target:'insights',items:[]},
 ];
 
@@ -129,7 +130,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
     this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;
     this._onLocation=()=>{
-      if(!['settings','activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
+      if(!['settings','discovery','activities','devices'].includes(this.currentRoute().view)&&(this._optionsStep||this._optionsBusy)){
         void this.cancelOptions();
       }else{this._lastSignature='';this.render();}
     };
@@ -302,7 +303,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const nav=event.target?.closest?.('[data-nav]');
     if(nav){event.preventDefault();if(this.blockWholeHomeNavigation())return;
       if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
-      this.navigate(nav.getAttribute('data-nav'),nav.getAttribute('data-room')||'');return;}
+      const next=nav.getAttribute('data-nav');
+      this.navigate(next,nav.getAttribute('data-room')||'');
+      if(next==='discovery'&&this._hass?.user?.is_admin===true)
+        await this.openOptions({action:'complete_setup'});
+      return;}
     const more=event.target?.closest?.('[data-more-info]');
     if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');if(entityId)this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));return;}
     const shortcut=event.target?.closest?.('[data-mm-shortcut]');
@@ -610,9 +615,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(this._lastSignature!==fingerprint){
       this._lastSignature=fingerprint;
       const activeModule=['settings','activities','devices'].includes(route.view)?'settings':
+        route.view==='discovery'?'discovery':
         ['insights','diagnostics'].includes(route.view)?'insights':'overview';
       const shell=rhiUxDomainShell({product:'Home Intelligence',domain:'MULTIMEDIA',
-        modules:MM_MODULES.map(m=>({...m,label:this.t(m.id)})),activeModule,activeItem:''});
+        modules:MM_MODULES.map(m=>({...m,label:m.id==='discovery'?'Discovery':this.t(m.id)})),activeModule,activeItem:''});
       const page=this.renderPage(model,route.view,route.room);
       const footer=rhiUxTechnicalFooter({product:'RHI Multimedia',uxVersion:RHI_MM_UX_VERSION,backendVersion:model.ready?model.backendVersion:this.t('not_published'),issue:!model.ready?this.t('backend_unavailable'):((model.summary.attention_rooms||model.unavailable)?this.t('attention'):this.t('ready')),severity:!model.ready?'warning':(model.summary.attention_rooms||model.unavailable)?'warning':''});
       if(!this.shadowRoot.querySelector?.('[data-mm-page]')){
@@ -706,10 +712,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   hero(view){
     const group=view==='overview'||view==='rooms'?'multimedia':
-      view==='settings'||view==='activities'?'activities':'insights';
+      view==='settings'||view==='activities'||view==='discovery'?'activities':'insights';
     const hero=rhiUxPageHero({
       title:this.t(view==='overview'?'overview_title':view),
-      description:this.t('hero_'+view),
+      description:this.t(view==='discovery'?'hero_settings':'hero_'+view),
       image:rhiMmHeroAsset(group),
       imageAlt:this.t('hero_art_'+group),
     });
@@ -722,14 +728,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
   renderPage(model,view,roomId) {
     // A full-house editing session deserves the available iPad canvas, not
     // the marketing hero and separate read-only Settings cards.
-    if(view==='settings'&&this._wholeHomeFlow&&this._optionsStep&&
+    if(['settings','discovery'].includes(view)&&this._wholeHomeFlow&&this._optionsStep&&
         this._hass?.user?.is_admin===true)
       return `<section class='mm-page-whole-home'>${this.renderOptionsEditor()}</section>`;
     const hero=this.hero(view);
     if(!model.ready){
       // A first-time installer must be able to reach the authoritative
       // Options Flow even before any room sensor exists.
-      const firstSetup=view==='settings'&&this._hass?.user?.is_admin?
+      const firstSetup=['settings','discovery'].includes(view)&&this._hass?.user?.is_admin?
         this.settings({rooms:[]}):view==='activities'&&this._hass?.user?.is_admin?
         this.activities({rooms:[]}):'';
       const editor=''; // Editors live exclusively in Settings and its configuration workspaces.
@@ -740,7 +746,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const status='';
     const content={
       overview:()=>this.overview(model),rooms:()=>this.rooms(model,roomId),activities:()=>this.activities(model),
-      settings:()=>this.settings(model),insights:()=>this.insights(model),
+      settings:()=>this.settings(model),discovery:()=>this.discovery(model),insights:()=>this.insights(model),
       devices:()=>this.devices(model),diagnostics:()=>this.diagnostics(model,roomId),
     }[view]||(()=>this.overview(model));
     const editor=''; // Editors live exclusively in Settings and its configuration workspaces.
@@ -1349,6 +1355,19 @@ class HomeBrainMultimediaCard extends HTMLElement {
         ${rhiUxEscape(link.skipped.join(', '))}</span></div>`;
     }));
     const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length||cec.length?`<div class="mm-device-list">${cec.join('')}${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
+  discovery(model){
+    if(this._optionsStep?.step_id==='complete_setup'&&this._hass?.user?.is_admin===true)
+      return this.renderOptionsEditor();
+    return `<section class="mm-surface mm-discovery-launch">
+      <h3>Discover and assign devices</h3>
+      <p>All supported native TVs, audio zones and players, with room-based
+         filtering and bulk assignment. Configure WOL, HDMI-CEC, roles and
+         native sources in one Review and Save.</p>
+      ${this._hass?.user?.is_admin===true?
+        '<button type="button" data-mm-option-action="complete_setup">Open device discovery</button>':
+        '<p>Ask your Home Assistant administrator to configure devices.</p>'}
+    </section>`;
+  }
   settings(model){
     if(this._optionsStep?.step_id==='complete_setup'&&this._hass?.user?.is_admin===true)
       return this.renderOptionsEditor();
