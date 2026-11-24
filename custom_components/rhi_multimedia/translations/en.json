@@ -170,10 +170,11 @@
       },
       "review": {
         "title": "Review and save",
-        "description": "Review the actual selected devices and input routes below. Deferred means the device must be awake before verification. Unchanged unavailable links are retained. No physical commands are sent.\n\n{summary}",
+        "description": "Review the actual selected devices and input routes below. Deferred means the device must be awake before verification. Unchanged unavailable links are retained. No physical commands are sent.\n\n{summary}\n\n{validation_detail}",
         "data": {
           "confirm": "Save Multimedia configuration",
-          "confirm_remove": "I confirm deleting the listed rooms"
+          "confirm_remove": "I confirm deleting the listed items",
+          "return_to_yaml": "Return to YAML"
         }
       },
       "validate_room_update": {
@@ -281,10 +282,11 @@
       },
       "yaml": {
         "title": "YAML import (advanced)",
-        "description": "{note}",
+        "description": "{note}\n\n{validation_detail}",
         "data": {
           "mode": "Update mode",
-          "yaml_text": "Multimedia rooms.yaml (complete room definitions)"
+          "yaml_text": "Multimedia rooms.yaml (complete room definitions)",
+          "visual_edit": "Edit visually"
         }
       },
       "speech_endpoint": {

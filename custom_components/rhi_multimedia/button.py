@@ -9,10 +9,10 @@ from __future__ import annotations
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from .const import DOMAIN, EVENT_UPDATE
-from .experience import build_room
+from .experience import NativeUpdate, RoomUpdate, build_room, queue_native_update
 from .foundation import selected_index
 from .device_preferences import (
     LogicalDeviceSetting, configured_logical_specs, async_test_asset_wol,
@@ -48,17 +48,25 @@ class ActivityButton(ButtonEntity):
 
     async def async_added_to_hass(self):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
-        # Publisher may have been registered before the button entity.
-        async_dispatcher_send(self.hass, EVENT_UPDATE, self.room)
+        # Planning may have been registered before this button. Scope and
+        # bundle registration refreshes rather than broadcasting every button.
+        queue_native_update(self.hass, self.context, None, {self.room})
 
     @callback
-    def _changed(self, room):
-        # A shared source can change eligibility in more than one room.
-        self.async_write_ha_state()
+    def _changed(self, update):
+        if isinstance(update, NativeUpdate) and self.room not in update.rooms:
+            return
+        self._native_update = update if isinstance(update, (NativeUpdate, RoomUpdate)) else None
+        try:
+            self.async_write_ha_state()
+        finally:
+            self._native_update = None
 
     @property
     def available(self):
-        experience = build_room(self.context, self.hass, selected_index(self.hass), self.room)
+        update = getattr(self, "_native_update", None)
+        experience = (update.room_model(self.context, self.hass, self.room) if update else
+                      build_room(self.context, self.hass, selected_index(self.hass), self.room))
         target = next((a for a in experience["activities"] if a["id"] == self.activity), None)
         return bool(target and target["available"] and
                     experience["control_owner"] == "multimedia" and

@@ -11,7 +11,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, EVENT_UPDATE
 from .engine import MediaError
-from .experience import logical_asset_id
+from .experience import NativeUpdate, logical_asset_id
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -51,8 +51,11 @@ class SpeechNotify(NotifyEntity):
                 self.hass, [target.entity_id], self._changed))
 
     @callback
-    def _changed(self, *_args):
-        self.async_write_ha_state()
+    def _changed(self, *args):
+        update = args[0] if args else None
+        if not isinstance(update, NativeUpdate) or any(
+                room in update.rooms for room, _ in self.bindings):
+            self.async_write_ha_state()
 
     @property
     def available(self):

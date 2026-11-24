@@ -54,9 +54,13 @@ control_device:
       selector:
         text:
     value:
-      description: Optional source, sound mode, remote key, volume (0–1), mute boolean, or offered native group peer.
+      description: Optional source, sound mode, remote key, volume (0–1), seek seconds, mute boolean, or offered native group peer.
       selector:
         object:
+    expected_activity:
+      description: Optional current activity identity for focus-sensitive commands.
+      selector:
+        text:
 
 press_activity_button:
   name: Press assigned activity button

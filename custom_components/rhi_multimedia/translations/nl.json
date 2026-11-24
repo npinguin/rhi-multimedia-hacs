@@ -170,10 +170,11 @@
       },
       "review": {
         "title": "Controleren en opslaan",
-        "description": "Controleer hieronder de geselecteerde apparaten en ingangsroutes. Uitgesteld betekent dat het apparaat ingeschakeld moet zijn voor verificatie. Ongewijzigde onbeschikbare koppelingen blijven behouden. Er worden geen fysieke opdrachten verstuurd.\n\n{summary}",
+        "description": "Controleer hieronder de geselecteerde apparaten en ingangsroutes. Uitgesteld betekent dat het apparaat ingeschakeld moet zijn voor verificatie. Ongewijzigde onbeschikbare koppelingen blijven behouden. Er worden geen fysieke opdrachten verstuurd.\n\n{summary}\n\n{validation_detail}",
         "data": {
           "confirm": "Multimedia-configuratie opslaan",
-          "confirm_remove": "Ik bevestig het verwijderen van de vermelde ruimtes"
+          "confirm_remove": "Ik bevestig het verwijderen van de vermelde items",
+          "return_to_yaml": "Terug naar YAML"
         }
       },
       "validate_room_update": {
@@ -295,10 +296,11 @@
       },
       "yaml": {
         "title": "YAML-import (geavanceerd)",
-        "description": "{note}",
+        "description": "{note}\n\n{validation_detail}",
         "data": {
           "mode": "Wijzigingsmodus",
-          "yaml_text": "Multimedia rooms.yaml (volledige ruimtedefinities)"
+          "yaml_text": "Multimedia rooms.yaml (volledige ruimtedefinities)",
+          "visual_edit": "Visueel bewerken"
         }
       },
       "speech_endpoint": {

@@ -14,8 +14,11 @@ function rhiMmWholeFromStep(step){
   const logicalDevices=JSON.parse(context.logical_devices_json||'[]');
   const proposedRooms=JSON.parse(context.proposed_rooms_json||'{}');
   const proposalExceptions=JSON.parse(context.proposal_exceptions_json||'[]');
-  const room=Object.keys(doc.rooms)[0]||'';
-  return {doc,areas,floors,areaFloors,sources,logicalDevices,proposedRooms,proposalExceptions,room,device:'',activity:'',tab:'discovery',
+  const localScope=JSON.parse(context.expert_scope_json||'null');
+  const room=localScope?.[1]||Object.keys(doc.rooms)[0]||'';
+  const tab=localScope?({room:'rooms',device:'devices',activity:'activities'})[localScope[0]]:'discovery';
+  return {doc,areas,floors,areaFloors,sources,logicalDevices,proposedRooms,proposalExceptions,localScope,room,
+    device:localScope?.[0]==='device'?localScope[2]:'',activity:localScope?.[0]==='activity'?localScope[2]:'',tab,
     catalogFilter:'all',catalogType:'all',catalogQuery:'',bulkRoom:room,selectedAssets:[],detailAsset:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
     newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:''};
 }
@@ -25,6 +28,7 @@ function rhiMmWholeSlug(name){
     .replace(/^_+|_+$/g,'');
 }
 function rhiMmWholeForPhysical(d,device,mutate){
+  if(d.localScope){mutate(device);return;} // Expert scope never edits sibling bindings.
   const physical=device.physical_id||device.entity;
   for(const room of Object.values(d.doc.rooms||{})){
     for(const current of Object.values(room.devices||{})){
@@ -69,6 +73,12 @@ function rhiMmWholeVerifiedMacs(d,device){
   return matches.length===1?matches[0].verified_macs||[]:[];
 }
 function rhiMmWholeCurrent(d){
+  if(d.localScope){
+    const [scope,room,id]=d.localScope;
+    d.room=room;d.tab=({room:'rooms',device:'devices',activity:'activities'})[scope];
+    if(scope==='device')d.device=id;
+    if(scope==='activity')d.activity=id;
+  }
   const room=d.doc.rooms[d.room];
   if(room){
     if(!Object.prototype.hasOwnProperty.call(room.devices||{},d.device))
@@ -78,9 +88,38 @@ function rhiMmWholeCurrent(d){
   }
   return {room,device:room?.devices?.[d.device],activity:room?.activities?.[d.activity]};
 }
+function rhiMmWholeIssues(d){
+  const detail=d.validationDetail||'';
+  const groups=new Map(),general=[];
+  for(const line of [...new Set(detail.split('\n').filter(Boolean))]){
+    const match=/^(rooms\.([a-z][a-z0-9_]*)(?:\.(devices|activities)\.([a-z][a-z0-9_]*))?(?:\.[a-z_]+(?:\[\d+\])?)*):\s*(.*)$/.exec(line);
+    if(!match||!d.doc.rooms[match[2]]){general.push(line);continue;}
+    const [,path,roomId,kind,key,reason]=match;
+    const room=d.doc.rooms[roomId];
+    const object=kind?room[kind]?.[key]:room;
+    // Field-specific messages are the repair actions; retain exact technical
+    // details separately. Avoid repeating the same room-level validation error.
+    let message=reason;
+    if(path.endsWith('.entity'))message='Choose the existing Home Assistant device.';
+    else if(path.endsWith('.area_id'))message='Choose the room in Home Assistant.';
+    else if(path.endsWith('.foundation_candidate_id'))message='Link the exact discovered device.';
+    else if(path.endsWith('.candidates')&&kind==='activities')message='Choose a verified native input for this activity.';
+    const group=groups.get(roomId)||{name:room.name||roomId,items:[]};
+    group.items.push({path,object:object?.name||key||room.name||roomId,message,kind});
+    groups.set(roomId,group);
+  }
+  for(const group of groups.values()){
+    group.items=group.items.filter(item=>item.kind||!group.items.some(other=>
+      other.kind&&item.message.includes('/'+other.path.split('.')[3]+':')&&
+      other.path.endsWith('.entity')&&item.message.includes('requires native media_player or remote entity')));
+  }
+  return {groups:[...groups.values()],general};
+}
 function rhiMmWholeRender(d,t,escape){
   const e=escape;
   if(!d)return `<p role='alert'>Unable to read the saved Multimedia configuration.</p>`;
+  const local=!!d.localScope;
+  const specialist=(id,label)=>local?'':`<button type='button' data-wh-action='specialist' data-wh-id='${id}'>${escape(label)}</button>`;
   const entry=(id,label,active,action)=>`<button type='button' data-wh-action='${action}'
     data-wh-id='${e(id)}' aria-pressed='${active}'>${e(label)}</button>`;
   const field=(key,value,kind='text',extra='')=>{
@@ -100,7 +139,7 @@ function rhiMmWholeRender(d,t,escape){
   // The main product tabs already select Discovery vs Settings. Only Settings
   // needs the Rooms/Devices/Activities *object categories* as local navigation.
   // No second competing Discovery tab in the whole-home editor.
-  const localSections=d.workspace==='discovery'?[]:
+  const localSections=local||d.workspace==='discovery'?[]:
     d.workspace==='settings'?sections.filter(x=>x[0]!=='discovery'):sections;
   const rooms=Object.entries(d.doc.rooms);
   const {room,device,activity}=rhiMmWholeCurrent(d);
@@ -128,7 +167,7 @@ function rhiMmWholeRender(d,t,escape){
   const verifiedMacs=rhiMmWholeVerifiedMacs(d,selectedDevice);
   const sameNativeCandidates=d.sources.filter(s=>s.entity===selectedDevice?.entity&&
     s.concept===selectedDevice?.foundation_concept);
-  const unresolvedDevice=String(selectedDevice?.entity||'').startsWith('REPLACE_WITH_');
+  const unresolvedDevice=!!selectedDevice&&(String(selectedDevice.entity||'').startsWith('REPLACE_WITH_')||!sameNativeCandidates.length);
   const resolveChoices=d.sources.map((source,index)=>[String(index),source]).filter(([,source])=>
     source.concept===selectedDevice?.foundation_concept&&!source.review_reason&&
     source.entity_registry_id&&source.config_entry_id&&source.candidate&&
@@ -281,7 +320,7 @@ function rhiMmWholeRender(d,t,escape){
       `:'<p>Pick any device in the table to view exact native sources and configure its role, power and CEC.</p>'}
     </section></div>`;
   }else if(d.tab==='rooms'){
-    content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
+    content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
       <h4>Home structure <small>Native HA Floor / Area</small></h4>
       ${roomButtons||'<p>No rooms configured yet</p>'}
       <a class='mm-wh-native-link' href='/config/areas/dashboard'>Create, edit or remove floors and Areas in Home Assistant</a>
@@ -306,11 +345,12 @@ function rhiMmWholeRender(d,t,escape){
           <label>New Room Area ${field('new_room_area',d.newRoomArea)}</label>
           <button type='button' data-wh-action='add_room_area'>Add Room Area</button>
         </details>
+        <details><summary>Advanced room settings</summary>${specialist('harmony_owner','Harmony / Premium ownership')}${specialist('speech_endpoint','Speaker announcements')}${specialist('cec_device','HDMI-CEC device policy')}${specialist('tv_wake','Device wake settings')}</details>
         <p>${Object.keys(room.devices||{}).length} devices · ${Object.keys(room.activities||{}).length} activities</p>
-        <button type='button' class='danger' data-wh-action='delete_room'>Remove room</button>`:''}
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_room'>Remove room</button>`}`:''}
     </section></div>`;
   }else if(d.tab==='devices'){
-    content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
+    content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
       <h4>Devices · ${e(room?.name||'No room')}</h4>
       <div class='mm-wh-list'>${deviceRows.map(([id,x])=>entry(id,x.name||id,id===currentDevice,'select_device')).join('')}</div>
       <h4>Assign supported device</h4>
@@ -320,20 +360,22 @@ function rhiMmWholeRender(d,t,escape){
       <small>Source binding and explicit control choice are reviewed together in one Multimedia Save; no separate Foundation wizard.</small>
     </section><section class='mm-wh-panel'>
       <h4>${e(selectedDevice?.name||'Select a device')}</h4>
-      ${selectedDevice?`<small>${e(selectedDevice.entity||'')} · ${e(selectedDevice.foundation_concept||'')} · ${e(currentDevice)}</small>
+      ${selectedDevice?`<small>${e(selectedDevice.name||currentDevice)} · ${e(selectedDevice.foundation_concept||'')}</small>
         <label>Display name${field('device_name',selectedDevice.name||'')}</label>
         <label class='mm-wh-check'>Enable native Premium controls after Review &amp; Save ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
         <small>Allowed only for this exact currently registered Foundation/native identity; HA permissions and capabilities are rechecked before each command.</small>
         ${unresolvedDevice?`<label>Choose the actual device for this role
           ${select('device_resolve','',[['','Select compatible native device'],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||'Area not assigned')+' · '+s.provider])])}</label>
-          <small>The room role and activity references are preserved. No device is started.</small>`:
+          <small>The room role and activity references are preserved. A replacement device needs fresh control approval. No device is started.</small>
+          ${!resolveChoices.length?`<p class='mm-muted'>No compatible native device is currently discovered. Check the Home Assistant integration and refresh discovery.</p>`:''}`:
           `<details><summary>Native device identity</summary><label>Foundation candidate
           ${select('device_candidate',currentCandidate,nativeBindingChoices,sameNativeCandidates.length?'':'disabled')}</label></details>`}
-        ${!bindingCurrent?`<p class='mm-room-error'>Native source no longer present in
-          Foundation-supported discovery. Review this exact binding.</p>`:
+        ${unresolvedDevice?`<p class='mm-room-error'>Device link is missing. Choose an existing native device above.</p>`:
+          !bindingCurrent?`<p class='mm-room-error'>The saved link needs review. Select its current native candidate.</p>`:
           sameNativeCandidates.every(x=>!x.approved)?
-          '<p class="mm-room-error">Discovered source · command approval pending.</p>':''}
-        <details><summary>Related native source entities</summary>
+          '<p class="mm-room-error">Device is linked; control approval is pending.</p>':
+          sameNativeCandidates.every(x=>!x.available)?'<p class="mm-muted">Device is linked but currently unavailable. Keep its identity; check native connectivity when needed.</p>':''}
+        <details><summary>Native identity and related entities</summary><p class='mm-selectable'>${e(selectedDevice.entity||'')} · ${e(currentDevice)}</p>
           ${(d.sources.find(x=>x.entity===selectedDevice.entity&&
             x.candidate===selectedDevice.foundation_candidate_id)?.related_entities||[])
             .map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.provider||x.domain||'native')}
@@ -364,7 +406,7 @@ function rhiMmWholeRender(d,t,escape){
             '<small>Passive mode disables direct power-on. Choose Native power behaviour to use WOL.</small>':''}
         </details>
         <small>HDMI-CEC and Wake-on-LAN are separate options. Shared physical devices keep a single power and CEC policy.</small>
-        <button type='button' class='danger' data-wh-action='delete_device'>Remove device</button>`:''}
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_device'>Remove device</button>`}`:''}
     </section></div>`;
   }else{
     const cast=selectedActivity?.devices||[];
@@ -420,7 +462,7 @@ function rhiMmWholeRender(d,t,escape){
         <button type='button' data-wh-action='step_add' data-phase='${phase}' ${cast.length?'':'disabled'}>Add ${phase==='steps'?'start':'stop'} action</button>
       </section>`;
     };
-    content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
+    content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
       <h4>Activities · ${e(room?.name||'No room')}</h4>
       <div class='mm-wh-list'>${activityRows.map(([id,x])=>entry(id,x.name||id,id===currentActivity,'select_activity')).join('')}</div>
       <h4>Add activity</h4>
@@ -446,51 +488,66 @@ function rhiMmWholeRender(d,t,escape){
         <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('activity_cast:'+key,cast.includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
         <h4>Step 2 — Tune actions and sequence</h4>
         ${renderSteps('steps')}${renderSteps('stop_steps')}
-        <button type='button' class='danger' data-wh-action='delete_activity'>Remove activity</button>`:''}
+        <details><summary>Advanced activity settings</summary>${specialist('cec_activity','HDMI-CEC relationships')}${specialist('button_mapping','Remote button mapping')}${specialist('macro_manage','One-touch shortcuts')}${specialist('script_step','Detailed action editor')}</details>
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_activity'>Remove activity</button>`}`:''}
     </section></div>`;
   }
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
     <header class='mm-wh-header'><div><h2>Configure Multimedia</h2>
-      <p>Discover → Rooms → Devices → Activities · one Review and Save</p></div>
+      <p>${local?'Expert · selected object only':'Rooms · Devices · Activities'}</p></div>
       <span class='mm-wh-draft'>${d.dirty?'Unsaved changes':'Current saved configuration'}</span></header>
     ${localSections.length?`<nav class='mm-wh-tabs' aria-label='Multimedia object categories'>
       ${localSections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
         data-wh-id='${id}' aria-pressed='${d.tab===id}'>
         <ha-icon icon='${icon}'></ha-icon>${e(label)}</button>`).join('')}
     </nav>`:''}
-    ${d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>Room
+    ${!local&&d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>Room
       ${select('room_select',d.room,rooms.map(([id,r])=>[id,r.name||id]))}</label></div>`:''}
-    ${d.error?`<p class='mm-room-error' role='alert' style='white-space:pre-wrap'>${e(d.error)}</p>`:''}
-    ${d.rawDraft==null&&d.error?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>Review ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
-    ${content}
+    ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
+      <strong>${d.validationStale?'Last validation — changes not yet checked':'Configuration needs attention'}</strong>
+      <p>${d.validationStale?'Select Save to recheck the edited configuration.':'Changes are not saved. Correct the items below, then select Save again.'}</p>
+      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(item.message)}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>Fix</button>`:''}</div>`).join('')}</div>`).join('')}
+      ${issues.general.map(line=>`<p>${e(line)}</p>`).join('')}
+      <button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.validationDetail)}</textarea>
+      <details><summary>Technical details</summary><p style='white-space:pre-wrap'>${e(d.validationDetail)}</p></details>
+    </section>`;})():''}
+    ${d.error&&d.error!==d.validationDetail?`<div class='mm-room-error mm-selectable' role='alert'><p style='white-space:pre-wrap'>${e(d.error)}</p>${!d.validationDetail?`<button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.error)}</textarea>`:''}</div>`:''}
+    ${d.rawDraft==null&&d.error&&!d.validationDetail?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>Review ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
+    ${d.rawDraft==null?content:''}
     <details class='mm-wh-expert' ${d.rawDraft!=null?'open':''}>
-      <summary>Advanced preferences and complete configuration</summary>
-      <div class='mm-wh-global'>
+      <summary>${local?'Advanced YAML / JSON · selected object only':'Advanced preferences and complete configuration'}</summary>
+      <div class='mm-wh-global' ${local?"style='display:none'":''}>
         <label>Default delay between activity steps (ms)
           ${field('global_delay',d.doc.default_step_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
         <label class='mm-wh-check'>Enable Multimedia UX
           ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
       </div>
-      <h4>Expert configuration · complete YAML / JSON</h4>
-      <p>Use only when needed. Edits remain in this session until native Review/Save.
-         The current full configuration is shown; no separate settings file is created.</p>
+      ${!local&&d.rawDraft==null?`<details><summary>Local Dell display registrations</summary><small>Changes are staged in this configuration until Save. Native discovery follows registration.</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||'No registered displays'}</p>${specialist('dell_add','Add display')}${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit','Rename display')+specialist('dell_remove','Remove display'):''}</details>`:''}
+      <h4>Expert configuration · YAML / JSON</h4>
+      <p>${local?'Only the selected object can change. Other configuration is context and is checked by Home Assistant.':'Edit the complete configuration as YAML or JSON. Save applies changes; Edit visually returns to the same draft.'}</p>
       <textarea data-wh-raw spellcheck='false' rows='15'
         aria-label='Advanced complete Multimedia configuration'>${e(d.rawDraft??JSON.stringify(d.doc,null,2))}</textarea>
-      <button type='button' data-wh-action='review_yaml'>Validate YAML / JSON &amp; Review</button>
-      <button type='button' data-wh-action='discard_raw'>Discard advanced edits</button>
-      ${d.editableDraft?`<button type='button' data-wh-action='edit_import'>Edit imported configuration in GUI</button>`:''}
-      <button type='button' data-wh-action='apply_json'>Apply JSON edits to GUI draft</button>
+      <div class='mm-setup-actions'><button type='button' data-mm-copy='yaml'>${e(t('copy_yaml'))}</button><button type='button' data-mm-paste='yaml'>${e(t('paste_yaml'))}</button><span data-mm-clipboard-status role='status'></span></div>
+      <button type='button' data-wh-action='review_yaml'>Edit visually</button>
+      ${d.rawDraft!=null?`<button type='button' data-wh-action='discard_raw'>Undo YAML edits</button>`:''}
     </details>
     <footer class='mm-wh-footer'>
       <span>${rooms.length} rooms · ${rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0)} devices ·
         ${rooms.reduce((n,[,r])=>n+Object.keys(r.activities||{}).length,0)} activities</span>
-      <button type='button' class='mm-wh-save' data-wh-action='review'>Review all changes</button>
-      <button type='button' data-mm-option-cancel>Cancel all changes</button>
+      <button type='button' class='mm-wh-save' data-wh-action='review'>Save</button>
+      <button type='button' data-mm-option-cancel>Cancel</button>
     </footer>
   </section>`;
 }
 function rhiMmWholeChange(d,key,value,checked=false){
   const {room,device,activity}=rhiMmWholeCurrent(d);
+  if(d.localScope){
+    const scope=d.localScope[0];
+    const allowed=scope==='room'?key.startsWith('room_')&&key!=='room_select'||key==='new_room_area':
+      scope==='device'?key.startsWith('device_'):
+      key.startsWith('activity_')||key.startsWith('step_');
+    if(!allowed){d.error='Only the selected object can change.';return false;}
+  }
   const parts=key.split(':');
   const phase=parts[1],index=Number(parts[2]);
   const step=activity?.[phase]?.[index];
@@ -557,7 +614,9 @@ function rhiMmWholeChange(d,key,value,checked=false){
   }
   else if(key==='device_resolve'&&device){
     const source=d.sources[Number(value)];
-    if(value===''||!String(device.entity).startsWith('REPLACE_WITH_')||!source||
+    const placeholder=String(device.entity).startsWith('REPLACE_WITH_');
+    const known=d.sources.some(s=>s.entity===device.entity&&s.concept===device.foundation_concept);
+    if(value===''||(!placeholder&&known)||!source||
        source.concept!==device.foundation_concept||source.review_reason||
        !source.candidate||!source.entity_registry_id||!source.config_entry_id||
        !(device.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')))
@@ -576,6 +635,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
         foundation_config_entry_id:source.config_entry_id,
         foundation_device_registry_id:source.native_device_id,
         foundation_provider:source.provider});
+      if(!placeholder)x.control_approved=false;
     });
     d.dirty=true;
   }
@@ -701,6 +761,19 @@ function rhiMmWholeChange(d,key,value,checked=false){
 function rhiMmWholeAction(d,action,id,phase,index){
   const {room,activity}=rhiMmWholeCurrent(d);
   const fail=message=>{d.error=message;return false;};
+  if(d.localScope){
+    const scope=d.localScope[0];
+    const allowed=action==='discard_raw'||action==='focus_issue'||
+      (scope==='room'&&['add_room_area','delete_room_area'].includes(action))||
+      (scope==='activity'&&['step_add','step_remove','step_up','step_down'].includes(action));
+    if(!allowed)return fail('Only the selected object can change.');
+    if(action==='focus_issue'){
+      const [,roomId,group,objectId]=String(id).split('.');
+      if(roomId!==d.localScope[1]||(scope==='room'?(group==='devices'||group==='activities'):
+         group!==(scope==='device'?'devices':'activities')||objectId!==d.localScope[2]))
+        return fail('This issue is outside the selected object. Open its own Settings.');
+    }
+  }
   if(action==='discard_raw'){d.rawDraft=null;d.editableDraft='';d.error='';return true;}
   if(action==='edit_import'){
     const diagnostic=d.error;

@@ -6,13 +6,46 @@ Foundation remains the technical selection authority.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from .const import CONF_ROOMS, DOMAIN
-from .foundation import selected_sources
+from .foundation import authorized_source, selected_sources, projection_source_reads
+
+
+_PRIVATE_VALUE = re.compile(
+    r"(?i)(?:\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|"
+    r"\b(?:\d{1,3}\.){3}\d{1,3}\b|"
+    r"\b(?:[0-9a-f]{1,4}:){2,}[0-9a-f:]{0,29}\b|"
+    r"https?://[^\s]+|"
+    r"\b(?:password|passwd|token|api[_-]?key|secret|authorization)\s*[:=]\s*[^\s,;]+|"
+    r"\bBearer\s+[A-Za-z0-9._~+/-]+=*)")
+_PRIVATE_KEYS = {"password", "passwd", "token", "access_token", "refresh_token", "api_key",
+                 "secret", "authorization", "credentials", "mac", "mac_address", "ip",
+                 "ip_address", "broadcast_address", "host", "media_title", "media_artist",
+                 "media_album_name", "media_content_id", "message", "power_on", "power_off"}
+
+
+def _redact_evidence(value):
+    """Redact private values in the existing diagnostic projection only."""
+    if isinstance(value, dict):
+        return {key: ("**REDACTED**" if str(key).lower() in _PRIVATE_KEYS
+                      else _redact_evidence(item)) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_redact_evidence(item) for item in value]
+    if isinstance(value, str):
+        return _PRIVATE_VALUE.sub("**REDACTED**", value)
+    return value
 
 
 async def async_get_config_entry_diagnostics(hass, entry):
+    # Discovery, per-device authorization and target readback consume the
+    # same request-local evidence. No cached grant survives this export.
+    with projection_source_reads(hass):
+        return _config_entry_diagnostics(hass, entry)
+
+
+def _config_entry_diagnostics(hass, entry):
     context = hass.data.get(DOMAIN, {})
     engine = context.get("engine")
     adapter = context.get("adapter")
@@ -22,16 +55,20 @@ async def async_get_config_entry_diagnostics(hass, entry):
     from .frontend import ux_diagnostics
 
     approved_sources, origin = selected_sources(hass)
-    selected = {(source.concept, source.entity_id): source for source in approved_sources}
-    selection_error = None if selected else origin
+    # Legacy Foundation selection and explicitly reviewed One-Save bindings
+    # are both valid runtime authorization paths. Report the same decision
+    # as the command adapter, including explicit revocation.
+    selection_error = None if approved_sources else origin
 
     sources, routes = {}, {}
     if engine and adapter:
         for room, spec in rooms.items():
             sources[room] = adapter.readback(spec)
             for key, device in spec["devices"].items():
-                candidate = selected.get((device.get("foundation_concept"), device["entity"]))
-                approved = bool(candidate and candidate.candidate_id == device.get("foundation_candidate_id"))
+                candidate = authorized_source(hass, device)
+                approved = candidate is not None
+                if approved:
+                    selection_error = None
                 sources[room][key].update({
                     "role": device.get("role"),
                     "physical_id": device.get("physical_id"),
@@ -72,7 +109,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
     } if engine else {})
     from .source_discovery import discovered_av_sources, native_source_evidence
     discovered, discovery_origin = discovered_av_sources(hass)
-    return {
+    return _redact_evidence({
         "discovery": {"origin": discovery_origin,
                       "supported_candidates": [
                           native_source_evidence(hass, source) for source in discovered]},
@@ -97,5 +134,5 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "last_controls": dict(adapter.last_controls) if adapter else {},
         "last_attempts": {room: dict(value) for room, value in engine.last_attempts.items()} if engine else {},
         "attention_events": {room: adapter.attention_observation(room) for room in rooms} if adapter else {},
-        "publication": {"platforms": ["sensor", "select"], "physical_devices_duplicated": False},
-    }
+        "publication": {"platforms": ["media_player", "sensor", "select", "switch", "number", "text", "button", "notify"], "physical_devices_duplicated": False},
+    })

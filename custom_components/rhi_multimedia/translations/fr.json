@@ -170,10 +170,11 @@
       },
       "review": {
         "title": "Vérifier et enregistrer",
-        "description": "Vérifiez les appareils et routes sélectionnés ci-dessous. Différé signifie que l’appareil doit être allumé pour la vérification. Les associations indisponibles inchangées sont conservées. Aucune commande physique n’est envoyée.\n\n{summary}",
+        "description": "Vérifiez les appareils et routes sélectionnés ci-dessous. Différé signifie que l’appareil doit être allumé pour la vérification. Les associations indisponibles inchangées sont conservées. Aucune commande physique n’est envoyée.\n\n{summary}\n\n{validation_detail}",
         "data": {
           "confirm": "Enregistrer la configuration Multimedia",
-          "confirm_remove": "Je confirme la suppression des pièces indiquées"
+          "confirm_remove": "Je confirme la suppression des éléments indiqués",
+          "return_to_yaml": "Retour au YAML"
         }
       },
       "validate_room_update": {
@@ -295,10 +296,11 @@
       },
       "yaml": {
         "title": "Import YAML (avancé)",
-        "description": "{note}",
+        "description": "{note}\n\n{validation_detail}",
         "data": {
           "mode": "Mode de modification",
-          "yaml_text": "Multimedia rooms.yaml (définitions complètes des pièces)"
+          "yaml_text": "Multimedia rooms.yaml (définitions complètes des pièces)",
+          "visual_edit": "Modifier visuellement"
         }
       },
       "speech_endpoint": {

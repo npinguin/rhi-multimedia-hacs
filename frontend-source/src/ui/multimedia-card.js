@@ -67,9 +67,9 @@ function rhiMmRemoteGroups(options){
     for(const k of selected)used.add(k);return {name,keys:selected};};
   const groups=[
     take('navigation',['HOME','home','MENU','menu','top_menu','BACK','back','INFO','info','EXIT','exit','UP','up','DPAD_UP','LEFT','left','DPAD_LEFT','ENTER','select','ok','DPAD_CENTER','RIGHT','right','DPAD_RIGHT','DOWN','down','DPAD_DOWN']),
-    take('media',['CHANNELUP','CHANNELDOWN','GUIDE','VOLUMEUP','VOLUMEDOWN','VOLUME_UP','VOLUME_DOWN','PLAY','play','MEDIA_PLAY','PAUSE','pause','MEDIA_PAUSE','MEDIA_PLAY_PAUSE','MEDIA_STOP','MUTE','mute']),
+    take('media',['CHANNELUP','CHANNELDOWN','CHANNEL_UP','CHANNEL_DOWN','GUIDE','epg','VOLUMEUP','VOLUMEDOWN','VOLUME_UP','VOLUME_DOWN','vol_up','vol_down','PLAY','play','MEDIA_PLAY','PAUSE','pause','MEDIA_PAUSE','MEDIA_PLAY_PAUSE','MEDIA_STOP','stop','MEDIA_NEXT','MEDIA_PREVIOUS','MUTE','mute','VOLUME_MUTE']),
     take('numbers',Array.from({length:10},(_,i)=>String(i))),
-    take('apps',['NETFLIX','AMAZON','RED','GREEN','BLUE','YELLOW']),
+    take('apps',['NETFLIX','AMAZON','RED','GREEN','BLUE','YELLOW','PROG_RED','PROG_GREEN','PROG_BLUE','PROG_YELLOW']),
   ];
   const other=keys.filter(k=>!used.has(k));if(other.length)groups.push({name:'more',keys:other});
   return groups.filter(group=>group.keys.length);
@@ -117,6 +117,7 @@ function rhiMmOptionDefaults(step){
   }
   return values;
 }
+const RHI_MM_SAVE_STEPS=new Set(['review','yaml','room_settings','tv_wake','speech_endpoint','harmony_owner','cec_device','cec_activity','button_value','macro_create','quick_edit_activity','script_defaults','dell_display','dell_remove']);
 class HomeBrainMultimediaCard extends HTMLElement {
   static getStubConfig() { return {type:'custom:homebrain-multimedia-card'}; }
   constructor() {
@@ -127,13 +128,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._settingsCategory='locations';this._settingsSelections=new Map();
     this._activitySettingsStage='devices';this._wholeHomeFlow=false;this._wholeHome=null;
     this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
-    this._optionsStep=null;this._optionsData={};this._optionsBusy=false;
-    this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;this._pendingNavigation=null;
+    this._diagnosticExport=null;this._diagnosticEpoch=0;
+    this._optionsStep=null;this._optionsData={};this._optionsBusy=false;this._optionsDirty=false;
+    this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;this._clipboardRequest=0;this._pendingNavigation=null;
     this._onLocation=()=>{
       const route=this.currentRoute();
-      if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)&&
-         !['settings','discovery'].includes(route.view)&&
-         (this._wholeHome?.dirty||this._optionsStep?.step_id==='review'||this._optionsBusy)){
+      if((this._optionsStep||this._optionsBusy)&&
+         (this._wholeHomeFlow?!['settings','discovery'].includes(route.view):route.view!==this._view||route.room!==this._room||route.floor!==this._floor)&&
+         this.hasUnsavedOptions()){
         this._pendingNavigation=route;
         // Browser Back must not silently discard a dirty native HA draft.
         const url=new URL(window.location.href);
@@ -151,6 +153,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }else{this._lastSignature='';this.render();}
     };
     this.shadowRoot.addEventListener('click',event=>this.onClick(event));
+    // No browser-generated held-key command stream. Providers without an
+    // explicitly qualified native repeat contract use discrete presses.
+    this.shadowRoot.addEventListener('keydown',event=>{
+      if(event.repeat&&['Enter',' '].includes(event.key)&&
+         event.target?.closest?.('[data-device-action="remote_key"]'))event.preventDefault();
+    });
     this.shadowRoot.addEventListener('change',event=>{this.onControlChange(event);this.onOptionValue(event);this.onWholeHomeInput(event);});
     this.shadowRoot.addEventListener('input',event=>{this.onOptionValue(event);this.onWholeHomeInput(event);});
     this.shadowRoot.addEventListener('toggle',event=>this.onToggle(event),true);
@@ -164,6 +172,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   set hass(hass) {
     this._hass=hass;
+    if(!hass?.user?.is_admin){this._diagnosticExport=null;++this._diagnosticEpoch;}
     if(!hass?.user?.is_admin&&(this._optionsStep||this._optionsBusy)){
       void this.cancelOptions();
     }else this.render();
@@ -182,6 +191,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
   navigate(view,room='',floor) {
     if (!RHI_MM_VIEWS.includes(view)) return;
     this._destinationSelection=null;
+    this._diagnosticExport=null;++this._diagnosticEpoch;
     const url=new URL(window.location.href);
     url.searchParams.set('multimedia_view',view);
     if(room)url.searchParams.set('multimedia_room',room);else url.searchParams.delete('multimedia_room');
@@ -194,6 +204,68 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   onToggle(event){const el=event.target?.closest?.('details[data-persist]');if(!el)return;const key=el.getAttribute('data-persist');if(el.open)this._expanded.add(key);else this._expanded.delete(key);}
   async onClick(event) {
+    const diagnostic=event.target?.closest?.('[data-mm-diagnostic-export]');
+    if(diagnostic){
+      event.preventDefault();if(!this._hass?.user?.is_admin)return;
+      const roomId=diagnostic.getAttribute('data-mm-diagnostic-export')||'';
+      const epoch=++this._diagnosticEpoch;
+      this._diagnosticExport={roomId,busy:true};this._optionRefresh();
+      try{
+        const result=await rhiMmDiagnosticExport(this._hass,roomId);
+        if(epoch!==this._diagnosticEpoch||!this._hass?.user?.is_admin||this.currentRoute().view!=='diagnostics')return;
+        this._diagnosticExport={roomId,text:JSON.stringify(result,null,2)};
+      }catch(_){if(epoch===this._diagnosticEpoch)this._diagnosticExport={roomId,error:true};}
+      if(epoch===this._diagnosticEpoch)this._optionRefresh();return;
+    }
+    const clipboard=event.target?.closest?.('[data-mm-copy],[data-mm-paste]');
+    if(clipboard){
+      event.preventDefault();
+      if(!this._hass?.user?.is_admin||this._optionsBusy)return;
+      const request=++this._clipboardRequest;
+      const clipboardEpoch=this._optionsEpoch,diagnosticEpoch=this._diagnosticEpoch;
+      const userId=this._hass.user.id,step=this._optionsStep;
+      const kind=clipboard.getAttribute('data-mm-copy');
+      const fieldSelector=kind==='diagnostics'?'[data-mm-diagnostics-text]':'[data-wh-raw],textarea[data-mm-option-field="yaml_text"]';
+      const field=this.shadowRoot?.querySelector?.(fieldSelector);
+      const beforePaste=field?.value;
+      const status=clipboard.parentElement?.querySelector?.('[data-mm-clipboard-status]');
+      const fallback=kind==='issues'?clipboard.closest?.('[role="alert"]')?.querySelector?.('[data-mm-copy-fallback]'):null;
+      // Clipboard prompts are asynchronous. Do not overwrite a newer draft,
+      // refocus a detached editor, or expose fallback text after navigation.
+      const current=()=>request===this._clipboardRequest&&this._hass?.user?.is_admin&&
+        this._hass.user.id===userId&&!this._optionsBusy&&this._optionsEpoch===clipboardEpoch&&
+        this._diagnosticEpoch===diagnosticEpoch&&this._optionsStep===step&&
+        clipboard.isConnected!==false&&(kind==='issues'||this.shadowRoot?.querySelector?.(fieldSelector)===field);
+      const tell=value=>{if(current()&&status)status.textContent=value;};
+      if(kind){
+        const value=kind==='issues'?fallback?.value:field?.value;
+        if(typeof value!=='string'||!value){tell(this.t('clipboard_empty_copy'));return;}
+        try{
+          if(!globalThis.navigator?.clipboard?.writeText)throw Error('Clipboard unavailable');
+          await globalThis.navigator.clipboard.writeText(value);
+          tell(this.t('clipboard_copied'));
+        }catch(_){
+          if(!current())return;
+          if(kind==='issues'){
+            if(fallback){fallback.hidden=false;fallback.focus();fallback.select();}
+          }else{field?.focus();field?.select();}
+          tell(this.t('clipboard_unavailable'));
+        }
+      }else if(field){
+        try{
+          if(!globalThis.navigator?.clipboard?.readText)throw Error('Clipboard unavailable');
+          const value=await globalThis.navigator.clipboard.readText();
+          if(!current()||field.value!==beforePaste)return;
+          if(!value){tell(this.t('clipboard_empty'));return;}
+          field.value=value;
+          if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
+            this._wholeHome.rawDraft=value;this._wholeHome.editableDraft='';this._wholeHome.dirty=true;
+          }else{this._optionsData.yaml_text=value;this._optionsDirty=true;}
+          field.focus();tell(this.t('clipboard_pasted'));
+        }catch(_){if(current()){field.focus();tell(this.t('clipboard_manual_paste'));}}
+      }
+      return;
+    }
     const context=event.target?.closest?.('[data-context-tab]');
     if(context){const value=context.getAttribute('data-context-tab');this._contextSelections.set(this._contextScope,value);this._contextKey='';this._lastSignature='';this.render();return;}
     const refresh=event.target?.closest?.('[data-context-refresh]');
@@ -212,6 +284,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
       event.preventDefault();
       const category=openSettings.getAttribute('data-mm-settings-open');
       if(['locations','devices','activities'].includes(category)){
+        if(this.hasUnsavedOptions()){
+          this._optionsError=this.t('whole_home_leave_warning');this._optionRefresh();return;
+        }
         if(this._optionsStep||this._optionsBusy)await this.cancelOptions();
         const room=openSettings.getAttribute('data-room')||'';
         const key=openSettings.getAttribute('data-device')||'';
@@ -246,17 +321,23 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(this._optionsBusy)return;
         if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
           this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
-          await this.submitOptions();
-        }else if(this._optionsStep?.step_id==='review'){
-          await this.submitOptions();
+          await this.submitOptions({save:true});
+        }else if(this._optionsStep){
+          await this.submitOptions({save:true});
         }
       }
       return;
     }
     const reviewBack=event.target?.closest?.('[data-mm-review-back]');
-    if(reviewBack&&this._wholeHomeFlow&&this._optionsStep?.step_id==='review'){
-      this._optionsData.return_to_setup=true;this._optionsData.confirm=false;
-      await this.submitOptions();return;
+    if(reviewBack&&this._optionsStep){
+      const back=this._wholeHomeFlow?'return_to_setup':'return_to_yaml';
+      if(this._wholeHomeFlow||(this._optionsStep.data_schema||[]).some(field=>field.name===back)){
+        if(this._optionsStep.step_id!=='review')this._optionsData=rhiMmOptionDefaults(this._optionsStep);
+        this._optionsData[back]=true;
+        if((this._optionsStep.data_schema||[]).some(field=>field.name==='confirm'))this._optionsData.confirm=false;
+        await this.submitOptions();
+      }
+      return;
     }
     const category=event.target?.closest?.('[data-mm-settings-category]');
     if(category){
@@ -318,14 +399,21 @@ class HomeBrainMultimediaCard extends HTMLElement {
       return;
     }
     const floor=event.target?.closest?.('[data-floor]');
-    if(floor){event.preventDefault();this.navigate('overview','',floor.getAttribute('data-floor')||'');return;}
+    if(floor){event.preventDefault();const target={view:'overview',room:'',floor:floor.getAttribute('data-floor')||''};if(this.hasUnsavedOptions()){this._pendingNavigation=target;this._optionRefresh();return;}if(this._optionsStep)await this.cancelOptions();this.navigate(target.view,target.room,target.floor);return;}
     const wholeAction=event.target?.closest?.('[data-wh-action]');
     if(wholeAction&&this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
       event.preventDefault();
       const action=wholeAction.getAttribute('data-wh-action');
-      if(action==='review'||action==='review_yaml'){
+      if(action==='specialist'){
+        const name=wholeAction.getAttribute('data-wh-id');
+        if(!(this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
+          this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
+        }
         this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
-        await this.submitOptions();
+        await this.submitOptions({specialist:name});
+      }else if(action==='review'||action==='review_yaml'){
+        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+        await this.submitOptions({save:action==='review',visual:action==='review_yaml'});
       }else{
         const id=action==='apply_json'
           ?this.shadowRoot?.querySelector?.('[data-wh-raw]')?.value||''
@@ -334,7 +422,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
           wholeAction.getAttribute('data-phase')||'',
           Number(wholeAction.getAttribute('data-index')));
         if(['focus_binding','focus_issue','edit_import'].includes(action)&&changed){
-          this.navigate('settings',this._wholeHome.room,'');return;
+          this.navigate('settings',this._wholeHome.room,'');
+          if(action==='focus_issue'){
+            const route=/\.(steps|stop_steps)\[(\d+)\]\.candidates$/.exec(id);
+            const key=route?'step_value:'+route[1]+':'+route[2]:id.endsWith('.entity')?'device_resolve':id.endsWith('.area_id')?'room_area':null;
+            if(key)this.shadowRoot?.querySelector?.(`[data-wh-field='${key}']`)?.focus();
+          }
+          return;
         }
         if(action==='tab'&&['rooms','devices','activities'].includes(id))
           this._wholeHome.settingsTab=id;
@@ -343,7 +437,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       return;
     }
     const option=event.target?.closest?.('[data-mm-option-action]');
-    if(option){event.preventDefault();if(!option.disabled)await this.openOptions({
+    if(option){event.preventDefault();if(!option.disabled)await this.openContextualOptions({
       action:option.getAttribute('data-mm-option-action'),
       room:option.getAttribute('data-mm-option-room')||'',
       activity:option.getAttribute('data-mm-option-activity')||'',
@@ -355,8 +449,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
         Number(option.getAttribute('data-mm-option-index')):null,
       device:option.getAttribute('data-mm-option-device')||'',
       stepType:option.getAttribute('data-mm-option-type')||''});return;}
+    const visualOption=event.target?.closest?.('[data-mm-option-visual]');
+    if(visualOption){event.preventDefault();await this.submitOptions({visual:true});return;}
     const submitOption=event.target?.closest?.('[data-mm-option-submit]');
-    if(submitOption){event.preventDefault();await this.submitOptions();return;}
+    if(submitOption){event.preventDefault();await this.submitOptions({save:RHI_MM_SAVE_STEPS.has(this._optionsStep?.step_id)});return;}
     const cancelOption=event.target?.closest?.('[data-mm-option-cancel]');
     if(cancelOption){event.preventDefault();await this.cancelOptions();return;}
     const nav=event.target?.closest?.('[data-nav]');
@@ -393,12 +489,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
         this._pendingNavigation=null;this._optionsError='';
         this.navigate(next,room,floor);return;
       }
-      if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)){
+      if(this._optionsStep||this._optionsBusy){
         if(this._optionsBusy){
           this._optionsError=this.t('whole_home_busy');
           this._optionRefresh();return;
         }
-        if(this._wholeHome?.dirty||this._optionsStep?.step_id==='review'){
+        if(this.hasUnsavedOptions()){
           this._pendingNavigation={view:next,room,floor};
           this._optionRefresh();return;
         }
@@ -409,7 +505,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
         await this.openOptions({action:'complete_setup'});
       return;}
     const more=event.target?.closest?.('[data-more-info]');
-    if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');if(entityId)this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));return;}
+    if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');
+      if(more.isConnected!==false&&/^media_player\.[a-z0-9_]+$/.test(entityId||'')&&this._hass?.states?.[entityId])
+        this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));
+      return;}
     const shortcut=event.target?.closest?.('[data-mm-shortcut]');
     if(shortcut&&!shortcut.disabled){
       const room=shortcut.getAttribute('data-room');
@@ -426,11 +525,20 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const inputs=this.shadowRoot?.querySelectorAll?.('[data-device-text]')||[];
       const input=[...inputs].find(el=>el.getAttribute('data-room')===room&&
         el.getAttribute('data-device')===device);
-      if(input && input.value.trim())await this.executeDevice(room,device,'remote_text',input.value);
+      if(input && input.value.trim()&&this.remoteInputCurrent(sendText))
+        await this.executeDevice(room,device,'remote_text',input.value,sendText.getAttribute('data-activity')??undefined);
       return;
     }
     const direct=event.target?.closest?.('[data-device-action]');
-    if(direct){if(!direct.disabled){const raw=direct.getAttribute('data-value');await this.executeDevice(direct.getAttribute('data-room'),direct.getAttribute('data-device'),direct.getAttribute('data-device-action'),raw===null?undefined:JSON.parse(raw));}return;}
+    if(direct){
+      const action=direct.getAttribute('data-device-action');
+      if(!direct.disabled&&(action!=='remote_key'||this.remoteInputCurrent(direct))){
+        const raw=direct.getAttribute('data-value');
+        await this.executeDevice(direct.getAttribute('data-room'),direct.getAttribute('data-device'),action,
+          raw===null?undefined:JSON.parse(raw),direct.getAttribute('data-activity')??undefined);
+      }
+      return;
+    }
     const action=event.target?.closest?.('[data-action]');
     if(!action||action.disabled)return;
     const roomId=action.getAttribute('data-room');
@@ -438,12 +546,30 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const activity=action.getAttribute('data-activity')||'';
     await this.execute(roomId,service,activity);
   }
+  remoteInputCurrent(element){
+    if(element?.isConnected===false||typeof document!=='undefined'&&document.visibilityState==='hidden')return false;
+    const route=this.currentRoute(),roomId=element.getAttribute('data-room');
+    if(!['overview','rooms'].includes(route.view)||(route.room&&route.room!==roomId))return false;
+    const room=rhiMmRooms(this._hass).rooms?.find(row=>row.id===roomId);
+    const device=room?.devices?.find(row=>row.key===element.getAttribute('data-device'));
+    return !!device&&device.entity_id===element.getAttribute('data-native-entity')&&
+      (room.activity_id||'')===(element.getAttribute('data-activity')||'')&&
+      !['starting','stopping'].includes(room.phase);
+  }
   async onControlChange(event){
     const floor=event.target?.closest?.('[data-floor-select]');
     if(floor){this.navigate('overview','',floor.value);return;}
     const input=event.target?.closest?.('[data-device-input]');
     if(!input||input.disabled||input.value==='')return;
     const action=input.getAttribute('data-device-input');
+    if(action==='seek'){
+      const roomId=input.getAttribute('data-room'),activity=input.getAttribute('data-activity')||'';
+      const route=this.currentRoute();
+      if(!['overview','rooms'].includes(route.view)||(route.room&&route.room!==roomId))return;
+      input.blur?.();
+      await this.executeDevice(roomId,input.getAttribute('data-device'),action,Number(input.value),activity);
+      return;
+    }
     await this.executeDevice(input.getAttribute('data-room'),input.getAttribute('data-device'),action,action==='volume'?Number(input.value):input.value);
   }
   onWholeHomeInput(event){
@@ -457,6 +583,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const value=element.type==='checkbox'?element.checked:element.value;
     const before=this._wholeHome.error;
     const changed=rhiMmWholeChange(this._wholeHome,key,value,element.checked);
+    if(changed&&this._wholeHome.validationDetail)this._wholeHome.validationStale=true;
     // Editing is ephemeral until native Review/Save. Avoid re-rendering
     // while typing so the iPad keyboard and field focus remain stable.
     if(event.type==='change'&&(changed||this._wholeHome.error!==before))
@@ -467,6 +594,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(!el||!this._optionsStep||this._optionsBusy)return;
     const key=el.getAttribute('data-mm-option-field');
     if(!key)return;
+    const before=JSON.stringify(this._optionsData[key]);
     if(el.hasAttribute('data-mm-option-choice')){
       const wanted=el.getAttribute('data-mm-option-choice');
       const values=new Set(Array.isArray(this._optionsData[key])?this._optionsData[key]:[]);
@@ -475,7 +603,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }else if(el.type==='checkbox')this._optionsData[key]=!!el.checked;
     else if(el.type==='number')this._optionsData[key]=el.value===''?'':Number(el.value);
     else this._optionsData[key]=el.value;
+    if(before!==JSON.stringify(this._optionsData[key]))this._optionsDirty=true;
   }
+  hasUnsavedOptions(){return !!(this._optionsBusy||this._optionsDirty||this._wholeHome?.dirty||this._optionsStep?.step_id==='review');}
   _optionRefresh(){this._optionsRevision++;this._lastSignature='';this.render();}
   settingsFlowFailure(error){
     // Only map owned stable error categories. Raw HA/transport error messages
@@ -491,7 +621,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     return this.t(key);
   }
   blockWholeHomeNavigation(){
-    if(this._wholeHomeFlow&&(this._optionsStep||this._optionsBusy)){
+    if(this.hasUnsavedOptions()||(this._wholeHomeFlow&&this._optionsStep)){
       this._optionsError=this.t('whole_home_leave_warning');
       this._optionRefresh();return true;
     }
@@ -511,13 +641,58 @@ class HomeBrainMultimediaCard extends HTMLElement {
         <button type="button" data-mm-leave-action="review" ${this._optionsBusy?'disabled':''}>${esc(this.t('whole_home_review_save'))}</button>
       </div></section>`;
   }
+  async openContextualOptions(request){
+    const {action,room,activity,device,phase,operation,index,stepType}=request;
+    const roomEdits=new Set(['add_room','rename_room','remove_room','edit_room']);
+    const activityEdits=new Set(['add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity','guided_activity']);
+    const specialistEdits=new Set(['button_mapping','macro_manage','cec_activity','cec_device','harmony_owner','speech_endpoint','tv_wake','script_step','script_defaults']);
+    if(!roomEdits.has(action)&&!activityEdits.has(action)&&!specialistEdits.has(action))
+      return this.openOptions(request);
+    if(this.hasUnsavedOptions()){this._optionsError=this.t('whole_home_leave_warning');this._optionRefresh();return;}
+    // The ordinary and specialist entry points now select a context inside
+    // the same home draft. The native HA integration still offers its own
+    // independent Options Flow for users who prefer that interface.
+    this.navigate('settings',room||this.currentRoute().room||'');
+    await this.openOptions({action:'complete_setup',room,activity,device});
+    if(this._optionsStep?.step_id!=='complete_setup'||!this._wholeHome)return;
+    const d=this._wholeHome;
+    if(roomEdits.has(action))d.tab=action==='edit_room'?'devices':'rooms';
+    else if(activityEdits.has(action)||activity||['script_step','button_mapping','macro_manage','cec_activity'].includes(action))d.tab='activities';
+    else d.tab='rooms';
+    d.workspace='settings';d.settingsTab=d.tab;
+    rhiMmWholeCurrent(d);
+    // Direct removal remains an explicit edit of the draft; final Save
+    // presents the destructive confirmation. Never remove an inferred item.
+    if(action==='remove_room'&&room===d.room)rhiMmWholeAction(d,'delete_room');
+    if(action==='remove_activity'&&room===d.room&&activity===d.activity)rhiMmWholeAction(d,'delete_activity');
+    if(action==='script_step'&&room===d.room&&activity===d.activity&&['steps','stop_steps'].includes(phase)){
+      const row=d.doc.rooms[room]?.activities?.[activity]?.[phase]?.[index];
+      if(['up','down'].includes(operation)&&Number.isInteger(index)&&row&&(!device||row.device===device)&&(!stepType||row.type===stepType))
+        rhiMmWholeAction(d,'step_'+operation,'',phase,index);
+      // Detailed edit/insert and provider-specific arguments remain the native specialist section.
+      if(operation==='edit'&&row&&(!device||row.device===device)&&(!stepType||row.type===stepType)){
+        this._optionRefresh();this.shadowRoot.querySelector?.(`[data-wh-field="step_type:${phase}:${index}"]`)?.focus();return;
+      }
+    }
+    this._optionRefresh();
+    if(specialistEdits.has(action)&&!['script_defaults','script_step'].includes(action)&&
+       (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
+      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      await this.submitOptions({specialist:action});
+    }else if(action==='script_step'&&!['up','down','edit'].includes(operation)&&
+       (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
+      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      await this.submitOptions({specialist:'script_step'});
+    }
+  }
   async openOptions({action,room='',activity='',scope='',id='',
     phase='',operation='',index=null,device='',stepType=''}) {
     if(!this._hass?.user?.is_admin||this._optionsBusy)return;
+    if(this.hasUnsavedOptions()){this._optionsError=this.t('whole_home_leave_warning');this._optionRefresh();return;}
     const oldStep=this._optionsStep;
     const wholeHome=action==='complete_setup';
     const epoch=++this._optionsEpoch;
-    this._optionsStep=null;this._optionsData={};this._optionsError='';
+    this._optionsStep=null;this._optionsData={};this._optionsDirty=false;this._optionsError='';
     this._optionsNotice='';this._optionsBusy=true;this._optionRefresh();
     try{
       if(oldStep)await rhiMmOptionsCancel(this._hass,oldStep);
@@ -548,8 +723,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }
       // Contextual Device Settings reuses the single Options Flow draft.
       if(this._wholeHome&&room&&this._wholeHome.doc.rooms[room]){
-        this._wholeHome.room=room;this._wholeHome.tab='devices';
-        this._wholeHome.settingsTab='devices';
+        this._wholeHome.room=room;this._wholeHome.tab=activity?'activities':device?'devices':'rooms';
+        this._wholeHome.settingsTab=this._wholeHome.tab;
+        if(activity&&this._wholeHome.doc.rooms[room].activities?.[activity])this._wholeHome.activity=activity;
         if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
           this._wholeHome.device=device;
       }
@@ -559,7 +735,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }
   }
-  async submitOptions(){
+  async submitOptions({save=false,visual=false,specialist=''}={}){
     const step=this._optionsStep;
     if(!step||this._optionsBusy||!this._hass?.user?.is_admin)return;
     if(!(step.data_schema||[]).every(rhiMmOptionSupported)){
@@ -568,10 +744,28 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const epoch=++this._optionsEpoch;
     this._optionsBusy=true;this._optionsError='';this._optionRefresh();
     try{
-      const response=await rhiMmOptionsAdvance(this._hass,step,{...this._optionsData});
+      const payload={...this._optionsData};
+      if(save&&step.step_id==='review'&&['true','false'].includes(step.description_placeholders?.explicit_confirmation))payload.confirm=true;
+      if((step.data_schema||[]).some(field=>field.name==='visual_edit'))payload.visual_edit=visual;
+      if((step.data_schema||[]).some(field=>field.name==='specialist_action')){
+        payload.specialist_action=specialist;
+        payload.specialist_room=specialist?this._wholeHome?.room||'':'';
+        payload.specialist_activity=specialist?this._wholeHome?.activity||'':'';
+      }
+      let response=await rhiMmOptionsAdvance(this._hass,step,payload);
       if(epoch!==this._optionsEpoch)return;
+      // A user Save may finish an ordinary edit in one interaction, but
+      // never bypass a backend-declared sensitive/unknown confirmation.
+      if(save&&step.step_id!=='review'&&response?.type==='form'&&response.step_id==='review'&&
+         !response.errors?.base&&response.description_placeholders?.explicit_confirmation==='false'&&
+         (response.data_schema||[]).some(field=>field.name==='confirm')&&
+         (response.data_schema||[]).every(field=>['confirm','return_to_setup','return_to_yaml'].includes(field.name))){
+        this._optionsStep=response;this._optionsData=rhiMmOptionDefaults(response);
+        response=await rhiMmOptionsAdvance(this._hass,response,{...this._optionsData,confirm:true});
+        if(epoch!==this._optionsEpoch)return;
+      }
       if(response?.type==='create_entry'){
-        this._optionsStep=null;this._optionsData={};this._wholeHomeFlow=false;this._wholeHome=null;
+        this._optionsStep=null;this._optionsData={};this._optionsDirty=false;this._wholeHomeFlow=false;this._wholeHome=null;
         this._optionsNotice=this.t('setup_saved');
         if(this._settingsCategory==='activities')this._activitySettingsStage='tune';
         if(this._pendingNavigation){
@@ -581,22 +775,45 @@ class HomeBrainMultimediaCard extends HTMLElement {
         }
       }else if(response?.type==='form'){
         this._optionsStep=response;
-        if(response.step_id!==step.step_id)this._optionsData=rhiMmOptionDefaults(response);
+        if(response.step_id!==step.step_id){this._optionsData=rhiMmOptionDefaults(response);this._optionsDirty=true;}
         if(response.step_id==='complete_setup'&&this._wholeHome){
           const reason=this.optionError(response,response.errors?.base)||'';
           const detail=response.description_placeholders?.validation_detail||'';
-          this._wholeHome.error=[reason,detail].filter(Boolean).join('\n');
+          this._wholeHome.validationDetail=detail;this._wholeHome.validationStale=false;
+          this._wholeHome.error=detail||reason;
           this._wholeHome.editableDraft=response.description_placeholders?.editable_draft_json||'';
-          if(!response.errors?.base&&step.step_id==='review'){
+          if(this._wholeHome.editableDraft&&this._wholeHome.rawDraft!=null){
+            // Backend parsed the exact submitted document, including missing bindings.
+            // Keep one semantic draft, not a second raw editor requiring conversion.
+            const parsed=JSON.parse(this._wholeHome.editableDraft);
+            this._wholeHome.doc=parsed;this._wholeHome.rawDraft=null;this._wholeHome.editableDraft='';
+            rhiMmWholeCurrent(this._wholeHome);
+          }else if(!response.errors?.base&&(step.step_id!=='complete_setup'||visual)){
             const normalized=rhiMmWholeFromStep(response);
-            this._wholeHome.doc=normalized.doc;this._wholeHome.rawDraft=null;
+            // Refresh native evidence too: specialist edits may alter the
+            // available choices, but the active room and category stay put.
+            for(const key of ['doc','areas','floors','areaFloors','sources','logicalDevices','proposedRooms','proposalExceptions'])
+              this._wholeHome[key]=normalized[key];
+            this._wholeHome.rawDraft=null;this._wholeHome.dirty=true;
             rhiMmWholeCurrent(this._wholeHome);
           }
         }
-        else if(response.step_id==='complete_setup')
+        else if(response.step_id==='complete_setup'){
           this._wholeHome=rhiMmWholeFromStep(response);
+          this._wholeHomeFlow=true;
+          this._wholeHome.workspace='settings';
+          this._wholeHome.tab=this._wholeHome.localScope?this._wholeHome.tab:'rooms';
+          this._wholeHome.settingsTab=this._wholeHome.tab;
+          rhiMmWholeCurrent(this._wholeHome);
+          this._wholeHome.dirty=true;
+          if(response.errors?.base){
+            this._wholeHome.validationDetail=response.description_placeholders?.validation_detail||'';
+            this._wholeHome.error=this._wholeHome.validationDetail||this.optionError(response,response.errors.base);
+          }
+        }
       }else{
-        this._optionsStep=null;this._optionsData={};
+        // A rejected or expired flow must not silently drop locally edited text.
+        // Keep the displayed draft available for copy and explicit cancellation.
         this._optionsError=this.t('setup_flow_failed');
       }
     }catch(error){
@@ -608,7 +825,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
   async cancelOptions(){
     const step=this._optionsStep;
     ++this._optionsEpoch;
-    this._optionsStep=null;this._optionsData={};this._optionsBusy=false;this._wholeHomeFlow=false;
+    this._optionsStep=null;this._optionsData={};this._optionsDirty=false;this._optionsBusy=false;this._wholeHomeFlow=false;
     this._wholeHome=null;this._pendingNavigation=null;
     this._optionsError='';this._optionsNotice='';this._optionRefresh();
     if(step){try{await rhiMmOptionsCancel(this._hass,step);}catch(_){}}
@@ -677,7 +894,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(step?.step_id==='complete_setup')return this.renderCompleteSetup(step);
     if(!step&&!this._optionsBusy&&!this._optionsError&&!this._optionsNotice)return '';
     const errors=step?.errors||{};
-    const base=[errors.base?this.optionError(step,errors.base):this._optionsError,step?.description_placeholders?.validation_detail].filter(Boolean).join('\n');
+    const detail=step?.description_placeholders?.validation_detail||'';
+    const base=detail|| (errors.base?this.optionError(step,errors.base):this._optionsError);
     const label=step?.step_id?
       this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.title`,
         step.description_placeholders||{}):null;
@@ -685,30 +903,35 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.description`,
         step.description_placeholders||{}):null;
     const unsupported=!!step&&!(step.data_schema||[]).every(rhiMmOptionSupported);
-    const guidance=description||step?.description_placeholders?.note;
+    const nativeReview=step?.step_id==='review'&&typeof step.description_placeholders?.change_summary==='string';
+    const guidance=nativeReview?step.description_placeholders.change_summary:errors.base&&step?.step_id==='yaml'?'Draft not saved. Correct the issue below and try again.':description||step?.description_placeholders?.note;
     const stageTitle=step?.step_id==='activity_devices'?this.t('choose_devices'):
       step?.step_id==='activity_device_order'?this.t('tune_actions'):null;
     return `${this.leaveDecision()}<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
+      ${this._wholeHomeFlow&&step?.step_id!=='review'?`<p class='mm-wh-draft'>${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.name||'Multimedia')} · ${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.activities?.[this._wholeHome?.activity]?.name||'Settings')}</p>`:''}
       <h3>${escape(stageTitle||label||this.t('setup_editor'))}</h3>
+      ${this._optionsDirty?`<span class='mm-wh-draft'>Unsaved changes</span>`:''}
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
-      ${base?`<p role="alert" class="mm-room-error" style="white-space:pre-wrap">${escape(base)}</p>`:''}
+      ${nativeReview&&step.description_placeholders?.native_preview?`<details class="mm-selectable"><summary>Native device and route details</summary><p style="white-space:pre-wrap">${escape(step.description_placeholders.native_preview)}</p></details>`:''}
+      ${base?`<div role="alert" class="mm-room-error mm-selectable"><p style="white-space:pre-wrap">${escape(base)}</p><button type="button" data-mm-copy="issues">${rhiUxEscape(this.t('copy_issues'))}</button><span data-mm-clipboard-status role="status"></span><textarea readonly hidden data-mm-copy-fallback aria-label="${rhiUxEscape(this.t('copy_issues_manual'))}" rows="6">${escape(base)}</textarea></div>`:''}
       ${this._optionsNotice?`<p role="status">${escape(this._optionsNotice)}</p>`:''}
       ${step?.type==='form'?`<div class="mm-option-fields">
-        ${(step.data_schema||[]).filter(field=>!(this._wholeHomeFlow&&
-          step.step_id==='review'&&field.name==='return_to_setup'))
+        ${(step.data_schema||[]).filter(field=>!['visual_edit','return_to_yaml'].includes(field.name)&&!(this._wholeHomeFlow&&field.name==='return_to_setup')&&!(nativeReview&&field.name==='confirm'))
           .map(field=>this.optionInput(step,field)).join('')}</div>`:''}
+      ${step?.step_id==='yaml'?`<div class="mm-setup-actions"><button type="button" data-mm-copy="yaml">${rhiUxEscape(this.t('copy_yaml'))}</button><button type="button" data-mm-paste="yaml">${rhiUxEscape(this.t('paste_yaml'))}</button><span data-mm-clipboard-status role="status"></span></div>`:''}
       <div class="mm-setup-actions">
-        ${this._wholeHomeFlow&&step?.step_id==='review'?
+        ${step?.step_id==='yaml'&&(step.data_schema||[]).some(field=>field.name==='visual_edit')?`<button type='button' data-mm-option-visual ${this._optionsBusy?'disabled':''}>Edit visually</button>`:''}
+        ${step&&(this._wholeHomeFlow&&(step.step_id==='review'||(step.data_schema||[]).some(field=>field.name==='return_to_setup'))||step.step_id==='review'&&(step.data_schema||[]).some(field=>field.name==='return_to_yaml'))?
           `<button type='button' data-mm-review-back>${this.t('whole_home_back')}</button>`:''}
-        ${step?`<button type="button" data-mm-option-submit ${this._optionsBusy||unsupported?'disabled':''}>${step.step_id==='review'?this.t('settings_save'):this.t('setup_continue')}</button>`:''}
-        ${step?`<button type="button" data-mm-option-cancel>${this.t('setup_cancel')}</button>`:''}
-        <a href="/config/integrations/integration/rhi_multimedia">${this.t('setup_manage')}</a>
+        ${step?`<button type="button" data-mm-option-submit ${this._optionsBusy||unsupported?'disabled':''}>${this._wholeHomeFlow&&step.step_id!=='review'&&RHI_MM_SAVE_STEPS.has(step.step_id)?'Apply to draft':RHI_MM_SAVE_STEPS.has(step.step_id)?this.t('settings_save'):this.t('setup_continue')}</button>`:''}
+        ${step?`<button type="button" data-mm-option-cancel>${this._wholeHomeFlow&&step.step_id!=='review'?'Cancel all changes':this.t('setup_cancel')}</button>`:''}
+        ${!step&&this._optionsError===this.t('setup_missing_entry')?`<a href="/config/integrations/integration/rhi_multimedia">${this.t('setup_manage')}</a>`:''}
       </div></section>`;
   }
-  async executeDevice(roomId,key,action,value){
+  async executeDevice(roomId,key,action,value,expectedActivity){
     const contract=rhiMmRooms(this._hass);
     const room=contract.ready?contract.rooms.find(row=>row.id===roomId):null;
-    return this.executeIntent(roomId,rhiMmDeviceIntent(room,key,action,value),contract);
+    return this.executeIntent(roomId,rhiMmDeviceIntent(room,key,action,value,expectedActivity),contract);
   }
   async execute(roomId,service,activity) {
     const contract=rhiMmRooms(this._hass);
@@ -737,14 +960,36 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(this._feedback.get(roomId)!==pending)return;
     this._feedback.set(roomId,feedback);this._lastSignature='';this.render();
   }
+  roomProjection() {
+    // HA sends immutable state objects on WebSocket updates. Reuse only
+    // actual timestamped room rows with unchanged object identity/version.
+    // Untimestamped or replaced rows, including removals, are projected afresh.
+    const rows=rhiMmRoomCandidates(this._hass);
+    const previous=this._roomProjection;
+    const reusable=previous&&rows.length===previous.rows.length&&
+      rows.every(([id,state],i)=>typeof state.last_updated==='string'&&
+        previous.rows[i][0]===id&&previous.rows[i][1]===state&&previous.rows[i][2]===state.last_updated);
+    if(reusable)return previous;
+    const contract=rhiMmRooms(this._hass,rows);
+    const model=rhiMmPresentation(contract);
+    return this._roomProjection={rows:rows.map(([id,state])=>[id,state,state.last_updated]),contract,model,
+      signature:JSON.stringify([model.ready,model.rooms,model.unavailable,model.backendVersion])};
+  }
   render() {
     if(!this.shadowRoot||!this._hass)return;
     const route=this.currentRoute();this._view=route.view;this._room=route.room;this._floor=route.floor||'';
-    const contract=rhiMmRooms(this._hass);
-    const model=rhiMmPresentation(contract);
+    const {contract,model,signature}=this.roomProjection();
     const editing=!!this._optionsStep;
-    const fingerprint=JSON.stringify([editing?'editing':model.ready,editing?null:model.rooms,
-      editing?null:model.unavailable,editing?null:model.backendVersion,
+    const activeInput=this.shadowRoot.activeElement;
+    if(activeInput?.matches?.('[data-device-input="seek"]')&&['overview','rooms'].includes(route.view)){
+      const selected=model.rooms.find(r=>r.id===activeInput.getAttribute('data-room'));
+      if(selected&&(!route.room||route.room===selected.id)&&
+          (selected.activity_id||'')===(activeInput.getAttribute('data-activity')||'')&&
+          selected.now_playing?.device_key===activeInput.getAttribute('data-device')&&
+          selected.devices?.find(d=>d.key===selected.now_playing.device_key)?.controls?.seek?.enabled)return;
+    }
+    if(route.view==='diagnostics'&&this._hass.user?.is_admin&&this._diagnosticExport?.roomId===route.room&&this.shadowRoot.activeElement?.matches?.('[data-mm-diagnostics-text]'))return;
+    const fingerprint=JSON.stringify([editing?'editing':signature,
       route.view,route.room,route.floor,[...this._feedback],this._settingsCategory,
       [...this._settingsSelections],[...this._remoteTabs],
       this._optionsRevision,this._activitySettingsStage,this._hass.user?.id,this._hass.user?.is_admin,this._hass.locale?.language||this._hass.language]);
@@ -775,12 +1020,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const ids=model.ready&&route.view==='overview'?(focused?[focused.id]:[]):
       model.ready&&route.view==='activities'?model.rooms.map(r=>r.id):
       model.ready&&route.view==='rooms'&&model.rooms.length?(route.room?model.rooms.filter(r=>r.id===route.room).map(r=>r.id):[model.rooms[0].id]):[];
-    this.renderContext(ids);
+    this.renderContext(ids,contract);
   }
-  renderContext(ids){
+  renderContext(ids,contract=rhiMmRooms(this._hass)){
     const host=this.shadowRoot.querySelector?.('[data-mm-context]');
     if(!host)return;
-    const roomRows=rhiMmRooms(this._hass).rooms||[];
+    const roomRows=contract.rooms||[];
     const current=this.currentRoute();
     const scopedRows=current.view==='devices'?roomRows:roomRows.filter(r=>ids.includes(r.id));
     const allowedDestinations=scopedRows.flatMap(r=>r.devices)
@@ -1232,9 +1477,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const validTimeline=!!media&&typeof media.position==='number'&&Number.isFinite(media.position)&&
       typeof media.duration==='number'&&Number.isFinite(media.duration)&&
       media.duration>0&&media.position>=0&&media.position<=media.duration;
+    const seekable=validTimeline&&enabled('seek')&&Number.isFinite(player.controls.seek.max_seconds)&&media.duration<=player.controls.seek.max_seconds;
     const progress=validTimeline?`<div class='mm-media-progress'>
-      <progress max='${media.duration}' value='${media.position}'
-        aria-label='${this.t('playback_progress')}'></progress>
+      ${seekable?`<input type='range' min='0' max='${media.duration}' step='any' value='${media.position}' data-device-input='seek' data-room='${e(room.id)}' data-device='${e(player.key)}' data-activity='${e(room.activity_id||'')}' aria-label='${e(this.t('seek'))}'/>`:`<progress max='${media.duration}' value='${media.position}' aria-label='${this.t('playback_progress')}'></progress>`}
       <span>${rhiMmPlaybackTime(media.position)} / ${rhiMmPlaybackTime(media.duration)}</span>
     </div>`:'';
     const audioVolume=readyAudio&&audio.controls?.volume?.enabled===true&&
@@ -1416,6 +1661,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const remote=part!=='audio'&&c.remote_key?.enabled===true?(()=>{
         const sections=rhiMmRemoteGroups(c.remote_key.options);
         const key=room.id+':'+d.key+':remote';
+        const contextAttrs=`data-activity="${escape(room.activity_id||'')}" data-native-entity="${escape(d.entity_id||'')}"`;
         const renderKey=k=>{
           if(c.remote_key?.enabled!==true||!c.remote_key.options?.includes(k))return '';
           const name=k.replace(/^DPAD_/,'').toUpperCase();
@@ -1428,7 +1674,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
             PLAY:'mdi:play',PAUSE:'mdi:pause',MUTE:'mdi:volume-off'};
           const label=['ENTER','SELECT','OK','CENTER'].includes(name)?'OK':name.replaceAll('_',' ');
           return `<button type="button" class="mm-remote-command" ${attrs} data-device-action="remote_key"
-            data-value="${escape(JSON.stringify(k))}"
+            data-value="${escape(JSON.stringify(k))}" ${contextAttrs}
             aria-label="${escape(d.name+' · '+label)}" title="${escape(label)}">
             ${icons[name]?`<ha-icon icon='${icons[name]}'></ha-icon>`:
               `<span>${escape(label)}</span>`}</button>`;
@@ -1472,7 +1718,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
                   data-device="${escape(d.key)}" autocomplete="off"
                   placeholder="${this.t('remote_text_placeholder')}"></label>
                 <button type="button" data-device-text-submit data-room="${escape(room.id)}"
-                  data-device="${escape(d.key)}">${this.t('remote_text_send')}</button></div>`:
+                  data-device="${escape(d.key)}" ${contextAttrs}>${this.t('remote_text_send')}</button></div>`:
               `<p class="mm-muted">${this.t('remote_text_unavailable')}</p>`):
             `${navigation}${media?`<div class="mm-native-buttons" role="group"
                aria-label="${this.t('remote_media')}">${media.keys.map(renderKey).join('')}</div>`:''}${extras}`;
@@ -2160,6 +2406,9 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
     return `<section class="mm-section"><div class="mm-heading"><div><h2>${this.t('runtime_diagnostics')}</h2><p>${this.t('diag_help')}</p></div>
       <button type="button" class="mm-link" data-nav="insights"
         ${roomId?`data-room="${escape(roomId)}"`:''}>${this.t('insights')}</button></div>
+      ${manage?`<section class='mm-surface mm-selectable'><h3>Engineering evidence</h3><p>Export the actual Multimedia diagnostic record${roomId?' for this room':' for this installation'}. No native commands are sent.</p><button type='button' data-mm-diagnostic-export='${escape(roomId)}' ${this._diagnosticExport?.busy?'disabled':''}>${this._diagnosticExport?.busy?'Loading…':'Export diagnostics'}</button>
+        ${this._diagnosticExport?.roomId===roomId&&this._diagnosticExport?.error?`<p role='alert'>Diagnostics could not be loaded. Use the native Home Assistant integration diagnostics if the API is unavailable.</p>`:''}
+        ${this._diagnosticExport?.roomId===roomId&&this._diagnosticExport?.text?`<label>Diagnostic evidence<textarea readonly data-mm-diagnostics-text rows='12'>${escape(this._diagnosticExport.text)}</textarea></label><button type='button' data-mm-copy='diagnostics'>${rhiUxEscape(this.t('copy_diagnostics'))}</button><span data-mm-clipboard-status role='status'></span>`:''}</section>`:''}
       <div class="mm-diag-grid">${cards}</div></section>`;
   }
 }

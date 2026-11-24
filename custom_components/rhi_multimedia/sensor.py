@@ -9,10 +9,11 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, EVENT_UPDATE
-from .experience import VERSION, build_room, logical_asset_id
-from .foundation import selected_index, SELECTION_CHANGED_EVENT
+from .experience import (VERSION, build_room, logical_asset_id, NativeUpdate, RoomUpdate,
+                         queue_native_update, cancel_native_update)
+from .foundation import authorized_source, selected_index, SELECTION_CHANGED_EVENT, projection_source_reads
 from .source_discovery import logical_source_type, related_source_entities, logical_av_catalog
-from .validation import native_state
+from .validation import live_related_source, native_availability, native_state
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -44,11 +45,24 @@ async def async_setup_entry(hass, entry, async_add_entities):
     # supported, discovered logical AV devices. Configured rooms already
     # subscribe to their owned sources in the existing integration runtime.
     watched_ids: tuple[str, ...] = ()
+    primary_ids: set[str] = set()
     cancel_watch = None
 
     @callback
-    def source_changed(_event):
-        async_dispatcher_send(hass, EVENT_UPDATE, "*")
+    def source_changed(event):
+        entity = event.data.get("entity_id")
+        if entity not in primary_ids:
+            # Companion-only links expose availability (and a native notify
+            # label), not their unrelated sensor values or attributes.
+            before, after = event.data.get("old_state"), event.data.get("new_state")
+            if before is not None and after is not None:
+                changed = native_availability(before) != native_availability(after)
+                if entity.startswith("notify."):
+                    changed = changed or getattr(before, "name", None) != getattr(after, "name", None)
+                if not changed:
+                    return
+        queue_native_update(hass, context, entity,
+                            context.get("native_projection_rooms", {}).get(entity, ()))
 
     def refresh_watch():
         nonlocal watched_ids, cancel_watch
@@ -57,15 +71,25 @@ async def async_setup_entry(hass, entry, async_add_entities):
         engine_watched = set()
         if engine:
             adapter = context.get("adapter")
-            for room in rooms.values():
-                for device in room.get("devices", {}).values():
-                    engine_watched.add(device["entity"])
-                    remote = adapter.paired_remote(device) if adapter else None
-                    if remote:
-                        engine_watched.add(remote["entity"])
-        ids = tuple(sorted(({asset.device["entity"] for asset in projected.values()}
-                            | {rel["entity_id"] for asset in projected.values()
-                               for rel in asset.related_entities}) - engine_watched))
+            with projection_source_reads(hass):
+                for room in rooms.values():
+                    for device in room.get("devices", {}).values():
+                        engine_watched.add(device["entity"])
+                        remote = adapter.paired_remote(device) if adapter else None
+                        if remote:
+                            engine_watched.add(remote["entity"])
+        # Build the dependency index only on structural changes. Tombstoned
+        # discovered assets retain identity, not their obsolete subscriptions.
+        dependencies = {}
+        primary_ids.clear()
+        for asset in projected.values():
+            if not asset.source_published:
+                continue
+            primary_ids.add(asset.device["entity"])
+            for entity in {asset.device["entity"], *(link["entity_id"] for link in asset.related_entities)}:
+                dependencies.setdefault(entity, set()).update(asset.room_ids)
+        context["native_projection_rooms"] = dependencies
+        ids = tuple(sorted(set(dependencies) - engine_watched))
         if ids == watched_ids:
             return
         if cancel_watch is not None:
@@ -98,17 +122,23 @@ async def async_setup_entry(hass, entry, async_add_entities):
             if asset_id not in current:
                 entity.mark_unpublished()
                 native_links[asset_id].mark_unpublished()
+        # Share the single discovery result before the single structural
+        # publication; no second Foundation catalog traversal in media_player.
+        refresh_players = context.get("refresh_logical_players")
+        if refresh_players:
+            refresh_players(current)
         refresh_watch()
-        async_dispatcher_send(hass, EVENT_UPDATE, "*")
+        async_dispatcher_send(hass, EVENT_UPDATE, RoomUpdate("*"))
 
     refresh_watch()
     if getattr(hass, "bus", None) is not None:
         entry.async_on_unload(hass.bus.async_listen(
             SELECTION_CHANGED_EVENT, foundation_changed))
     entry.async_on_unload(lambda: cancel_watch() if cancel_watch else None)
+    entry.async_on_unload(lambda: cancel_native_update(context))
 
 
-def logical_asset_projection_specs(hass, rooms: dict) -> dict:
+def configured_asset_projection_specs(hass, rooms: dict, *, include_links=True) -> dict:
     """Exactly one RHI logical device per configured actionable AV asset.
 
     Native vendor devices retain their identity and control. The existing Dell
@@ -140,9 +170,16 @@ def logical_asset_projection_specs(hass, rooms: dict) -> dict:
             if item["device"]["entity"] != entity_id:
                 item["conflicted_identity"] = True
             item["rooms"].add(room_id)
-            if not item["source_entities"]:
+            if include_links and not item["source_entities"]:
                 item["source_entities"] = related_source_entities(
                     hass, native_device_id, entity_id)
+    return assets
+
+
+def logical_asset_projection_specs(hass, rooms: dict) -> dict:
+    """Configured devices plus read-only discovered AV assets."""
+    registry = er.async_get(hass)
+    assets = configured_asset_projection_specs(hass, rooms)
     # Publish logical devices from the read-only supported-domain catalog even
     # before a room is configured. Configured assets always retain their
     # historical IDs; the same native device cannot create another RHI wrapper.
@@ -247,16 +284,24 @@ class LogicalAssetSensor(SensorEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
     @callback
-    def _changed(self, _room):
-        self.async_write_ha_state()
+    def _changed(self, update):
+        if update == "*" or (isinstance(update, NativeUpdate) and self.source_published
+                and update.affects(self.device["entity"], self.related_entities)):
+            # HA reads several properties during one synchronous state write.
+            # Resolve the same binding once, never retain across publications.
+            self._write_evidence = self._evidence()
+            try:
+                self.async_write_ha_state()
+            finally:
+                self._write_evidence = None
 
     def _evidence(self):
-        source = selected_index(self.hass).get(
-            (self.device.get("foundation_concept"), self.device["entity"]))
-        approved = (source is not None
-                    and source.candidate_id == self.device.get("foundation_candidate_id"))
+        current = getattr(self, "_write_evidence", None)
+        if current is not None:
+            return current
+        source = authorized_source(self.hass, self.device)
         state = native_state(self.hass, self.device["entity"])
-        return source if approved else None, state
+        return source, state
 
     @staticmethod
     def _fresh_native(state) -> bool:
@@ -282,20 +327,7 @@ class LogicalAssetSensor(SensorEntity):
         return bool((getattr(raw, "attributes", {}) or {}).get("restored"))
 
     def _related_native_entity(self, link: dict) -> dict:
-        """Refresh read-only runtime state for one exact known source endpoint."""
-        if not self.source_published:
-            status = "source_unpublished"
-        elif link.get("availability") == "disabled":
-            status = "disabled"
-        else:
-            observed = native_state(self.hass, link["entity_id"])
-            if self._fresh_native(observed):
-                status = "available"
-            elif self._native_restored(link["entity_id"]):
-                status = "restored"
-            else:
-                status = "unavailable"
-        return {**link, "availability": status}
+        return live_related_source(self.hass, link, self.source_published)
 
     @property
     def extra_state_attributes(self):
@@ -390,8 +422,12 @@ class NativeSourceSensor(SensorEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
     @callback
-    def _changed(self, _room):
-        self.async_write_ha_state()
+    def _changed(self, update):
+        # Identity remains structural, but exact related availability is
+        # live readback. Other media/room updates cannot affect this link.
+        if update == "*" or (isinstance(update, NativeUpdate) and self.source_published
+                and update.affects(self.source_entity_id, self.related_entities)):
+            self.async_write_ha_state()
 
     @property
     def native_value(self):
@@ -405,7 +441,7 @@ class NativeSourceSensor(SensorEntity):
             "rooms": list(self.room_ids),
             "related_source_entities": [
                 {"entity_id": x["entity_id"], "provider": x.get("provider"),
-                 "availability": x.get("availability")}
+                 "availability": live_related_source(self.hass, x, self.source_published)["availability"]}
                 for x in self.related_entities
             ],
             "source_published": self.source_published,
@@ -434,11 +470,19 @@ class RoomSensor(SensorEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
     @callback
-    def _changed(self, room):
-        # Other rooms can acquire/release a shared endpoint or group. Refresh
-        # room status on every domain invalidation; inspect remains room-local.
-        if self.kind == "status" or room == self.room:
+    def _changed(self, update):
+        # Commands/reservations keep their existing cross-room invalidation.
+        # Native telemetry only affects explicitly associated rooms.
+        if isinstance(update, NativeUpdate):
+            if self.kind != "status" or self.room not in update.rooms:
+                return
+        elif self.kind != "status" and update != self.room:
+            return
+        self._native_update = update if isinstance(update, (NativeUpdate, RoomUpdate)) else None
+        try:
             self.async_write_ha_state()
+        finally:
+            self._native_update = None
 
     @property
     def native_value(self):
@@ -455,7 +499,9 @@ class RoomSensor(SensorEntity):
         origin = {"schema_major": 1, "owner": "multimedia", "asset_id": self.room,
                   "event_id": "activity_attention", "title": f"{room.get('name', self.room)}: activity needs attention",
                   "qualified": True, "protected": False, "kind": "incident"}
-        properties = build_room(self.context, self.hass, selected_index(self.hass), self.room)
+        update = getattr(self, "_native_update", None)
+        properties = (update.room_model(self.context, self.hass, self.room) if update else
+                      build_room(self.context, self.hass, selected_index(self.hass), self.room))
         # Preserve existing native activity/status/source-role identities and
         # historical attributes. The state is the execution phase; direct
         # room properties replace the retired household snapshot.
@@ -486,8 +532,14 @@ class PlanningTargetsSensor(SensorEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
     @callback
-    def _changed(self, room):
-        self.async_write_ha_state()
+    def _changed(self, update):
+        if isinstance(update, NativeUpdate) and not update.rooms:
+            return
+        self._native_update = update if isinstance(update, (NativeUpdate, RoomUpdate)) else None
+        try:
+            self.async_write_ha_state()
+        finally:
+            self._native_update = None
 
     @property
     def native_value(self):
@@ -496,10 +548,19 @@ class PlanningTargetsSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         registry = er.async_get(self.hass)
-        selected = selected_index(self.hass)
-        rows = []
-        for room_id, room in self.context["engine"].rooms.items():
-            experience = build_room(self.context, self.hass, selected, room_id)
+        update = getattr(self, "_native_update", None)
+        rooms = self.context["engine"].rooms
+        previous = getattr(self, "_published_rows", {})
+        scoped = isinstance(update, NativeUpdate) and set(previous) == set(rooms)
+        selected = None if update else selected_index(self.hass)
+        by_room = {}
+        for room_id in rooms:
+            if scoped and room_id not in update.rooms:
+                by_room[room_id] = previous[room_id]
+                continue
+            experience = (update.room_model(self.context, self.hass, room_id) if update else
+                          build_room(self.context, self.hass, selected, room_id))
+            rows = []
             for activity in experience["activities"]:
                 unique_id = f"{self.entry_id}:{room_id}:activity:{activity['id']}"
                 entity_id = registry.async_get_entity_id("button", DOMAIN, unique_id)
@@ -511,4 +572,7 @@ class PlanningTargetsSensor(SensorEntity):
                              "qualified": bool(activity["available"] and
                                                experience["control_owner"] == "multimedia" and
                                                experience["phase"] not in ("starting", "stopping"))})
-        return {"rhi_planning_targets": rows}
+            by_room[room_id] = rows
+        # Derived publication only; no scheduling or authorization cache.
+        self._published_rows = by_room
+        return {"rhi_planning_targets": [row for rows in by_room.values() for row in rows]}

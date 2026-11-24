@@ -17,7 +17,8 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import EVENT_UPDATE
 from .engine import MediaError
-from .validation import native_choices, native_state
+from .experience import NativeUpdate
+from .validation import live_related_source, native_choices, native_state
 
 from .const import DOMAIN
 from .dell_c8621qt import DellC8621QT, DellProtocolError, valid_host
@@ -42,8 +43,6 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
 
     if hass is None:
         return  # Pure Dell transport test fixture has no HA registry.
-    from homeassistant.helpers.dispatcher import async_dispatcher_send
-    from .foundation import SELECTION_CHANGED_EVENT
     from .sensor import logical_asset_projection_specs
 
     context = hass.data[DOMAIN]
@@ -59,10 +58,9 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         async_add_entities(list(projected.values()))
 
     @callback
-    def foundation_changed(event):
-        if event.data.get("domain_id") != "multimedia":
-            return
-        current = logical_asset_projection_specs(hass, rooms)
+    def refresh_logical_players(current):
+        # The sensor platform owns the shared discovery projection and its
+        # structural watcher. Both native platforms consume the same specs.
         added = []
         for key, spec in current.items():
             if not spec["device"]["entity"].startswith("media_player."):
@@ -76,13 +74,17 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
         if added:
             async_add_entities(added)
         for key, player in projected.items():
-            if key not in current:
+            if (key not in current
+                    or not current[key]["device"]["entity"].startswith("media_player.")):
                 player.mark_unpublished()
-        async_dispatcher_send(hass, EVENT_UPDATE, "*")
 
-    if getattr(hass, "bus", None) is not None:
-        entry.async_on_unload(hass.bus.async_listen(
-            SELECTION_CHANGED_EVENT, foundation_changed))
+    context["refresh_logical_players"] = refresh_logical_players
+
+    def remove_refresh():
+        if context.get("refresh_logical_players") is refresh_logical_players:
+            context.pop("refresh_logical_players", None)
+
+    entry.async_on_unload(remove_refresh)
 
 
 class DellC8621QTPlayer(MediaPlayerEntity):
@@ -198,6 +200,7 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
         ("stop", MediaPlayerEntityFeature.STOP),
         ("next", MediaPlayerEntityFeature.NEXT_TRACK),
         ("previous", MediaPlayerEntityFeature.PREVIOUS_TRACK),
+        ("seek", MediaPlayerEntityFeature.SEEK),
     )
 
     def __init__(self, context, entry_id: str, asset_id: str, spec: dict) -> None:
@@ -231,8 +234,20 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
     @callback
-    def _changed(self, _room) -> None:
-        self.async_write_ha_state()
+    def _changed(self, update) -> None:
+        if isinstance(update, NativeUpdate):
+            if not self.source_published or not update.affects(
+                    self.device["entity"], self.related_entities):
+                return
+        # Keep native attributes and capability reads consistent throughout
+        # the synchronous HA write; never reuse these in a physical command.
+        from .foundation import projection_source_reads
+        with projection_source_reads(self.hass):
+            self._write_options = self._options()
+            try:
+                self.async_write_ha_state()
+            finally:
+                self._write_options = None
 
     def _native(self):
         if not self.source_published or self.conflicted_identity:
@@ -270,6 +285,9 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
         return active[0] if len(active) == 1 else None
 
     def _options(self) -> dict:
+        cached = getattr(self, "_write_options", None)
+        if cached is not None:
+            return cached
         binding = self._binding()
         adapter = self.context.get("adapter")
         if binding is None or adapter is None:
@@ -375,7 +393,7 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
             "rooms": list(self.room_ids),
             "related_source_entities": [
                 {"entity_id": x["entity_id"], "provider": x.get("provider"),
-                 "availability": x.get("availability")}
+                 "availability": live_related_source(self.hass, x, self.source_published)["availability"]}
                 for x in self.related_entities
             ],
             "source_readback": "native_ha_state" if self._native() else "unavailable_or_restored",
@@ -443,3 +461,6 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
 
     async def async_media_previous_track(self):
         await self._execute("previous")
+
+    async def async_media_seek(self, position):
+        await self._execute("seek", position)

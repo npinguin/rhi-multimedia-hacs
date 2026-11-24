@@ -668,3 +668,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
   .mm-shell .rhiUxModuleTab{font-size:11px;padding:7px 4px}
   .mm-cockpit-device-heading>span{flex-basis:125px}
 }
+
+/* Text is engineering evidence, not a screenshot-only control. */
+.mm-options-editor textarea,.mm-wh-expert textarea,.mm-selectable,.mm-selectable textarea,.mm-options-description{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
+[data-mm-diagnostics-text],[data-mm-copy-fallback]{width:100%;box-sizing:border-box;min-height:120px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;overflow:auto}

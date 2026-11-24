@@ -2,9 +2,11 @@
 const RHI_MM_VIEWS = Object.freeze(['overview','settings','discovery','insights','rooms','activities','devices','diagnostics']);
 const RHI_MM_PHASES = ['idle','starting','active','partial','stopping','interrupted','error'];
 
-function rhiMmRooms(hass) {
-  const candidates=Object.entries(hass?.states||{}).filter(([id,state])=>id.startsWith('sensor.')&&
+function rhiMmRoomCandidates(hass) {
+  return Object.entries(hass?.states||{}).filter(([id,state])=>id.startsWith('sensor.')&&
     typeof state?.attributes?.rhi_multimedia_room==='string');
+}
+function rhiMmRooms(hass,candidates=rhiMmRoomCandidates(hass)) {
   const counts=new Map();
   for(const [,state] of candidates){const key=state.attributes.rhi_multimedia_room;counts.set(key,(counts.get(key)||0)+1);}
   const rooms=[];const versions=new Set();let unavailable=0;
@@ -64,17 +66,23 @@ function rhiMmShortcutIntent(room, action, key){
   return null;
 }
 
-function rhiMmDeviceIntent(room, key, action, value) {
+function rhiMmDeviceIntent(room, key, action, value, expectedActivity) {
   const device=room?.devices?.find(d=>d.key===key);
   const capability=device?.controls?.[action];
   if(!device?.foundation_approved||!capability?.enabled||['starting','stopping'].includes(room.phase))return null;
+  const activityBound=['seek','remote_key','remote_text'].includes(action);
+  if(activityBound&&expectedActivity!==undefined&&(expectedActivity||null)!==(room.activity_id||null))return null;
   if(Array.isArray(capability.options)){if(typeof value!=='string'||!capability.options.includes(value))return null;}
   else if(action==='volume'){if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1)return null;}
+  else if(action==='seek'){
+    if(typeof value!=='number'||!Number.isFinite(value)||!Number.isFinite(capability.max_seconds)||value<0||value>capability.max_seconds)return null;
+    if(room.now_playing?.device_key!==key||!Number.isFinite(room.now_playing?.duration)||value>room.now_playing.duration)return null;
+  }
   else if(action==='mute'){if(typeof value!=='boolean')return null;}
   else if(action==='remote_text'){
     if(typeof value!=='string'||value.length<1||value.length>256||/[\x00-\x1f\x7f]/.test(value))return null;
   }else if(value!==undefined&&value!==null)return null;
-  return {domain:'rhi_multimedia',service:'control_device',data:{room:room.id,device:key,action,...(value!==undefined&&value!==null?{value}:{})}};
+  return {domain:'rhi_multimedia',service:'control_device',data:{room:room.id,device:key,action,...(value!==undefined&&value!==null?{value}:{}),...(activityBound&&room.phase==='active'&&room.activity_id?{expected_activity:room.activity_id}:{})}};
 }
 
 
@@ -152,6 +160,38 @@ const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
   'guided_activity','add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity',
   'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
 ]));
+async function rhiMmEntry(hass){
+  if(hass?.user?.is_admin!==true)throw new Error('Multimedia admin permission required');
+  if(typeof hass.callWS!=='function'||typeof hass.callApi!=='function')
+    throw new Error('Native HA configuration API unavailable');
+  const entries=await hass.callWS({type:'config_entries/get',domain:'rhi_multimedia'});
+  const matched=Array.isArray(entries)?entries.filter(e=>
+    e?.domain==='rhi_multimedia'&&e.supports_options===true&&
+    typeof e.entry_id==='string'&&e.entry_id):[];
+  if(matched.length!==1)throw new Error('Multimedia Options Flow unavailable');
+  return matched[0].entry_id;
+}
+async function rhiMmDiagnosticExport(hass,roomId=''){
+  const entryId=await rhiMmEntry(hass);
+  const response=await hass.callApi('GET','diagnostics/config_entry/'+encodeURIComponent(entryId));
+  const data=response?.data;
+  if(!data||data.identity?.domain!=='rhi_multimedia'||data.identity.config_entry_id!==entryId)
+    throw new Error('Invalid Multimedia diagnostics response');
+  // Only Multimedia's own privacy-safe diagnostic payload, never HA's
+  // surrounding system information, other integrations or issue registry.
+  if(!roomId)return data;
+  if(!data.configuration?.room_ids?.includes(roomId))throw new Error('Unknown Multimedia diagnostics room');
+  const scoped={identity:data.identity,ux:data.ux,build_handoff:data.build_handoff,
+    publication:data.publication,configuration:{room_ids:[roomId]},scope:roomId};
+  const onlyRoom=source=>source&&Object.prototype.hasOwnProperty.call(source,roomId)?{[roomId]:source[roomId]}:{};
+  for(const key of ['execution','target_readback','source_readback','last_controls','last_attempts','attention_events'])
+    scoped[key]=onlyRoom(data[key]);
+  for(const key of ['harmony_ownership','configured_activities','activity_routes'])
+    scoped.configuration[key]=onlyRoom(data.configuration[key]);
+  const linked=new Set(Object.values(scoped.source_readback[roomId]||{}).map(d=>d.entity));
+  scoped.discovery={origin:data.discovery?.origin,supported_candidates:(data.discovery?.supported_candidates||[]).filter(d=>linked.has(d.entity))};
+  return scoped;
+}
 async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',
   phase='',operation='',index=null,device='',stepType=''}){
   if(hass?.user?.is_admin!==true)
@@ -160,13 +200,9 @@ async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''
     throw new Error('Native HA configuration API unavailable');
   if(!RHI_MM_OPTION_ACTIONS.has(action))
     throw new Error('Unsupported Multimedia settings action');
-  const entries=await hass.callWS({type:'config_entries/get',domain:'rhi_multimedia'});
-  const matched=Array.isArray(entries)?entries.filter(e=>
-    e?.domain==='rhi_multimedia'&&e.supports_options===true&&
-    typeof e.entry_id==='string'&&e.entry_id):[];
-  if(matched.length!==1)throw new Error('Multimedia Options Flow unavailable');
+  const entryId=await rhiMmEntry(hass);
   let step=await hass.callApi('POST','config/config_entries/options/flow',
-    {handler:matched[0].entry_id});
+    {handler:entryId});
   const advance=async(expected,data)=>{
     if(step?.type!=='form'||step.step_id!==expected||typeof step.flow_id!=='string')
       throw new Error('Unexpected Multimedia Options Flow step');
