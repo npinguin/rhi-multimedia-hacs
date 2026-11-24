@@ -330,9 +330,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
         const id=action==='apply_json'
           ?this.shadowRoot?.querySelector?.('[data-wh-raw]')?.value||''
           :wholeAction.getAttribute('data-wh-id')||'';
-        rhiMmWholeAction(this._wholeHome,action,id,
+        const changed=rhiMmWholeAction(this._wholeHome,action,id,
           wholeAction.getAttribute('data-phase')||'',
           Number(wholeAction.getAttribute('data-index')));
+        if(action==='focus_binding'&&changed){
+          this.navigate('settings',this._wholeHome.room,'');return;
+        }
         if(action==='tab'&&['rooms','devices','activities'].includes(id))
           this._wholeHome.settingsTab=id;
         this._optionRefresh();
@@ -576,8 +579,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }else if(response?.type==='form'){
         this._optionsStep=response;
         if(response.step_id!==step.step_id)this._optionsData=rhiMmOptionDefaults(response);
-        if(response.step_id==='complete_setup'&&this._wholeHome)
-          this._wholeHome.error=this.optionError(response,response.errors?.base)||'';
+        if(response.step_id==='complete_setup'&&this._wholeHome){
+          const reason=this.optionError(response,response.errors?.base)||'';
+          const detail=response.description_placeholders?.validation_detail||'';
+          this._wholeHome.error=[reason,detail].filter(Boolean).join(' — ');
+        }
         else if(response.step_id==='complete_setup')
           this._wholeHome=rhiMmWholeFromStep(response);
       }else{

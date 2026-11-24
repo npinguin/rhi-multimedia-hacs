@@ -1112,11 +1112,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 # Keep the full iPad editor and unsaved draft when validation
                 # rejects data, rather than falling back to the legacy forms.
                 return await self._complete_setup_form(
-                    text=proposed, errors=result.get("errors") or {})
+                    text=proposed, errors=result.get("errors") or {},
+                    validation_detail=(result.get("description_placeholders") or {}).get(
+                        "validation_detail", ""))
             return result
         return await self._complete_setup_form()
 
-    async def _complete_setup_form(self, text=None, errors=None):
+    async def _complete_setup_form(self, text=None, errors=None, validation_detail=""):
         from .validation import native_state
         areas = area_choices(self.hass)
         # Floor/Area ownership remains native HA. The editor renders a live
@@ -1216,6 +1218,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
                 "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),
                 "proposal_exceptions_json": json.dumps(proposals["exceptions"], ensure_ascii=False),
+                "validation_detail": validation_detail[:200] if errors else "",
                 "discovery_origin": discovery_origin,
                 "note": "Supported-domain discovery defaults to Select All when Foundation "
                         "publishes it. Classify and assign without prior Foundation wizard. "
@@ -1452,7 +1455,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                                                  "Review native identities and input choices.")
         return self.async_show_form(step_id="yaml", errors=errors,
                                     data_schema=schema,
-                                    description_placeholders={"note": note})
+                                    description_placeholders={"note": note,
+                                                              "validation_detail": rejection_detail if errors else ""})
 
     async def async_step_guided_activity(self, user_input=None):
         """Activity-first setup using only existing HA Options Flow writes."""

@@ -60,10 +60,13 @@ function rhiMmWholeRepairable(d){
   return rows;
 }
 function rhiMmWholeVerifiedMacs(d,device){
-  const source=d.sources.find(s=>s.entity===device?.entity&&
+  // Native Device Registry MAC evidence is read-only before Review/Save.
+  // Command rights remain enforced by the backend and must not follow discovery.
+  const matches=d.sources.filter(s=>s.entity===device?.entity&&
     s.concept===device?.foundation_concept&&
-    s.candidate===device?.foundation_candidate_id&&s.approved===true);
-  return source?.verified_macs||[];
+    s.candidate===device?.foundation_candidate_id&&
+    !s.review_reason&&s.entity_registry_id&&s.config_entry_id&&s.provider);
+  return matches.length===1?matches[0].verified_macs||[]:[];
 }
 function rhiMmWholeCurrent(d){
   const room=d.doc.rooms[d.room];
@@ -131,7 +134,7 @@ function rhiMmWholeRender(d,t,escape){
     ...(!bindingCurrent&&selectedDevice?[ [currentCandidate,currentCandidate+' · no longer selected in Foundation'] ]:[]),
     ...sameNativeCandidates.map(s=>[s.candidate,s.label+' · '+s.provider])
   ];
-  const discovered=(d.logicalDevices||[]).map(asset=>{
+  const allDiscovered=(d.logicalDevices||[]).map(asset=>{
     const linkedRoomIds=rooms.filter(([,r])=>Object.values(r.devices||{}).some(x=>
       // The configured logical asset is stable even when Foundation reissues
       // a candidate or HA renames its entity. Never infer a link by label.
@@ -143,7 +146,8 @@ function rhiMmWholeRender(d,t,escape){
     )).map(([id])=>id);
     const linkedRooms=linkedRoomIds.map(id=>d.doc.rooms[id]?.name||id);
     return {...asset,linkedRoomIds,linkedRooms};
-  }).filter(asset=>{
+  });
+  const discovered=allDiscovered.filter(asset=>{
     if(d.catalogType!=='all'&&asset.logical_type!==d.catalogType)return false;
     if(d.catalogFilter==='unassigned'&&asset.linkedRooms.length)return false;
     if(d.catalogFilter==='in_room'&&!asset.linkedRoomIds.includes(d.bulkRoom))return false;
@@ -172,7 +176,7 @@ function rhiMmWholeRender(d,t,escape){
     const types=[...new Set((d.logicalDevices||[]).map(x=>x.logical_type).filter(Boolean))].sort();
     content=`<div class='mm-wh-grid mm-wh-discovery'><section class='mm-wh-panel'>
       <div class='mm-wh-heading'><div><h4>Device discovery &amp; assignment</h4>
-        <p>Found ${(d.logicalDevices||[]).length} supported devices · ${(d.logicalDevices||[]).filter(x=>!x.room_ids?.length).length} unassigned</p></div>
+        <p>Found ${allDiscovered.length} supported devices · ${allDiscovered.filter(x=>!x.linkedRoomIds.length).length} unassigned in this draft</p></div>
         <div class='mm-wh-step-actions'>
           <button type='button' data-wh-action='repair_bindings'
             ${repairs.length?'':'disabled'}>Review ${repairs.length} saved device link${repairs.length===1?'':'s'}</button>
@@ -180,6 +184,8 @@ function rhiMmWholeRender(d,t,escape){
             ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>Review proposed home setup (${Object.keys(d.proposedRooms||{}).length} rooms)</button>
         </div></div>
         ${repairs.length?'<p class="mm-muted">Review exact native links without replacing rooms or starting devices.</p>':''}
+        ${!Object.keys(d.proposedRooms||{}).length?`<p role='status' class='mm-muted'>No unambiguous automatic room proposals. Existing rooms are preserved; create or edit a room in Settings using a real Home Assistant Area. Native source discovery remains available.</p>
+          <button type='button' data-nav='settings'>Open Rooms &amp; Devices in Settings</button>`:''}
       <div class='mm-wh-searchfilters'>
         <label>Search ${field('catalog_query',d.catalogQuery)}</label>
         <label>Type ${select('catalog_type',d.catalogType,[['all','All device types'],...types.map(x=>[x,x.replaceAll('_',' ')])])}</label>
@@ -229,6 +235,9 @@ function rhiMmWholeRender(d,t,escape){
           ${e(d.areas[d.doc.rooms[d.bulkRoom].area_id]||'Not assigned')} · Floor:
           ${e(d.floors[d.areaFloors[d.doc.rooms[d.bulkRoom].area_id]]||'Not published')}</small>`:''}
         ${currentBinding?`
+          <p role='status' class='mm-muted'>Native control: ${e(currentBinding.control_approved===true?'requested for this exact source':'not yet approved in this draft')} · ${e(connected?.review_reason||(!connected?'current candidate not found; reselect in Devices':'review exact registry identity before Save'))}</p>
+          ${currentAsset.linkedRoomIds?.length>1&&['television','display'].includes(currentAsset.logical_type)?`<p class='mm-room-error'>This display is linked to multiple rooms. Verify its physical placement and remove only an incorrect room link; nothing is reassigned automatically.</p>`:''}
+          <button type='button' data-wh-action='focus_binding'>Review binding, permission and Wake-on-LAN in Settings</button>
           ${selectedRepair?`<button type='button' data-wh-action='repair_binding'
             data-wh-id='${e(selectedRepair.roomId+':'+selectedRepair.key)}'>
             Review this device link (one-device test)</button>`:''}
@@ -566,7 +575,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
           x.candidate===device.foundation_candidate_id&&x.provider==='harmony'))
         return fail('Harmony keeps exclusive control of this device');
       const macs=rhiMmWholeVerifiedMacs(d,device);
-      if(!macs.length)return fail('No approved native MAC address for this device');
+      if(!macs.length)return fail('No verified native MAC published for this exact source. Check its HA Device Registry and current Foundation binding.');
       const existing=device.power_on?.action==='wake_on_lan.send_magic_packet'
         ?device.power_on.data:{};
       if(!macs.includes(existing?.mac)&&macs.length!==1)
@@ -584,7 +593,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(key==='device_wol_mac'&&device){
     const mac=String(value||'').trim().replaceAll('-',':').toLowerCase();
     if(!rhiMmWholeVerifiedMacs(d,device).includes(mac))
-      return fail('MAC must match this exact authorized native device');
+      return fail('MAC must match the current native HA Device Registry for this exact source');
     rhiMmWholeForPhysical(d,device,x=>{
       if(x.power_on?.action!=='wake_on_lan.send_magic_packet')
         x.power_on={action:'wake_on_lan.send_magic_packet',data:{mac,broadcast_port:9}};
@@ -693,6 +702,17 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!changed)return fail('Existing setup preserved; review the listed source exceptions');
     d.room=Object.keys(d.doc.rooms)[0]||'';d.bulkRoom=d.room;d.device='';d.activity='';
     d.tab='rooms';d.dirty=true;d.error='';return true;
+  }
+  if(action==='focus_binding'){
+    if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose the exact room before reviewing source access');
+    const asset=(d.logicalDevices||[]).find(x=>x.asset_id===d.detailAsset);
+    if(!asset)return fail('Choose the exact discovered device first');
+    const matches=Object.entries(d.doc.rooms[d.bulkRoom].devices||{}).filter(([,x])=>
+      (x.asset_id||x.physical_id)===asset.asset_id||
+      asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
+    if(matches.length!==1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
+    d.room=d.bulkRoom;d.device=matches[0][0];d.tab='devices';
+    d.settingsTab='devices';d.workspace='settings';d.error='';return true;
   }
   if(action==='repair_bindings'||action==='repair_binding'){
     const repairs=rhiMmWholeRepairable(d);
