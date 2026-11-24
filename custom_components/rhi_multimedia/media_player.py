@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from homeassistant.components.media_player import MediaPlayerEntity, MediaPlayerEntityFeature
 from homeassistant.components.media_player.const import MediaPlayerState
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 
@@ -41,7 +42,6 @@ async def async_setup_entry(hass, entry, async_add_entities) -> None:
 
     if hass is None:
         return  # Pure Dell transport test fixture has no HA registry.
-    from homeassistant.core import callback
     from homeassistant.helpers.dispatcher import async_dispatcher_send
     from .foundation import SELECTION_CHANGED_EVENT
     from .sensor import logical_asset_projection_specs
@@ -230,6 +230,7 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
         self.async_on_remove(async_dispatcher_connect(self.hass, EVENT_UPDATE, self._changed))
 
+    @callback
     def _changed(self, _room) -> None:
         self.async_write_ha_state()
 

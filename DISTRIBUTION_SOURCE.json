@@ -1,9 +1,9 @@
 {
   "status": "PROTECTED_TEST_CANDIDATE",
-  "source_commit": "f9ec54f50025c6ae96fcfbe65c595eef5eb1885f",
-  "source_zip_sha256": "3ab509eb75616e965d5092ee27375e8bb235d12a3d5cb3b7c2ee1a96f178878d",
-  "protected_zip_sha256": "28d5a5ff2270a475379c9ab7d6b9d271037f87f937389247950caa29276e1fef",
-  "manifest_version": "0.1.18",
+  "source_commit": "aa42ba706b34e3a3ef2525c015de29b532a002e2",
+  "source_zip_sha256": "c74615e1a9d2840a5238b7ca813ac258be86d54b11ee03d5185781cd404c92d0",
+  "protected_zip_sha256": "05f7b73264faeb2c43ced98d5959b2e3c3db2ebdd64f3737ab0df75253329de5",
+  "manifest_version": "0.1.19",
   "platforms": {
     "aarch64": {
       "ha_image": "ghcr.io/home-assistant/home-assistant@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82",
@@ -11,7 +11,7 @@
       "extension_suffix": ".cpython-314-aarch64-linux-musl.so",
       "cython": "3.2.9",
       "compiler": "cc (Alpine 15.2.0) 15.2.0",
-      "protected_zip_sha256": "249862b7a4fd9f770f965715c0ea6c0522f0f46176fa8a9fff94d1efdd51d1bf"
+      "protected_zip_sha256": "cd48d6810caa3836f5126b0294ea2a3080533b4f9ff6c8dfe1657da89dff02ba"
     },
     "x86_64": {
       "ha_image": "ghcr.io/home-assistant/home-assistant@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82",
@@ -19,7 +19,7 @@
       "extension_suffix": ".cpython-314-x86_64-linux-musl.so",
       "cython": "3.2.9",
       "compiler": "cc (Alpine 15.2.0) 15.2.0",
-      "protected_zip_sha256": "7a175ce7f138bdcb753878ca28ea18e7ca2ebd8daf0cb331ae5e9949991e9216"
+      "protected_zip_sha256": "e2f439f281e464e604e1eaadf8b9bbfc5a49003897d49eb054bd3c37d6a7271e"
     }
   },
   "protected_modules": [
@@ -62,8 +62,8 @@
     "const.py": "e069223f0b676bbe160ca3200916dc84b9a6b3e6c35ee441b34f431ade882ee6",
     "dell_c8621qt.cpython-314-aarch64-linux-musl.so": "33363c6168e124e2bb6513cb92f9c8003c697bb9f3a8a348bb82170374e9cd37",
     "dell_c8621qt.cpython-314-x86_64-linux-musl.so": "3528db5c0ae093870743ede77a732b01d5a88b1a07ed8f2c8fd9c6cd8d40d331",
-    "device_preferences.cpython-314-aarch64-linux-musl.so": "153267f4f3af39d6428e187979d34fcdc77af3cfcf93e7c6fac7541e1ae66169",
-    "device_preferences.cpython-314-x86_64-linux-musl.so": "834e2a67c0e09bdcfa71bfbfc2319bceac2942075fbb574c4366bc0d4cf45678",
+    "device_preferences.cpython-314-aarch64-linux-musl.so": "e16fdc91314e2e4034204a5db7ac9458d647f40b1be5f52ab0ed97f81c94a2fb",
+    "device_preferences.cpython-314-x86_64-linux-musl.so": "101c086c5cbaa060b48b6d2f56bfc55bea8b3ad8ca1134d610d824adaeb0e963",
     "diagnostics.py": "4ef1f0a059e9f8f877dece18a9cdc40991ead20da5c2a79453d666bbea1f9a81",
     "engine.cpython-314-aarch64-linux-musl.so": "d3c4cec3b4096c71cf6d7615f30664105d9e261d6023b6aec6af27738d00dee3",
     "engine.cpython-314-x86_64-linux-musl.so": "810dacaa841e00719ed09b7a42a51b7e9cbdfb440cf67677945a9a0c4976328a",
@@ -73,7 +73,7 @@
     "foundation.cpython-314-x86_64-linux-musl.so": "8b49d605019f75450e68fc3458b776a2c0fe5528b534c69d54a980ff1cca7db5",
     "frontend.py": "15aa2bb10920988989a5cedc1133d98b9f7b9d5b008b8b19014ce7f235f82907",
     "frontend/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
-    "frontend/PACKAGE_MANIFEST.json": "6c6bc7f31fb26c215575d6e80f151ef62dc578827b33469990266bb06cf85e3a",
+    "frontend/PACKAGE_MANIFEST.json": "8f6323fa759242a2e1b6d6b0a0cb53d8f11e58cc203bc5c5cbf155ab6a24b1d2",
     "frontend/assets/branding/company-logo.svg": "264f0d86798a2a53e30b8beb5cae366e4b0916adbb3716b3deb23b5ddbed053d",
     "frontend/assets/devices/amazon_echo_dot.svg": "ebde2df0e45b8b1e1ae146e83cd9e55db7170420afb3ed09ed4bfffc957c49fb",
     "frontend/assets/devices/amazon_echo_spot.svg": "e50f4658679782929e98afefb8dcac53ad676fcaddcf750fab058169f3ccbf69",
@@ -88,12 +88,12 @@
     "frontend/assets/heroes/multimedia-activities.svg": "f2296a8f6bce275a88e62ea1bc0010c6dfe713281fba55d8b7f99157e900f7b0",
     "frontend/assets/heroes/multimedia-insights.svg": "d4c86cfb9d522b902fe67cb5be7b9ffca266ca5914cbbc3d82a31e88a51dfba7",
     "frontend/assets/heroes/multimedia-overview.svg": "3e77dc6c9a4861f760d05137894ba42c1c702bdce7bf50a4d46161e7a350b41d",
-    "frontend/rhi-multimedia-ux.js": "dbe22e0d1802c24e7b1e457990f6f511dba98aa86273445d2aa4c5c3fbcbf251",
-    "frontend/rhi-multimedia-ux.js.sha256": "8c0556acd90acbff20181cf6237c45953c7fee3dbc97c64c068c93cb84800e88",
+    "frontend/rhi-multimedia-ux.js": "7a6963ab7deb421307a30cd6da2dcabe91f7bd43c796aa61baf5d5136f65c7e4",
+    "frontend/rhi-multimedia-ux.js.sha256": "99c32e5f4e972de7db4e16694325df5b1dd1f43b7d3be585c6d6ffb10c3a8896",
     "icon.png": "8925e28f6d3e2eafde22a14896e58ec292bfddd1ae58d881a6b4de1ac1c30bc2",
     "logo.png": "960321934daedcd75e08e7146d4f983dae0081e910d00750793053205a43d3ba",
-    "manifest.json": "e674ba48b22a26b69a03a784ec8c29c381013b6c39a227135f9b75c3fcf37661",
-    "media_player.py": "e071d86d9449ef3bf11acbf9edb5f14c96f094fe84cef2c6ac8e7fc71a0575a7",
+    "manifest.json": "b7036e6476a4c818fe6207d34fa14bdcaa3a2386338a9727b2a147e674d29272",
+    "media_player.py": "56fcf56eb69203675065c35643735f269d3745c42b5fad3f514c2d6d8e49548f",
     "notify.py": "b89e3626a30be4ad07da984926da4dbfd8987633225d37e402a7459ffc7aec52",
     "number.py": "4aa017d5a58d854fdf92220d3bf2b4ea68b8f8d602d1cc95460135e992b5cb3a",
     "product_profiles.json": "531cb65f65e9c985daa96041f2baafca1f759db019bf69add51593e9c8e4d7ab",
