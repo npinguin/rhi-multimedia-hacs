@@ -70,7 +70,12 @@ async def async_get_config_entry_diagnostics(hass, entry):
         room: engine.target_state(room) if engine.states[room].activity else None
         for room in engine.rooms
     } if engine else {})
+    from .source_discovery import discovered_av_sources, native_source_evidence
+    discovered, discovery_origin = discovered_av_sources(hass)
     return {
+        "discovery": {"origin": discovery_origin,
+                      "supported_candidates": [
+                          native_source_evidence(hass, source) for source in discovered]},
         "ux": ux_diagnostics(hass, entry),
         "identity": {"domain": DOMAIN, "version": manifest["version"],
                      "config_entry_id": entry.entry_id},

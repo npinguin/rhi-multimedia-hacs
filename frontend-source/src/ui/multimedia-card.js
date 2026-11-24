@@ -245,7 +245,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }else if(choice==='review'&&this._pendingNavigation){
         if(this._optionsBusy)return;
         if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
-          this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+          this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
           await this.submitOptions();
         }else if(this._optionsStep?.step_id==='review'){
           await this.submitOptions();
@@ -323,8 +323,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(wholeAction&&this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
       event.preventDefault();
       const action=wholeAction.getAttribute('data-wh-action');
-      if(action==='review'){
-        this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+      if(action==='review'||action==='review_yaml'){
+        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
         await this.submitOptions();
       }else{
         const id=action==='apply_json'
@@ -333,7 +333,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         const changed=rhiMmWholeAction(this._wholeHome,action,id,
           wholeAction.getAttribute('data-phase')||'',
           Number(wholeAction.getAttribute('data-index')));
-        if(action==='focus_binding'&&changed){
+        if(['focus_binding','focus_issue','edit_import'].includes(action)&&changed){
           this.navigate('settings',this._wholeHome.room,'');return;
         }
         if(action==='tab'&&['rooms','devices','activities'].includes(id))
@@ -448,8 +448,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   onWholeHomeInput(event){
     if(this._optionsStep?.step_id!=='complete_setup'||!this._wholeHome)return;
+    const raw=event.target?.closest?.('[data-wh-raw]');
+    if(raw){this._wholeHome.rawDraft=raw.value;this._wholeHome.editableDraft='';this._wholeHome.dirty=true;return;}
     const element=event.target?.closest?.('[data-wh-field]');
     if(!element)return;
+    if(this._wholeHome.rawDraft!=null){this._wholeHome.error='Validate or discard advanced YAML edits before changing GUI fields.';this._optionRefresh();return;}
     const key=element.getAttribute('data-wh-field');
     const value=element.type==='checkbox'?element.checked:element.value;
     const before=this._wholeHome.error;
@@ -582,7 +585,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(response.step_id==='complete_setup'&&this._wholeHome){
           const reason=this.optionError(response,response.errors?.base)||'';
           const detail=response.description_placeholders?.validation_detail||'';
-          this._wholeHome.error=[reason,detail].filter(Boolean).join(' — ');
+          this._wholeHome.error=[reason,detail].filter(Boolean).join('\n');
+          this._wholeHome.editableDraft=response.description_placeholders?.editable_draft_json||'';
+          if(!response.errors?.base&&step.step_id==='review'){
+            const normalized=rhiMmWholeFromStep(response);
+            this._wholeHome.doc=normalized.doc;this._wholeHome.rawDraft=null;
+            rhiMmWholeCurrent(this._wholeHome);
+          }
         }
         else if(response.step_id==='complete_setup')
           this._wholeHome=rhiMmWholeFromStep(response);
@@ -668,7 +677,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(step?.step_id==='complete_setup')return this.renderCompleteSetup(step);
     if(!step&&!this._optionsBusy&&!this._optionsError&&!this._optionsNotice)return '';
     const errors=step?.errors||{};
-    const base=errors.base?this.optionError(step,errors.base):this._optionsError;
+    const base=[errors.base?this.optionError(step,errors.base):this._optionsError,step?.description_placeholders?.validation_detail].filter(Boolean).join('\n');
     const label=step?.step_id?
       this._hass?.localize?.(`component.rhi_multimedia.options.step.${step.step_id}.title`,
         step.description_placeholders||{}):null;
@@ -682,7 +691,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     return `${this.leaveDecision()}<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
       <h3>${escape(stageTitle||label||this.t('setup_editor'))}</h3>
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
-      ${base?`<p role="alert" class="mm-room-error">${escape(base)}</p>`:''}
+      ${base?`<p role="alert" class="mm-room-error" style="white-space:pre-wrap">${escape(base)}</p>`:''}
       ${this._optionsNotice?`<p role="status">${escape(this._optionsNotice)}</p>`:''}
       ${step?.type==='form'?`<div class="mm-option-fields">
         ${(step.data_schema||[]).filter(field=>!(this._wholeHomeFlow&&

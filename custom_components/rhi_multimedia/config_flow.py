@@ -20,6 +20,7 @@ from .dell_c8621qt import valid_host
 from .foundation import authorized_source, reviewed_native_source, selected_native_macs
 from .source_discovery import (area_choices, av_sources, discovered_av_sources,
                                logical_av_catalog, proposed_room_setup, source_lists, speech_player_eligible,
+                               native_source_evidence,
                                tts_choices)
 from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
                          native_state, cec_links_for_activity, route_status, validate_action,
@@ -145,7 +146,11 @@ def _remapped_device(device: dict, entity_id: str) -> dict:
 
 def _source_ref(flow, entity_id: str, concept: str) -> dict:
     matches, _ = discovered_av_sources(flow.hass)
-    candidate = next((x for x in matches if x.entity_id == entity_id and x.concept == concept), None)
+    exact = [x for x in matches if x.entity_id == entity_id and x.concept == concept
+             and not x.review_reason]
+    if len(exact) > 1:
+        raise ValueError(f"{entity_id}: ambiguous Foundation/{concept} source; review native identity")
+    candidate = exact[0] if exact else None
     old = (flow._previous_room or {}).get("devices", {})
     previous = next((dev for dev in old.values()
                      if dev.get("entity") == entity_id and dev.get("foundation_concept") == concept
@@ -574,7 +579,8 @@ class _Wizard:
                 lines.append("  Harmony owns every declared endpoint; Premium activities retained but disabled.")
             for key, device in room["devices"].items():
                 state = native_state(self.hass, device["entity"])
-                lines.append(f"  {key}: {device['entity']} ({state.state if state else 'unavailable'})")
+                intent = " · native control approval requested" if device.get("control_approved") is True else ""
+                lines.append(f"  {key}: {device['entity']} ({state.state if state else 'unavailable'}){intent}")
             for activity in room["activities"].values():
                 lines.append(f"  {activity.get('name', 'Activity')}:")
                 for step in activity.get("steps", []):
@@ -587,6 +593,57 @@ class _Wizard:
                     lines.append(f"    {step['device']} · {' / '.join(step['candidates'])}: {preview['status']}")
         return "\n".join(lines) or "No rooms"
 
+    def _resolve_yaml_bindings(self, rooms):
+        """Resolve missing candidate IDs from exact native entity/concept only.
+
+        Explicitly supplied and existing identities are never silently repaired.
+        An explicit control_approved intent still needs the normal Review/Save
+        and the unchanged runtime native authorization gate.
+        """
+        sources, _ = discovered_av_sources(self.hass)
+        errors = []
+        for room_id, room in rooms.items():
+            if not isinstance(room, dict) or not isinstance(room.get("devices"), dict):
+                continue  # Canonical structural validator reports these shapes.
+            for key, device in room["devices"].items():
+                if not isinstance(device, dict) or device.get("foundation_candidate_id"):
+                    continue
+                if str(device.get("entity", "")).startswith("REPLACE_WITH_"):
+                    continue  # Canonical preflight reports the unresolved site slot.
+                if not isinstance(device.get("entity"), str) or not isinstance(device.get("foundation_concept"), str):
+                    continue
+                path = f"rooms.{room_id}.devices.{key}"
+                previous = self._original_rooms.get(room_id, {}).get("devices", {}).get(key, {})
+                if previous == device:
+                    continue  # Unchanged legacy pending source remains read-only.
+                if previous.get("entity") == device.get("entity") and previous.get("foundation_concept") == device.get("foundation_concept") and previous.get("foundation_candidate_id"):
+                    # Preserve the previous exact binding; a stale link needs an
+                    # explicit repair, never an automatic identity replacement.
+                    for field, value in previous.items():
+                        if field.startswith("foundation_"):
+                            device.setdefault(field, value)
+                    if "control_approved" in previous:
+                        device.setdefault("control_approved", previous["control_approved"])
+                    continue
+                matches = [src for src in sources if src.entity_id == device.get("entity")
+                           and src.concept == device.get("foundation_concept") and not src.review_reason]
+                if len(matches) != 1:
+                    errors.append(f"{path}: expected one current Foundation candidate for {device.get('entity')!r} / {device.get('foundation_concept')!r}; found {len(matches)}. Review native discovery.")
+                    continue
+                src = matches[0]
+                device["foundation_candidate_id"] = src.candidate_id
+                if device.get("control_approved") is True:
+                    for field, value in {"foundation_entity_registry_id": src.entity_registry_id,
+                                         "foundation_config_entry_id": src.config_entry_id,
+                                         "foundation_device_registry_id": src.device_registry_id,
+                                         "foundation_provider": src.provider}.items():
+                        if field in device and device[field] != value:
+                            errors.append(f"{path}.{field}: supplied native identity does not match current discovery")
+                        else:
+                            device[field] = value
+        if errors:
+            raise ValueError("\n".join(errors))
+
     def _review_configuration(self):
         if self._rooms:
             validate_rooms(self._rooms)
@@ -594,6 +651,7 @@ class _Wizard:
         supported, _ = discovered_av_sources(self.hass)
         selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
         command_sources = list(current)
+        problems = []
         # Reviewed semantic configuration is explicit control intent in the
         # single native Multimedia Options Flow. Verify exact current
         # Foundation/native identity BEFORE accepting this one Save. Discovery
@@ -611,7 +669,8 @@ class _Wizard:
                 if approved_source is None:
                     if previous_devices.get(device_key) == device:
                         continue
-                    raise ValueError("Reviewed native control binding is no longer valid")
+                    problems.append(f"rooms.{room_id}.devices.{device_key}: reviewed native control binding is no longer valid; select the matching Foundation device")
+                    continue
                 match = next((source for source in supported
                               if source.concept == device.get("foundation_concept")
                               and source.entity_id == device.get("entity")
@@ -620,7 +679,8 @@ class _Wizard:
                 if match is None:
                     if previous_devices.get(device_key) == device:
                         continue
-                    raise ValueError("Reviewed native control is not in supported discovery")
+                    problems.append(f"rooms.{room_id}.devices.{device_key}: reviewed native control is not in supported discovery; review the current native candidate")
+                    continue
                 key = (match.concept, match.entity_id, match.candidate_id)
                 selected.add(key)
                 if not any((source.concept, source.entity_id, source.candidate_id) == key
@@ -636,7 +696,8 @@ class _Wizard:
                 if ((device.get("foundation_concept"), device.get("entity"),
                      device.get("foundation_candidate_id")) not in discovered
                         and previous.get("devices", {}).get(key) != device):
-                    raise ValueError("New or changed device not in Foundation-supported discovery")
+                    problems.append(f"rooms.{room_id}.devices.{key}: {device.get('entity')} not in Foundation-supported discovery; select the exact current candidate")
+                    continue
                 tts_id = device.get("speech_tts_registry_id")
                 if tts_id and tts_id != previous.get("devices", {}).get(key, {}).get("speech_tts_registry_id"):
                     approved_speech = next((source for source in command_sources
@@ -645,7 +706,7 @@ class _Wizard:
                                             and source.candidate_id == device.get("foundation_candidate_id")), None)
                     if (room.get("harmony_controller") or not speech_player_eligible(
                             self.hass, device, approved_speech) or tts_id not in tts_choices(self.hass)):
-                        raise ValueError("Speech requires an exact selected Cast source and native TTS provider")
+                        problems.append(f"rooms.{room_id}.devices.{key}.speech_tts_registry_id: speech requires an exact selected Cast source and native TTS provider")
                 # The visual whole-home editor and scoped/global YAML share
                 # the exact native MAC + approved source gate. A read-only
                 # discovered device is never authorized for Wake-on-LAN.
@@ -663,7 +724,7 @@ class _Wizard:
                             or not device["entity"].startswith(("media_player.", "remote."))
                             or str(wol.get("data", {}).get("mac", "")).lower()
                             not in selected_native_macs(self.hass, approved_wol)):
-                        raise ValueError("Wake-on-LAN MAC must belong to the authorized native device")
+                        problems.append(f"rooms.{room_id}.devices.{key}.power_on: Wake-on-LAN MAC must belong to the authorized native device; choose a verified native MAC")
                 # A physical AV device has one wake destination across all
                 # consuming rooms. Existing unchanged legacy settings remain
                 # readable, but newly edited WOL cannot diverge by room.
@@ -676,16 +737,17 @@ class _Wizard:
                            for spec in self._rooms.values()
                            for other in spec["devices"].values()
                            if other.get("physical_id", other["entity"]) == physical):
-                        raise ValueError("Shared physical device has conflicting Wake-on-LAN settings")
+                        problems.append(f"rooms.{room_id}.devices.{key}.power_on: shared physical device has conflicting Wake-on-LAN settings")
             for activity_id, activity in room["activities"].items():
                 prior = previous.get("activities", {}).get(activity_id, {})
                 if activity == prior:
                     continue
                 for key in activity["devices"]:
                     device = room["devices"][key]
-                    if (device.get("foundation_concept"), device["entity"],
-                            device.get("foundation_candidate_id")) not in selected:
-                        raise ValueError("Changed activity includes revoked source or pending command approval")
+                    if (device.get("control_approved") is False or
+                            (device.get("foundation_concept"), device["entity"],
+                             device.get("foundation_candidate_id")) not in selected):
+                        problems.append(f"rooms.{room_id}.activities.{activity_id}.devices.{key}: changed activity includes revoked source or pending command approval")
                 # Expert/global YAML and Assisted must enforce the same actual
                 # native input/sound-mode choices. A name-only edit retains
                 # existing routes even if their native source is currently
@@ -703,9 +765,9 @@ class _Wizard:
                         offered = None
                     if (action in BUTTON_VALUE_ACTIONS
                             and (not offered or binding["value"] not in offered)):
-                        raise ValueError("Activity button not offered by selected native provider")
+                        problems.append(f"rooms.{room_id}.activities.{activity_id}.button_map.{button}: activity button not offered by selected native provider; choose a supported command")
                     if action not in BUTTON_VALUE_ACTIONS and not device["entity"].startswith("media_player."):
-                        raise ValueError("Media action requires a native media player")
+                        problems.append(f"rooms.{room_id}.activities.{activity_id}.button_map.{button}: media action requires a native media player")
                 script_pairs = [(prior.get(kind, []), activity.get(kind, []))
                                 for kind in ("steps", "stop_steps")]
                 for macro_id, macro in activity.get("macros", {}).items():
@@ -727,16 +789,20 @@ class _Wizard:
                                        and device["entity"].startswith("media_player.") else
                                        REMOTE_KEYSETS.get(integration, ()))
                             if step["value"] not in offered:
-                                raise ValueError("Scripted remote key not supported by selected native provider")
+                                problems.append(f"rooms.{room_id}.activities.{activity_id}: scripted remote key not supported by selected native provider ({step['device']})")
                             continue
                         if step.get("type") not in ("source", "sound_mode"):
                             continue
                         live = source_lists(self.hass, device["entity"])
                         offered = live["source_list" if step["type"] == "source"
                                        else "sound_mode_list"]
-                        if not offered or any(value not in offered
-                                              for value in step["candidates"]):
-                            raise ValueError("Changed route is not offered by the selected native HA device")
+                        path = f"rooms.{room_id}.activities.{activity_id}: {step['device']} {step['type']}"
+                        if not offered:
+                            problems.append(f"{path}: route verification pending; {device['entity']} exposes no native choices now. Bring the device online and validate again; no power command was sent.")
+                        elif any(value not in offered for value in step["candidates"]):
+                            problems.append(f"{path}: {step['candidates']!r} not offered by {device['entity']}; choose from {offered!r}")
+        if problems:
+            raise ValueError("\n".join(problems))
         engine = self.hass.data.get(DOMAIN, {}).get("engine")
         # Changing an opaque external controller is a physical ownership
         # handoff, not a name edit. Require hub OFF and no affected Premium task.
@@ -789,6 +855,7 @@ class _Wizard:
             self._complete_setup_finish = False
             return await self.async_step_complete_setup()
         errors = {}
+        detail = ""
         if user_input:
             if not user_input.get("confirm"):
                 errors["base"] = "confirm_save"
@@ -810,8 +877,9 @@ class _Wizard:
             else:
                 try:
                     reason = self._review_configuration()
-                except (ValueError, TypeError, KeyError):
+                except (ValueError, TypeError, KeyError, AttributeError) as exc:
                     errors["base"] = "selection_changed"
+                    detail = _validation_detail(exc)
                 else:
                     if reason:
                         errors["base"] = reason
@@ -825,11 +893,13 @@ class _Wizard:
         preview = self._review_summary()
         if getattr(self, "_yaml_import", False):
             preview = self._yaml_diff + "\n\n" + preview
+        if detail:
+            preview = "Validation failed:\n" + detail + "\n\n" + preview
         return self.async_show_form(step_id="review", errors=errors,
                                     data_schema=vol.Schema(fields),
                                     description_placeholders={"rooms": str(len(self._rooms)),
                                         "activities": str(sum(len(r["activities"]) for r in self._rooms.values())),
-                                        "summary": preview})
+                                        "summary": preview, "validation_detail": detail})
 
 
 class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
@@ -898,7 +968,9 @@ class _StrictYamlLoader(yaml.SafeLoader):
         for key_node, value_node in node.value:
             key = self.construct_object(key_node, deep=deep)
             if not isinstance(key, str) or key in result:
-                raise ValueError("YAML keys must be unique strings")
+                mark = key_node.start_mark
+                reason = f"duplicate YAML key {key!r}" if isinstance(key, str) else "YAML mapping key must be a string"
+                raise ValueError(f"{reason} at line {mark.line + 1}, column {mark.column + 1}")
             result[key] = self.construct_object(value_node, deep=deep)
         return result
 
@@ -909,14 +981,78 @@ def _yaml_document(document: str) -> dict:
         raise ValueError("YAML must be nonempty and at most 128 kB")
     try:
         payload = yaml.load(document, Loader=_StrictYamlLoader)
-    except (yaml.YAMLError, ValueError, RecursionError) as exc:
-        raise ValueError("Malformed or duplicated YAML configuration") from exc
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        location = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        raise ValueError("YAML syntax error or unsupported YAML tag" + location) from exc
+    except RecursionError as exc:
+        raise ValueError("YAML nesting exceeds supported depth") from exc
     if not isinstance(payload, dict):
         raise ValueError("YAML must be a mapping")
     return payload
 
 
-def _yaml_plan(document: str, existing: dict, mode: str) -> tuple[dict, list[str]]:
+def _validation_detail(exc) -> str:
+    return "\n".join("".join(ch for ch in line if ch.isprintable())[:500]
+                     for line in str(exc).splitlines()[:40])[:4096]
+
+
+def _validate_home(rooms: dict, resolve_bindings=None) -> None:
+    """Collect independent room errors through the canonical validator."""
+    if not isinstance(rooms, dict) or not rooms:
+        validate_rooms(rooms)
+        return
+    issues = []
+    if resolve_bindings is not None:
+        # CEC and other canonical invariants require exact candidate IDs.
+        # Resolve them on the disposable prospective model BEFORE validation,
+        # never write them to the saved Config Entry at this stage.
+        try:
+            resolve_bindings(rooms)
+        except ValueError as exc:
+            issues.extend(str(exc).splitlines())
+    for key, room in rooms.items():
+        try:
+            validate_rooms({key: room})
+        except (ValueError, TypeError, KeyError, AttributeError, OverflowError) as exc:
+            issues.append(f"rooms.{key}: {exc}")
+        # Explicit unfilled template values are not real source choices. Report
+        # every independent slot at once, even where another room is invalid.
+        if not isinstance(room, dict):
+            continue
+        if str(room.get("area_id", "")).startswith("REPLACE_WITH_"):
+            issues.append(f"rooms.{key}.area_id: select the actual Home Assistant Area")
+        devices = room.get("devices")
+        if isinstance(devices, dict):
+            for role, device in devices.items():
+                if not isinstance(device, dict):
+                    continue
+                if str(device.get("entity", "")).startswith("REPLACE_WITH_"):
+                    issues.append(f"rooms.{key}.devices.{role}.entity: choose the actual native HA entity")
+                if str(device.get("foundation_candidate_id", "")).startswith("REPLACE_WITH_"):
+                    issues.append(f"rooms.{key}.devices.{role}.foundation_candidate_id: resolve the exact native Foundation candidate")
+        activities = room.get("activities")
+        if isinstance(activities, dict):
+            for activity_id, activity in activities.items():
+                if not isinstance(activity, dict):
+                    continue
+                for phase in ("steps", "stop_steps"):
+                    steps = activity.get(phase, [])
+                    if not isinstance(steps, list):
+                        continue
+                    for index, step in enumerate(steps):
+                        if not isinstance(step, dict):
+                            continue
+                        candidates = step.get("candidates", [])
+                        if isinstance(candidates, list) and any(
+                                str(value).startswith("REPLACE_WITH_") for value in candidates):
+                            issues.append(f"rooms.{key}.activities.{activity_id}.{phase}[{index}].candidates: select a verified native input for {step.get('device')}")
+    if issues:
+        raise ValueError("\n".join(issues))
+    validate_rooms(rooms)
+
+
+def _yaml_plan(document: str, existing: dict, mode: str, *, resolve_bindings=None) -> tuple[dict, list[str]]:
     """Prepare independent room/device/activity changes without another config store.
 
     Each change replaces only named fields of one semantic object. Lists, such
@@ -931,9 +1067,10 @@ def _yaml_plan(document: str, existing: dict, mode: str) -> tuple[dict, list[str
         incoming = payload["rooms"]
         if not isinstance(incoming, dict) or not incoming:
             raise ValueError("YAML must contain at least one complete room")
-        validate_rooms(incoming)
-        return (deepcopy(incoming) if mode == "replace" else
-                {**deepcopy(existing), **deepcopy(incoming)}), []
+        result = (deepcopy(incoming) if mode == "replace" else
+                  {**deepcopy(existing), **deepcopy(incoming)})
+        _validate_home(result, resolve_bindings)
+        return result, []
     if set(payload) != {"changes"} or mode != "merge":
         raise ValueError("Scoped changes require changes: and merge mode")
     changes = payload["changes"]
@@ -989,7 +1126,7 @@ def _yaml_plan(document: str, existing: dict, mode: str) -> tuple[dict, list[str
             if not isinstance(original, dict):
                 raise ValueError("Cannot edit an invalid object")
             container[key] = {**original, **update}
-    validate_rooms(result)
+    _validate_home(result, resolve_bindings)
     return result, removals
 
 
@@ -1118,6 +1255,51 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return result
         return await self._complete_setup_form()
 
+    def _editable_home_draft(self, text):
+        """Transport a renderable rejected YAML as an unsaved editor draft.
+
+        This is not semantic validation or an alternative writer. The same
+        native preflight and Review/Save must still succeed after repair.
+        """
+        try:
+            payload = _yaml_document(text)
+            if set(payload) - {"rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
+                return ""
+            rooms = payload.get("rooms")
+            if not isinstance(rooms, dict) or not rooms:
+                return ""
+            for room_id, room in rooms.items():
+                if not re.fullmatch(r"[a-z][a-z0-9_]*", room_id) or not isinstance(room, dict):
+                    return ""
+                if any(not isinstance(room.get(group), dict) for group in ("devices", "activities")):
+                    return ""
+                if any(not isinstance(device, dict) or not isinstance(device.get("entity"), str)
+                       for device in room["devices"].values()):
+                    return ""
+                if any(not isinstance(activity, dict) or not isinstance(activity.get("devices"), list)
+                       or any(not isinstance(step, dict) or not isinstance(step.get("type"), str)
+                              for phase in ("steps", "stop_steps")
+                              for step in activity.get(phase, []))
+                       or any(not isinstance(activity.get(phase, []), list)
+                              for phase in ("steps", "stop_steps"))
+                       for activity in room["activities"].values()):
+                    return ""
+            try:
+                self._resolve_yaml_bindings(rooms)
+            except ValueError:
+                pass  # Keep all unresolved slots; the original diagnostic remains.
+            doc = {"rooms": rooms,
+                   "dell_displays": payload.get("dell_displays", self._original_dell_displays),
+                   "enable_ux": payload.get("enable_ux", self._original_enable_ux),
+                   "default_step_delay_ms": payload.get("default_step_delay_ms", self._original_step_delay_ms)}
+            if (not isinstance(doc["dell_displays"], dict)
+                    or type(doc["enable_ux"]) is not bool):
+                return ""
+            validate_step_delay(doc["default_step_delay_ms"])
+            return json.dumps(doc, ensure_ascii=False, allow_nan=False)
+        except (ValueError, TypeError, AttributeError, KeyError, RecursionError, OverflowError):
+            return ""
+
     async def _complete_setup_form(self, text=None, errors=None, validation_detail=""):
         from .validation import native_state
         areas = area_choices(self.hass)
@@ -1131,14 +1313,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                            for a in ar.async_get(self.hass).async_list_areas()}
         except (ImportError, AttributeError, RuntimeError):
             pass  # Optional fixture/old HA: never fabricate a physical floor.
-        discovered, discovery_origin = discovered_av_sources(self.hass)
-        logical_devices, _ = logical_av_catalog(self.hass, self._rooms)
-        proposals = proposed_room_setup(self.hass, self._rooms)
+        discovery = discovered_av_sources(self.hass)
+        discovered, discovery_origin = discovery
+        catalog = logical_av_catalog(self.hass, self._rooms, discovered=discovery)
+        logical_devices, _ = catalog
+        proposals = proposed_room_setup(self.hass, self._rooms, discovered=discovery, catalog=catalog)
         asset_by_candidate = {
             (row["concept"], row["candidate_id"], row["entity_id"]): asset["asset_id"]
             for asset in logical_devices for row in asset["candidates"]
         }
-        approved, _ = av_sources(self.hass)
         from .foundation import discovered_sources
         native_sources, _ = discovered_sources(self.hass)
         # Native MAC evidence is read-only and can be shown before command
@@ -1165,8 +1348,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             native_features = attrs.get("supported_features")
             can_play = (type(native_features) is int
                         and bool(native_features & MediaPlayerEntityFeature.PLAY))
-            label = attrs.get("friendly_name")
+            evidence = native_source_evidence(self.hass, src)
             sources.append({
+                **evidence,
                 "entity": src.entity_id,
                 "candidate": src.candidate_id,
                 "concept": src.concept,
@@ -1187,10 +1371,6 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "model": src.model,
                 "related_entities": list(src.related_entities),
                 "area_id": src.area_id,
-                "label": label if isinstance(label, str) and label.strip()
-                         else src.entity_id,
-                "source_list": source_lists(self.hass, src.entity_id)["source_list"],
-                "sound_mode_list": source_lists(self.hass, src.entity_id)["sound_mode_list"],
                 "native_can_play": can_play,
             })
         if text is None:
@@ -1218,7 +1398,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
                 "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),
                 "proposal_exceptions_json": json.dumps(proposals["exceptions"], ensure_ascii=False),
-                "validation_detail": validation_detail[:200] if errors else "",
+                "validation_detail": validation_detail[:4096] if errors else "",
+                "editable_draft_json": self._editable_home_draft(text) if errors and text else "",
                 "discovery_origin": discovery_origin,
                 "note": "Supported-domain discovery defaults to Select All when Foundation "
                         "publishes it. Classify and assign without prior Foundation wizard. "
@@ -1338,7 +1519,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     room_document = yaml.safe_dump({"rooms": payload["rooms"]}) if "rooms" in payload else None
                     if room_document is not None:
                         proposed, explicit_removals = _yaml_plan(
-                            room_document, self._original_rooms, mode)
+                            room_document, self._original_rooms, mode,
+                            resolve_bindings=self._resolve_yaml_bindings)
                     else:
                         if mode != "merge":
                             raise ValueError("Replace needs a complete rooms mapping")
@@ -1365,7 +1547,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         payload.get("default_step_delay_ms", self._original_step_delay_ms))
                 else:
                     proposed, explicit_removals = _yaml_plan(
-                        document, self._original_rooms, mode)
+                        document, self._original_rooms, mode,
+                        resolve_bindings=self._resolve_yaml_bindings)
                     dell = deepcopy(self._original_dell_displays)
                     ux_option = self._original_enable_ux
                     step_delay_ms = self._original_step_delay_ms
@@ -1378,11 +1561,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 self._yaml_step_delay_ms = step_delay_ms
                 try:
                     reason = self._review_configuration()
-                except (ValueError, KeyError, TypeError, RecursionError):
+                except (ValueError, KeyError, TypeError, RecursionError, AttributeError) as exc:
                     self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
                         previous, previous_dell, previous_ux, previous_delay)
                     errors["base"] = "selection_changed"
-                    rejection_detail = "Foundation or current room state changed; recheck selected sources"
+                    rejection_detail = _validation_detail(exc)
                 else:
                     if reason:
                         self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
@@ -1404,11 +1587,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         if explicit_removals:
                             self._yaml_diff += "\nExplicit removals: " + ", ".join(explicit_removals)
                         return await self.async_step_review()
-            except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+            except (ValueError, TypeError, OverflowError, RecursionError, AttributeError, KeyError) as exc:
                 errors["base"] = "yaml_invalid"
-                # First bounded diagnostic only: never echo entire user YAML.
-                rejection_detail = "".join(ch for ch in (str(exc).splitlines() or [""])[0]
-                                           if ch.isprintable())[:200]
+                rejection_detail = _validation_detail(exc)
         if focus is not None:
             scope, room_id, object_id = focus
             room = self._original_rooms.get(room_id, {})
