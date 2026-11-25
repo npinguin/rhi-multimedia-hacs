@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "product": "rhi_multimedia",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "bundle_filename": "rhi-multimedia-ux.js",
-  "runtime_sha256": "1fdc49c5084fc3b0e9abee744358b2fc35bc749843189a67c56e8f1c69ba13f6",
+  "runtime_sha256": "86362db61ea9463f1edd369f0f1783a4dae1d7e964f19b15fa4482406c1df1c6",
   "core_version": "1.6.4",
   "files": [
     {
@@ -92,15 +92,15 @@
     },
     {
       "path": "rhi-multimedia-ux.js",
-      "size": 452901,
-      "bytes": 452901,
-      "sha256": "1fdc49c5084fc3b0e9abee744358b2fc35bc749843189a67c56e8f1c69ba13f6"
+      "size": 464547,
+      "bytes": 464547,
+      "sha256": "86362db61ea9463f1edd369f0f1783a4dae1d7e964f19b15fa4482406c1df1c6"
     },
     {
       "path": "rhi-multimedia-ux.js.sha256",
       "size": 87,
       "bytes": 87,
-      "sha256": "f055b61b4602cd7332f3d667b24241dfa20c7bcdbbb6c56310084021bc43aa05"
+      "sha256": "1ee700e655d21e2e79f2af399be05937e6a6a0709358ed4df86e4e2a8ae4a3b8"
     }
   ]
 }

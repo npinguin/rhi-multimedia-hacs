@@ -125,6 +125,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this.config={}; this._hass=null; this._view=''; this._room='';
     this._lastSignature=''; this._feedback=new Map();
     this._expanded=new Set();this._remoteSelections=new Map();this._remoteTabs=new Map();
+    this._remotePress=null;this._onRemoteBlur=()=>this.cancelRemotePress();
     this._settingsCategory='locations';this._settingsSelections=new Map();
     this._activitySettingsStage='devices';this._wholeHomeFlow=false;this._wholeHome=null;
     this._destinationSelection=null;this._contextSelections=new Map();this._contextKey='';this._contextCards=[];this._planSummary=null;this._planRequest=0;
@@ -132,6 +133,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._optionsStep=null;this._optionsData={};this._optionsBusy=false;this._optionsDirty=false;
     this._optionsError='';this._optionsNotice='';this._optionsEpoch=0;this._optionsRevision=0;this._clipboardRequest=0;this._pendingNavigation=null;
     this._onLocation=()=>{
+      this.cancelRemotePress();
       const route=this.currentRoute();
       if((this._optionsStep||this._optionsBusy)&&
          (this._wholeHomeFlow?!['settings','discovery'].includes(route.view):route.view!==this._view||route.room!==this._room||route.floor!==this._floor)&&
@@ -159,13 +161,37 @@ class HomeBrainMultimediaCard extends HTMLElement {
       if(event.repeat&&['Enter',' '].includes(event.key)&&
          event.target?.closest?.('[data-device-action="remote_key"]'))event.preventDefault();
     });
+    this.shadowRoot.addEventListener('pointerdown',event=>this.startRemotePress(event));
+    this.shadowRoot.addEventListener('pointerup',event=>this.finishRemotePress(event));
+    this.shadowRoot.addEventListener('pointercancel',()=>this.cancelRemotePress());
+    this.shadowRoot.addEventListener('pointermove',event=>{
+      const press=this._remotePress;
+      if(press?.state==='down'&&event.pointerId===press.pointer&&
+        Math.hypot(event.clientX-press.x,event.clientY-press.y)>12)this.cancelRemotePress();
+    });
+    this.shadowRoot.addEventListener('pointerout',event=>{
+      const press=this._remotePress;
+      if(press?.state==='down'&&event.pointerId===press.pointer&&
+        !press.element.contains?.(event.relatedTarget))this.cancelRemotePress();
+    });
+    this.shadowRoot.addEventListener('contextmenu',event=>{
+      if(event.target?.closest?.('[data-native-hold="true"]'))event.preventDefault();
+    });
     this.shadowRoot.addEventListener('change',event=>{this.onControlChange(event);this.onOptionValue(event);this.onWholeHomeInput(event);});
     this.shadowRoot.addEventListener('input',event=>{this.onOptionValue(event);this.onWholeHomeInput(event);});
     this.shadowRoot.addEventListener('toggle',event=>this.onToggle(event),true);
   }
   setConfig(config={}) { this.config={...(config||{})}; this._lastSignature=''; this.render(); }
-  connectedCallback() {window.addEventListener('popstate',this._onLocation);window.addEventListener('location-changed',this._onLocation);this.render();}
+  connectedCallback() {
+    window.addEventListener('popstate',this._onLocation);window.addEventListener('location-changed',this._onLocation);
+    window.addEventListener('blur',this._onRemoteBlur);
+    if(typeof document!=='undefined')document.addEventListener('visibilitychange',this._onRemoteBlur);
+    this.render();
+  }
   disconnectedCallback() {
+    this.cancelRemotePress();
+    window.removeEventListener('blur',this._onRemoteBlur);
+    if(typeof document!=='undefined')document.removeEventListener('visibilitychange',this._onRemoteBlur);
     window.removeEventListener('popstate',this._onLocation);
     window.removeEventListener('location-changed',this._onLocation);
     if(this._optionsStep||this._optionsBusy)void this.cancelOptions();
@@ -190,6 +216,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
   }
   navigate(view,room='',floor) {
     if (!RHI_MM_VIEWS.includes(view)) return;
+    this.cancelRemotePress();
     this._destinationSelection=null;
     this._diagnosticExport=null;++this._diagnosticEpoch;
     const url=new URL(window.location.href);
@@ -379,6 +406,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     const remoteTab=event.target?.closest?.('[data-remote-tab]');
     if(remoteTab){
+      this.cancelRemotePress();
       const room=remoteTab.getAttribute('data-room'),device=remoteTab.getAttribute('data-device');
       const tab=remoteTab.getAttribute('data-remote-tab');
       if(['buttons','numbers','text'].includes(tab)){
@@ -389,6 +417,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     const focus=event.target?.closest?.('[data-remote-focus]');
     if(focus){
+      this.cancelRemotePress();
       const id=focus.getAttribute('data-room'),key=focus.getAttribute('data-remote-focus');
       const route=this.currentRoute(),room=rhiMmRooms(this._hass).rooms?.find(r=>r.id===id);
       if(['rooms','overview'].includes(route.view)&&room&&(!route.room||route.room===room.id)&&room.devices.some(d=>d.key===key)){
@@ -506,7 +535,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       return;}
     const more=event.target?.closest?.('[data-more-info]');
     if(more){event.preventDefault();const entityId=more.getAttribute('data-more-info');
-      if(more.isConnected!==false&&/^media_player\.[a-z0-9_]+$/.test(entityId||'')&&this._hass?.states?.[entityId])
+      if(this.nativeMediaLinkCurrent(more,entityId))
         this.dispatchEvent(new CustomEvent('hass-more-info',{detail:{entityId},bubbles:true,composed:true}));
       return;}
     const shortcut=event.target?.closest?.('[data-mm-shortcut]');
@@ -531,8 +560,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     const direct=event.target?.closest?.('[data-device-action]');
     if(direct){
-      const action=direct.getAttribute('data-device-action');
-      if(!direct.disabled&&(action!=='remote_key'||this.remoteInputCurrent(direct))){
+      const requested=direct.getAttribute('data-device-action');
+      const action=requested==='remote_key'?this.takeRemotePress(direct,event):requested;
+      if(action&&!direct.disabled&&(!['remote_key','remote_hold','remote_repeat'].includes(action)||this.remoteInputCurrent(direct))){
         const raw=direct.getAttribute('data-value');
         await this.executeDevice(direct.getAttribute('data-room'),direct.getAttribute('data-device'),action,
           raw===null?undefined:JSON.parse(raw),direct.getAttribute('data-activity')??undefined);
@@ -545,6 +575,34 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const service=action.getAttribute('data-action');
     const activity=action.getAttribute('data-activity')||'';
     await this.execute(roomId,service,activity);
+  }
+  startRemotePress(event){
+    if(event.isPrimary===false||event.button!==0)return;
+    this._remotePress=null;
+    const element=event.target?.closest?.('[data-native-hold="true"]');
+    if(!element||element.disabled||!this.remoteInputCurrent(element))return;
+    this._remotePress={element,pointer:event.pointerId,time:event.timeStamp,x:event.clientX,y:event.clientY,state:'down'};
+  }
+  cancelRemotePress(){
+    if(this._remotePress)this._remotePress.state='cancelled';
+  }
+  finishRemotePress(event){
+    const press=this._remotePress;
+    if(!press||press.pointer!==event.pointerId||press.state!=='down')return;
+    if(event.target?.closest?.('[data-native-hold="true"]')!==press.element||
+       !this.remoteInputCurrent(press.element)||Math.hypot(event.clientX-press.x,event.clientY-press.y)>12){
+      this.cancelRemotePress();return;
+    }
+    press.state=event.timeStamp-press.time>=500?'held':'short';
+  }
+  takeRemotePress(element,event){
+    const press=this._remotePress;
+    this._remotePress=null;
+    // Keyboard/screen-reader activation stays discrete; the folded native
+    // timed actions below provide equivalent accessible hold/repeat.
+    if(!press||press.element!==element||event.detail===0)return 'remote_key';
+    if(press.state==='cancelled'||press.state==='down')return null;
+    return press.state==='held'?'remote_hold':'remote_key';
   }
   remoteInputCurrent(element){
     if(element?.isConnected===false||typeof document!=='undefined'&&document.visibilityState==='hidden')return false;
@@ -562,6 +620,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const input=event.target?.closest?.('[data-device-input]');
     if(!input||input.disabled||input.value==='')return;
     const action=input.getAttribute('data-device-input');
+    if(['remote_hold','remote_repeat'].includes(action)){
+      if(!this.remoteInputCurrent(input))return;
+      const value=input.value;input.value='';
+      await this.executeDevice(input.getAttribute('data-room'),input.getAttribute('data-device'),action,value,input.getAttribute('data-activity')??undefined);
+      return;
+    }
     if(action==='seek'){
       const roomId=input.getAttribute('data-room'),activity=input.getAttribute('data-activity')||'';
       const route=this.currentRoute();
@@ -1241,7 +1305,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const unavailable=d.available!==true;
       const advanced=['play','pause','stop','previous','next','remote_key','sound_mode']
         .some(action=>d.controls?.[action]?.enabled===true);
-      const nativeAction=this.nativeMediaPlayerAction(d);
+      const nativeAction=this.nativeMediaPlayerAction(d,room);
       const stateLabel=needsBinding?this.t('media_needs_configuration'):
         unavailable?this.t('device_unavailable'):rhiMmStateLabel(this._hass,d.state);
       return `<div class="mm-cockpit-device ${needsBinding?'mm-device-unbound':''}">
@@ -1499,13 +1563,18 @@ class HomeBrainMultimediaCard extends HTMLElement {
       </button>`:'';
     const transport=action('previous','mdi:skip-previous')+action('play','mdi:play')+
       action('pause','mdi:pause')+action('stop','mdi:stop')+action('next','mdi:skip-next');
-    const nativePlayer=player?this.nativeMediaPlayerAction(player):'';
     const devices=room.devices||[];
     const selectedActivity=(room.activities||[]).find(a=>a.id===room.activity_id);
     const cast=new Set(selectedActivity?.device_keys||[]);
     // A disabled optional room source cannot make a healthy active HDMI
     // activity look broken. Without an activity, show room-level setup truth.
     const relevant=cast.size?devices.filter(d=>cast.has(d.key)):devices;
+    // Native HA More Info owns browse/play, including provider data and permissions.
+    // Offer explicit named players before playback, never infer a media catalog.
+    const browsePlayers=relevant.filter(d=>this.nativeBrowseAvailable(room,d));
+    const nativePlayer=browsePlayers.length?
+      browsePlayers.map(d=>this.nativeMediaPlayerAction(d,room,false,true)).join(''):
+      player?this.nativeMediaPlayerAction(player,room,true):'';
     const needsApproval=relevant.some(d=>d.foundation_approved===false);
     const unavailable=relevant.some(d=>d.available===false);
     const runnable=relevant.some(d=>d.foundation_approved===true&&d.available===true&&
@@ -1548,16 +1617,48 @@ class HomeBrainMultimediaCard extends HTMLElement {
     </article>`;
   }
 
-  nativeMediaPlayerAction(device){
+  nativeBrowseAvailable(room,device){
+    const state=this._hass?.states?.[device?.entity_id];
+    const features=state?.attributes?.supported_features;
+    const active=room.activities?.find(a=>a.id===room.activity_id&&a.active);
+    // HA Core media player BROWSE_MEDIA and PLAY_MEDIA feature flags.
+    return device?.foundation_approved===true&&device.available===true&&!device.external_owner&&
+      room.control_owner!=='harmony'&&!['starting','stopping'].includes(room.phase)&&
+      (!room.activity_id||!!active?.device_keys?.includes(device.key))&&
+      /^media_player\.[a-z0-9_]+$/.test(device.entity_id||'')&&
+      !!state&&!['unknown','unavailable','off'].includes(state.state)&&
+      Number.isSafeInteger(features)&&features>=0&&
+      (features&131072)!==0&&(features&512)!==0;
+  }
+  nativeMediaLinkCurrent(element,entityId){
+    if(element?.isConnected===false||!/^media_player\.[a-z0-9_]+$/.test(entityId||'')||
+       !this._hass?.states?.[entityId])return false;
+    const roomId=element.getAttribute('data-native-room');
+    if(!roomId)return true; // Native settings/discovery links keep native HA ownership.
+    const route=this.currentRoute();
+    if(!['overview','rooms'].includes(route.view)||(route.room&&route.room!==roomId))return false;
+    const room=rhiMmRooms(this._hass).rooms?.find(r=>r.id===roomId);
+    const key=element.getAttribute('data-native-device');
+    const device=room?.devices?.find(d=>d.key===key);
+    if(device?.entity_id!==entityId)return false;
+    const activity=element.getAttribute('data-native-activity');
+    if(element.getAttribute('data-native-browse')==='true')
+      return (room.activity_id||'')===activity&&this.nativeBrowseAvailable(room,device);
+    return activity==null||((room.activity_id||'')===activity&&room.now_playing?.device_key===key);
+  }
+
+  nativeMediaPlayerAction(device,room=null,playback=false,browse=false){
     // Reuse the actual Home Assistant media-player dialog as Basic does.
     // Never discover a new endpoint from entity names or invent an action.
     const id=device?.entity_id;
     if(typeof id!=='string'||!/^media_player\.[a-z0-9_]+$/.test(id)||
        !this._hass?.states?.[id])return '';
     const e=rhiUxEscape;
-    return `<button type="button" class="mm-native-media-link" data-more-info="${e(id)}"
-      aria-label="${e(device.name+' · '+this.t('native_device'))}">
-      <ha-icon icon="mdi:open-in-new"></ha-icon>${this.t('native_device')}</button>`;
+    const context=room?` data-native-room="${e(room.id)}" data-native-device="${e(device.key)}"${(playback||browse)?` data-native-activity="${e(room.activity_id||'')}"`:''}${browse?' data-native-browse="true"':''}`:'';
+    const label=browse?this.t('native_browse')+' · '+device.name:this.t('native_device');
+    return `<button type="button" class="mm-native-media-link" data-more-info="${e(id)}"${context}
+      aria-label="${e(device.name+' · '+label)}">
+      <ha-icon icon="${browse?'mdi:play-box-multiple-outline':'mdi:open-in-new'}"></ha-icon>${e(label)}</button>`;
   }
   roomDeviceBasicActions(room,device){
     // Direct basic controls use the same native capability-checked gateway.
@@ -1675,7 +1776,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
           const label=['ENTER','SELECT','OK','CENTER'].includes(name)?'OK':name.replaceAll('_',' ');
           return `<button type="button" class="mm-remote-command" ${attrs} data-device-action="remote_key"
             data-value="${escape(JSON.stringify(k))}" ${contextAttrs}
-            aria-label="${escape(d.name+' · '+label)}" title="${escape(label)}">
+            ${c.remote_hold?.enabled===true&&c.remote_hold.options?.includes(k)?'data-native-hold="true"':''}
+            aria-label="${escape(d.name+' · '+label)}" title="${escape(label+(c.remote_hold?.enabled===true&&c.remote_hold.options?.includes(k)?' · '+this.t('remote_hold_hint'):''))}">
             ${icons[name]?`<ha-icon icon='${icons[name]}'></ha-icon>`:
               `<span>${escape(label)}</span>`}</button>`;
         };
@@ -1685,6 +1787,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
           return ['up','down','left','right'].includes(name)?name:
             ['enter','select','ok','center'].includes(name)?'ok':'extra';
         };
+        const timed=['remote_hold','remote_repeat'].map(action=>{
+          const cap=c[action];
+          if(cap?.enabled!==true||!Array.isArray(cap.options)||!cap.options.length)return '';
+          return `<label>${escape(this.t(action))}<select ${attrs} ${contextAttrs} data-device-input="${action}">
+            <option value="">${escape(this.t('select'))}</option>${cap.options.map(k=>`<option value="${escape(k)}">${escape(k)}</option>`).join('')}</select></label>`;
+        }).join('');
+        const timedPanel=timed?`<details class="mm-remote-timed"><summary>${escape(this.t('remote_timed_actions'))}</summary>${timed}</details>`:'';
         const navigation=main?`<div class="mm-remote-navigation" role="group" aria-label="${this.t('remote_navigation')}">${main.keys.map(k=>`<span class="mm-remote-key mm-remote-key-${escape(position(k))}">${renderKey(k)}</span>`).join('')}</div>`:'';
         const extra=sections.filter(s=>s.name!=='navigation').map(section=>{
           const persist=key+':'+section.name;
@@ -1722,9 +1831,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
               `<p class="mm-muted">${this.t('remote_text_unavailable')}</p>`):
             `${navigation}${media?`<div class="mm-native-buttons" role="group"
                aria-label="${this.t('remote_media')}">${media.keys.map(renderKey).join('')}</div>`:''}${extras}`;
-          return selector+content;
+          return selector+content+(chosen==='buttons'?timedPanel:'');
         }
-        return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}</details>`;
+        return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}${timedPanel}</details>`;
       })():'';
       return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'||part==='advanced'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(part==='advanced'?options('sound_mode',d.sound_mode)+remote:room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
     }).join('');
@@ -1755,7 +1864,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     return (device.notification_destinations||[]).filter(d=>typeof d.endpoint_id==='string'&&d.endpoint_id.startsWith('ha_notify:'))
       .map(d=>`<button class="mm-link" type="button" data-notification-destination="${rhiUxEscape(d.endpoint_id)}">${this.t('notifications')} · ${rhiUxEscape(d.name)}${d.available?'':' · '+this.t('unavailable')}</button>`).join('');
   }
-  roomDeviceDetails(room){return `<article class="mm-surface"><h3>${this.t('connected_devices')}</h3><div class="mm-device-list">${room.devices.map(d=>`<div class="mm-device-row">${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}<div><b>${rhiUxEscape(d.name)}</b>${d.product_profile?`<small>${this.t('verified_model')}: ${rhiUxEscape(d.product_profile.manufacturer)} ${rhiUxEscape(d.product_profile.model)}</small>`:''}<small>${rhiUxEscape(rhiMmRoleLabel(this._hass,d.role))} · ${rhiUxEscape(d.source||rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small>${d.registered_location?.area_id?`<small>${this.t('native_area')}: ${rhiUxEscape(d.registered_location.area_name||d.registered_location.area_id)}${d.registered_location.area_id!==room.area_id?` · ${this.t('used_in')}: ${rhiUxEscape(room.name)}`:''}</small>`:''}${this.roomAvailableControls(d)}${this.deviceNotificationActions(d)}</div><span class="mm-phase ${d.available&&d.foundation_approved?'mm-phase-good':'mm-phase-warn'}">${d.available&&d.foundation_approved?this.t('connected'):this.t('attention')}</span>${this.nativeMediaPlayerAction(d)}</div>`).join('')}</div></article>`;}
+  roomDeviceDetails(room){return `<article class="mm-surface"><h3>${this.t('connected_devices')}</h3><div class="mm-device-list">${room.devices.map(d=>`<div class="mm-device-row">${rhiMmDeviceArt(d,this.t('illustrative_device_art'))}<div><b>${rhiUxEscape(d.name)}</b>${d.product_profile?`<small>${this.t('verified_model')}: ${rhiUxEscape(d.product_profile.manufacturer)} ${rhiUxEscape(d.product_profile.model)}</small>`:''}<small>${rhiUxEscape(rhiMmRoleLabel(this._hass,d.role))} · ${rhiUxEscape(d.source||rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small>${d.registered_location?.area_id?`<small>${this.t('native_area')}: ${rhiUxEscape(d.registered_location.area_name||d.registered_location.area_id)}${d.registered_location.area_id!==room.area_id?` · ${this.t('used_in')}: ${rhiUxEscape(room.name)}`:''}</small>`:''}${this.roomAvailableControls(d)}${this.deviceNotificationActions(d)}</div><span class="mm-phase ${d.available&&d.foundation_approved?'mm-phase-good':'mm-phase-warn'}">${d.available&&d.foundation_approved?this.t('connected'):this.t('attention')}</span>${this.nativeMediaPlayerAction(d,room)}</div>`).join('')}</div></article>`;}
   roomRoutes(room){
     const cec=room.activities.flatMap(activity=>(activity.cec_links||[]).map(link=>{
       const source=room.devices.find(d=>d.key===link.source)?.name||link.source;

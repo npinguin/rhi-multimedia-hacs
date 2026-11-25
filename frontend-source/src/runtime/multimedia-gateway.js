@@ -70,7 +70,7 @@ function rhiMmDeviceIntent(room, key, action, value, expectedActivity) {
   const device=room?.devices?.find(d=>d.key===key);
   const capability=device?.controls?.[action];
   if(!device?.foundation_approved||!capability?.enabled||['starting','stopping'].includes(room.phase))return null;
-  const activityBound=['seek','remote_key','remote_text'].includes(action);
+  const activityBound=['seek','remote_key','remote_text','remote_hold','remote_repeat'].includes(action);
   if(activityBound&&expectedActivity!==undefined&&(expectedActivity||null)!==(room.activity_id||null))return null;
   if(Array.isArray(capability.options)){if(typeof value!=='string'||!capability.options.includes(value))return null;}
   else if(action==='volume'){if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1)return null;}

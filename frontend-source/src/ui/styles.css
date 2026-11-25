@@ -672,3 +672,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 /* Text is engineering evidence, not a screenshot-only control. */
 .mm-options-editor textarea,.mm-wh-expert textarea,.mm-selectable,.mm-selectable textarea,.mm-options-description{user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
 [data-mm-diagnostics-text],[data-mm-copy-fallback]{width:100%;box-sizing:border-box;min-height:120px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;overflow:auto}
+
+/* Only explicitly supported native held keys intercept a touch callout. */
+.mm-remote-command[data-native-hold="true"]{touch-action:manipulation;-webkit-touch-callout:none;user-select:none}
+.mm-remote-timed label{display:block;margin:6px 0}.mm-remote-timed select{margin-inline-start:8px}

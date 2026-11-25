@@ -88,6 +88,15 @@ function rhiMmWholeCurrent(d){
   }
   return {room,device:room?.devices?.[d.device],activity:room?.activities?.[d.activity]};
 }
+function rhiMmWholeText(d){
+  if(d.rawDraft!=null)return d.rawDraft;
+  if(!d.localScope)return JSON.stringify(d.doc,null,2);
+  const [scope,roomId,id]=d.localScope;
+  const {room,device,activity}=rhiMmWholeCurrent(d);
+  const object={...(scope==='room'?room:scope==='device'?device:activity)};
+  if(scope==='room'){delete object.devices;delete object.activities;}
+  return JSON.stringify({scope,room:roomId,id,object},null,2);
+}
 function rhiMmWholeIssues(d){
   const detail=d.validationDetail||'';
   const groups=new Map(),general=[];
@@ -493,9 +502,9 @@ function rhiMmWholeRender(d,t,escape){
     </section></div>`;
   }
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
-    <header class='mm-wh-header'><div><h2>Configure Multimedia</h2>
-      <p>${local?'Expert · selected object only':'Rooms · Devices · Activities'}</p></div>
-      <span class='mm-wh-draft'>${d.dirty?'Unsaved changes':'Current saved configuration'}</span></header>
+    <header class='mm-wh-header'><div><h2>${e(t('setup_editor'))}</h2>
+      <p>${local?e(t('expert_selected')):[t('rooms'),t('devices'),t('activities')].map(e).join(' · ')}</p></div>
+      <span class='mm-wh-draft'>${e(t(d.dirty?'whole_home_leave_title':'expert_saved'))}</span></header>
     ${localSections.length?`<nav class='mm-wh-tabs' aria-label='Multimedia object categories'>
       ${localSections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
         data-wh-id='${id}' aria-pressed='${d.tab===id}'>
@@ -504,18 +513,18 @@ function rhiMmWholeRender(d,t,escape){
     ${!local&&d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>Room
       ${select('room_select',d.room,rooms.map(([id,r])=>[id,r.name||id]))}</label></div>`:''}
     ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
-      <strong>${d.validationStale?'Last validation — changes not yet checked':'Configuration needs attention'}</strong>
-      <p>${d.validationStale?'Select Save to recheck the edited configuration.':'Changes are not saved. Correct the items below, then select Save again.'}</p>
-      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(item.message)}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>Fix</button>`:''}</div>`).join('')}</div>`).join('')}
+      <strong>${e(t(d.validationStale?'expert_validation_stale':'expert_attention'))}</strong>
+      <p>${e(t(d.validationStale?'expert_recheck':'expert_correct'))}</p>
+      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(item.message)}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>${e(t('expert_fix'))}</button>`:''}</div>`).join('')}</div>`).join('')}
       ${issues.general.map(line=>`<p>${e(line)}</p>`).join('')}
       <button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.validationDetail)}</textarea>
-      <details><summary>Technical details</summary><p style='white-space:pre-wrap'>${e(d.validationDetail)}</p></details>
+      <details><summary>${e(t('expert_details'))}</summary><p style='white-space:pre-wrap'>${e(d.validationDetail)}</p></details>
     </section>`;})():''}
     ${d.error&&d.error!==d.validationDetail?`<div class='mm-room-error mm-selectable' role='alert'><p style='white-space:pre-wrap'>${e(d.error)}</p>${!d.validationDetail?`<button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.error)}</textarea>`:''}</div>`:''}
     ${d.rawDraft==null&&d.error&&!d.validationDetail?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>Review ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
     ${d.rawDraft==null?content:''}
     <details class='mm-wh-expert' ${d.rawDraft!=null?'open':''}>
-      <summary>${local?'Advanced YAML / JSON · selected object only':'Advanced preferences and complete configuration'}</summary>
+      <summary>${e(t(local?'expert_local_text':'expert_global_text'))}</summary>
       <div class='mm-wh-global' ${local?"style='display:none'":''}>
         <label>Default delay between activity steps (ms)
           ${field('global_delay',d.doc.default_step_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
@@ -523,19 +532,19 @@ function rhiMmWholeRender(d,t,escape){
           ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
       </div>
       ${!local&&d.rawDraft==null?`<details><summary>Local Dell display registrations</summary><small>Changes are staged in this configuration until Save. Native discovery follows registration.</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||'No registered displays'}</p>${specialist('dell_add','Add display')}${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit','Rename display')+specialist('dell_remove','Remove display'):''}</details>`:''}
-      <h4>Expert configuration · YAML / JSON</h4>
-      <p>${local?'Only the selected object can change. Other configuration is context and is checked by Home Assistant.':'Edit the complete configuration as YAML or JSON. Save applies changes; Edit visually returns to the same draft.'}</p>
+      <h4>${e(t('expert_heading'))}</h4>
+      <p>${e(t(local?'expert_local_help':'expert_global_help'))}</p>
       <textarea data-wh-raw spellcheck='false' rows='15'
-        aria-label='Advanced complete Multimedia configuration'>${e(d.rawDraft??JSON.stringify(d.doc,null,2))}</textarea>
+        aria-label='${e(t(local?'expert_local_text':'expert_global_text'))}'>${e(rhiMmWholeText(d))}</textarea>
       <div class='mm-setup-actions'><button type='button' data-mm-copy='yaml'>${e(t('copy_yaml'))}</button><button type='button' data-mm-paste='yaml'>${e(t('paste_yaml'))}</button><span data-mm-clipboard-status role='status'></span></div>
-      <button type='button' data-wh-action='review_yaml'>Edit visually</button>
-      ${d.rawDraft!=null?`<button type='button' data-wh-action='discard_raw'>Undo YAML edits</button>`:''}
+      <button type='button' data-wh-action='review_yaml'>${e(t('expert_visual'))}</button>
+      ${d.rawDraft!=null?`<button type='button' data-wh-action='discard_raw'>${e(t('expert_undo'))}</button>`:''}
     </details>
     <footer class='mm-wh-footer'>
       <span>${rooms.length} rooms · ${rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0)} devices ·
         ${rooms.reduce((n,[,r])=>n+Object.keys(r.activities||{}).length,0)} activities</span>
-      <button type='button' class='mm-wh-save' data-wh-action='review'>Save</button>
-      <button type='button' data-mm-option-cancel>Cancel</button>
+      <button type='button' class='mm-wh-save' data-wh-action='review'>${e(t('whole_home_review_save'))}</button>
+      <button type='button' data-mm-option-cancel>${e(t('setup_cancel'))}</button>
     </footer>
   </section>`;
 }

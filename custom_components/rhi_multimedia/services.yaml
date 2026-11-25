@@ -54,7 +54,7 @@ control_device:
       selector:
         text:
     value:
-      description: Optional source, sound mode, remote key, volume (0–1), seek seconds, mute boolean, or offered native group peer.
+      description: Optional source, sound mode, offered native remote key (including bounded hold/repeat), volume (0–1), seek seconds, mute boolean, or offered native group peer.
       selector:
         object:
     expected_activity:

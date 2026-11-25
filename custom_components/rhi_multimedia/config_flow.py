@@ -1350,6 +1350,34 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return await self.async_step_existing_activity({"activity": activity_id})
         return await self.async_step_existing_room({"room": room_id})
 
+    def _expert_object_document(self, payload):
+        """Expand selected-object text into the existing complete draft guard.
+
+        Scope and sibling context come from the original Config Entry, not
+        from browser-provided unrelated data. Unlike a native merge patch,
+        this object is a replacement of the selected object's editable fields.
+        """
+        scope, room_id, object_id = self._yaml_focus
+        if (set(payload) != {"scope", "room", "id", "object"}
+                or (payload["scope"], payload["room"], payload["id"]) != self._yaml_focus
+                or not isinstance(payload["object"], dict)):
+            raise ValueError("Expert YAML must update its selected object only")
+        obj = deepcopy(payload["object"])
+        doc = {"rooms": deepcopy(self._original_rooms),
+               "dell_displays": deepcopy(self._original_dell_displays),
+               "enable_ux": self._original_enable_ux,
+               "default_step_delay_ms": self._original_step_delay_ms}
+        room = doc["rooms"][room_id]
+        if scope == "room":
+            if {"devices", "activities"} & set(obj):
+                raise ValueError("Edit devices/activities independently, not through a room overwrite")
+            doc["rooms"][room_id] = {**obj, "devices": room["devices"],
+                                     "activities": room["activities"]}
+        else:
+            room["devices" if scope == "device" else "activities"][object_id] = obj
+        self._expert_scope_rooms(doc)
+        return doc
+
     def _expert_scope_rooms(self, payload):
         """Complete visual context is not wider write authority."""
         scope, room_id, object_id = self._yaml_focus
@@ -1397,6 +1425,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         try:
             payload = _yaml_document(text)
             focus = getattr(self, "_yaml_focus", None)
+            if focus is not None and getattr(self, "_complete_setup", False) and "object" in payload:
+                payload = self._expert_object_document(payload)
             if set(payload) == {"changes"}:
                 if focus is not None:
                     self._check_expert_patch(payload, focus)
@@ -1669,6 +1699,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 document = user_input.get("yaml_text")
                 payload = _yaml_document(document)
                 mode = user_input.get("mode", "merge")
+                if focus is not None and getattr(self, "_complete_setup", False) and "object" in payload:
+                    payload = self._expert_object_document(payload)
                 local_visual = focus is not None and getattr(self, "_complete_setup", False) and set(payload) != {"changes"}
                 if focus is not None and not local_visual:
                     self._check_expert_patch(payload, focus)
