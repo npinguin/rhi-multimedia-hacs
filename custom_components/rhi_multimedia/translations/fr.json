@@ -87,6 +87,7 @@
       "confirm_save": "Confirmez pour enregistrer.",
       "selection_changed": "La sélection Foundation a changé ou une source a disparu. Vérifiez les associations et réessayez.",
       "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
+      "configuration_busy": "Une commande Multimedia est en cours. Réessayez après son exécution ; votre brouillon est conservé.",
       "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
       "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils."
     },
@@ -203,11 +204,11 @@
         }
       },
       "harmony_owner": {
-        "title": "Responsable de la commande de la pièce",
-        "description": "Choisissez un seul responsable. Avant de transférer à Harmony, associez tous les appareils natifs que le hub peut contrôler, y compris les appareils partagés et les zones couplées. Arrêtez toutes les activités Premium concernées et placez Harmony sur PowerOff. Désactivez les automatisations et commandes concurrentes. Les autres pièces Premium ne peuvent pas commander les appareils partagés déclarés tant que Harmony en est responsable. Les activités Premium existantes sont conservées.",
+        "title": "Périmètre des appareils Harmony",
+        "description": "Associez tous les appareils natifs que le hub peut commander, y compris les appareils partagés et les zones couplées. Avant de modifier cette association, arrêtez les activités Premium concernées et confirmez PowerOff. Un hub actif ou non vérifié réserve les appareils déclarés. PowerOff confirmé permet les commandes Premium autorisées sans modifier la configuration. Évitez les automatisations concurrentes.",
         "data": {
-          "controller": "Responsable de la commande",
-          "confirm": "Je confirme le périmètre complet et le transfert à un seul responsable"
+          "controller": "Contrôleur Harmony associé",
+          "confirm": "Je confirme le périmètre complet et la modification sûre"
         }
       },
       "tv_wake": {
@@ -329,6 +330,7 @@
       "selection_changed": "La sélection Foundation a changé ou une source a disparu. Vérifiez les associations et réessayez.",
       "confirm_remove_incompatible": "Confirmez les activités concernées avant de continuer.",
       "stop_room_before_edit": "Arrêtez l’activité de la pièce concernée avant de modifier ses appareils ou son activité.",
+      "configuration_busy": "Une commande Multimedia est en cours. Réessayez après son exécution ; votre brouillon est conservé.",
       "confirm_harmony_scope": "Confirmez le périmètre concerné et le transfert de responsabilité.",
       "stop_harmony_before_edit": "Placez le hub Harmony sélectionné sur PowerOff et attendez son retour d’état natif avant de modifier le responsable ou les appareils.",
       "wake_unavailable": "Sélectionnez un appareil multimédia natif approuvé par Foundation avec une adresse MAC enregistrée.",

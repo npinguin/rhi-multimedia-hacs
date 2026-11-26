@@ -87,6 +87,7 @@
       "confirm_save": "Bevestig om op te slaan.",
       "selection_changed": "De Foundation-selectie is gewijzigd of een bron is verdwenen. Controleer de koppelingen en probeer opnieuw.",
       "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
+      "configuration_busy": "Een Multimedia-opdracht wordt uitgevoerd. Sla opnieuw op zodra deze klaar is; je concept blijft behouden.",
       "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
       "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt."
     },
@@ -203,11 +204,11 @@
         }
       },
       "harmony_owner": {
-        "title": "Eigenaarschap ruimtebediening",
-        "description": "Kies één eigenaar. Wijs vóór overdracht aan Harmony alle native apparaten toe die de hub kan bedienen, ook gedeelde apparaten en gekoppelde zones. Stop alle betrokken Premium-activiteiten en zet Harmony op PowerOff. Schakel concurrerende automatiseringen en dashboardbediening uit. Andere Premium-ruimtes mogen gedeelde toegewezen apparaten niet bedienen zolang Harmony eigenaar is. Bestaande Premium-activiteiten blijven bewaard.",
+        "title": "Harmony-apparaatbereik",
+        "description": "Wijs alle native apparaten toe die de hub kan bedienen, inclusief gedeelde apparaten en gekoppelde zones. Stop vóór een wijziging van deze koppeling de betrokken Premium-activiteiten en bevestig PowerOff. Een actieve of niet-geverifieerde hub reserveert de toegewezen apparaten. Bevestigde PowerOff laat geautoriseerde Premium-bediening toe zonder configuratiewijziging. Vermijd concurrerende automatiseringen.",
         "data": {
-          "controller": "Eigenaar ruimtebediening",
-          "confirm": "Ik bevestig het volledige betrokken bereik en de overdracht naar één eigenaar"
+          "controller": "Gekoppelde Harmony-controller",
+          "confirm": "Ik bevestig het volledige betrokken bereik en de veilige wijziging"
         }
       },
       "tv_wake": {
@@ -329,6 +330,7 @@
       "selection_changed": "De Foundation-selectie is gewijzigd of een bron is verdwenen. Controleer de koppelingen en probeer opnieuw.",
       "confirm_remove_incompatible": "Bevestig de betrokken activiteiten voordat je verdergaat.",
       "stop_room_before_edit": "Stop de betrokken actieve ruimte vóór je apparaten of activiteiten wijzigt.",
+      "configuration_busy": "Een Multimedia-opdracht wordt uitgevoerd. Sla opnieuw op zodra deze klaar is; je concept blijft behouden.",
       "confirm_harmony_scope": "Bevestig het betrokken bereik en de eigendomsoverdracht.",
       "stop_harmony_before_edit": "Zet de geselecteerde Harmony-hub op PowerOff en wacht op de native terugmelding voordat je eigenaarschap of apparaten wijzigt.",
       "wake_unavailable": "Selecteer een in Foundation goedgekeurd media-apparaat met een geregistreerd MAC-adres.",

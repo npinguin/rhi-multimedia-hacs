@@ -43,6 +43,7 @@ function rhiMmIntent(room, service, activity = '') {
   if (!rhiMmCanRun(room, service, activity)) return null;
   const data = {room:room.id};
   if (service === 'start_activity') data.activity = activity;
+  else if (service === 'stop_activity' || service === 'recover_activity') data.expected_activity = room.activity_id || '';
   return {domain:'rhi_multimedia',service,data};
 }
 
@@ -56,12 +57,12 @@ function rhiMmShortcutIntent(room, action, key){
   if(action==='press_activity_button'){
     if(!Array.isArray(active.button_map)||
        !active.button_map.some(button=>button.button===key&&button.enabled===true))return null;
-    return {domain:'rhi_multimedia',service:action,data:{room:room.id,button:key}};
+    return {domain:'rhi_multimedia',service:action,data:{room:room.id,button:key,expected_activity:room.activity_id}};
   }
   if(action==='run_activity_macro'){
     if(!Array.isArray(active.macros)||
        !active.macros.some(macro=>macro.id===key&&macro.enabled===true))return null;
-    return {domain:'rhi_multimedia',service:action,data:{room:room.id,macro:key}};
+    return {domain:'rhi_multimedia',service:action,data:{room:room.id,macro:key,expected_activity:room.activity_id}};
   }
   return null;
 }

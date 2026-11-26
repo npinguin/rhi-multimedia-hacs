@@ -87,6 +87,7 @@
       "confirm_save": "Confirm to save.",
       "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry.",
       "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
+      "configuration_busy": "A Multimedia command is running. Retry Save after it completes; your draft is preserved.",
       "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
       "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints."
     },
@@ -203,11 +204,11 @@
         }
       },
       "harmony_owner": {
-        "title": "Room control ownership",
-        "description": "Choose one owner. Before transferring to Harmony, include every native endpoint the hub may control, including shared devices and coupled zones. Stop all affected Premium activities and set the Harmony hub to PowerOff. Disable competing automations and dashboard writers. Shared declared endpoints cannot be controlled by other Premium rooms while Harmony owns this scope. Existing Premium activity definitions are retained.",
+        "title": "Harmony resource scope",
+        "description": "Map every native endpoint the hub may control, including shared devices and coupled zones. Before changing the mapping, stop affected Premium activities and confirm hub PowerOff. An active or unverified hub reserves its declared endpoints. Confirmed PowerOff permits authorized Premium controls without changing configuration. Do not run competing automations.",
         "data": {
-          "controller": "Room control owner",
-          "confirm": "I confirm the complete affected scope and single-writer cutover"
+          "controller": "Mapped Harmony controller",
+          "confirm": "I confirm the full affected scope and safe mapping change"
         }
       },
       "tv_wake": {
@@ -329,6 +330,7 @@
       "selection_changed": "Foundation selection changed or a source disappeared. Review links and retry.",
       "confirm_remove_incompatible": "Confirm the affected activities before continuing.",
       "stop_room_before_edit": "Stop the affected active room before changing its devices or activity.",
+      "configuration_busy": "A Multimedia command is running. Retry Save after it completes; your draft is preserved.",
       "confirm_harmony_scope": "Confirm the affected scope and ownership handoff.",
       "stop_harmony_before_edit": "Set the selected Harmony hub to PowerOff and wait for its native readback before changing ownership or endpoints.",
       "wake_unavailable": "Select a Foundation-approved native media device with a registered MAC before configuring WOL.",

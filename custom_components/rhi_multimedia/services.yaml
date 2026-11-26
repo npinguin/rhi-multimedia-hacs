@@ -20,6 +20,11 @@ stop_activity:
       required: true
       selector:
         text: {}
+    expected_activity:
+      description: Optional activity identity observed by the requesting client. Empty means no current activity; omit for an explicit native current-state operation.
+      selector:
+        text: {}
+
 recover_activity:
   name: Recover multimedia activity
   description: Reruns the previous route and checks device readback after interruption.
@@ -28,6 +33,11 @@ recover_activity:
       required: true
       selector:
         text: {}
+    expected_activity:
+      description: Optional activity identity observed by the requesting client. Empty means no current activity; omit for an explicit native current-state operation.
+      selector:
+        text: {}
+
 inspect_room:
   name: Inspect multimedia sources
   description: Publishes native source_list and current input state for each configured endpoint.
@@ -74,6 +84,10 @@ press_activity_button:
       required: true
       selector:
         text: {}
+    expected_activity:
+      description: Optional activity identity observed by the requesting client. Empty means no current activity; omit for an explicit native current-state operation.
+      selector:
+        text: {}
 
 run_activity_macro:
   name: Run activity shortcut
@@ -87,3 +101,8 @@ run_activity_macro:
       required: true
       selector:
         text: {}
+    expected_activity:
+      description: Optional activity identity observed by the requesting client. Empty means no current activity; omit for an explicit native current-state operation.
+      selector:
+        text: {}
+

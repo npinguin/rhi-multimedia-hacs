@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from copy import deepcopy
 
 import voluptuous as vol
 from homeassistant.const import Platform
@@ -96,6 +97,14 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             state.progress = "Recovery required"
     adapter.persisted = previous
     runtime = {"entry": entry, "engine": engine, "adapter": adapter}
+    # Compare with the authoritative loaded options, excluding the purely
+    # visual flag that does not require a runtime reload. No second store.
+    loaded_options = deepcopy({k: v for k, v in entry.options.items() if k != "enable_ux"})
+    loaded_data = deepcopy(dict(entry.data))
+    adapter.configuration_current = lambda: (
+        hass.data.get(DOMAIN) is runtime and not runtime.get("_unloading")
+        and loaded_options == {k: v for k, v in entry.options.items() if k != "enable_ux"}
+        and loaded_data == dict(entry.data))
     hass.data[DOMAIN] = runtime
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -106,6 +115,8 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         unsubscribe_sources = None
         heos_entities = set()
         dirty_sources, dirty_rooms, dirty_presentation = set(), set(), set()
+        harmony_entities = {spec["devices"][spec["harmony_controller"]]["entity"]
+                            for spec in rooms.values() if spec.get("harmony_controller")}
 
         def refresh_source_tracker() -> None:
             nonlocal unsubscribe_sources
@@ -177,6 +188,15 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             # Preserve exact cross-room companion readback and actual HEOS
             # grouping dependencies; ordinary volume/position is local.
             dirty_presentation.update(runtime.get("native_projection_rooms", {}).get(entity, ()))
+            if entity in harmony_entities:
+                # A hub can change externally; invalidate overlapping room
+                # reservations even when the hub itself is not in that room.
+                keys = ("current_activity", "activity_starting", "restored")
+                if (before is None or after is None or before.state != after.state
+                        or any(before.attributes.get(k) != after.attributes.get(k) for k in keys)
+                        or ("activity_starting" in before.attributes) != ("activity_starting" in after.attributes)):
+                    dirty_rooms.update(rooms)
+                    dirty_presentation.update(rooms)
             if entity in heos_entities:
                 keys = ("group_members", "supported_features", "restored")
                 if (before is None or after is None or before.state != after.state
@@ -271,9 +291,10 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
                                   for step in definition.get("steps", []))
         provider_optimistic = provider_optimistic or scripted_unverified
         try:
-            operation = (engine.command(room, activity, fix_it=True)
-                         if service == "recover_activity"
-                         else engine.command(room, activity))
+            operation = engine.command(
+                room, activity, fix_it=service == "recover_activity",
+                expected_activity=call.data.get("expected_activity",
+                                                (activity or "") if service == "recover_activity" else None))
             result = await adapter.with_context(call.context, operation)
         except asyncio.CancelledError:
             if asyncio.current_task().cancelling():
@@ -317,13 +338,13 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
 
     async def press_button(call: ServiceCall) -> dict:
         room, button = call.data["room"], call.data["button"]
-        result = await adapter.with_context(call.context, engine.press_button(room, button))
+        result = await adapter.with_context(call.context, engine.press_button(room, button, expected_activity=call.data.get("expected_activity")))
         return {"room": room, "service": "press_activity_button",
                 "button": button, "result": result}
 
     async def run_macro(call: ServiceCall) -> dict:
         room, macro = call.data["room"], call.data["macro"]
-        result = await adapter.with_context(call.context, engine.run_macro(room, macro))
+        result = await adapter.with_context(call.context, engine.run_macro(room, macro, expected_activity=call.data.get("expected_activity")))
         return {"room": room, "service": "run_activity_macro",
                 "macro": macro, "result": result}
 
@@ -335,13 +356,13 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
 
     definitions = {
         "start_activity": (start, vol.Schema({vol.Required("room"): str, vol.Required("activity"): str})),
-        "stop_activity": (stop, vol.Schema({vol.Required("room"): str})),
-        "recover_activity": (recover, vol.Schema({vol.Required("room"): str})),
+        "stop_activity": (stop, vol.Schema({vol.Required("room"): str, vol.Optional("expected_activity"): str})),
+        "recover_activity": (recover, vol.Schema({vol.Required("room"): str, vol.Optional("expected_activity"): str})),
         "inspect_room": (inspect, vol.Schema({vol.Required("room"): str})),
         "press_activity_button": (press_button, vol.Schema({
-            vol.Required("room"): str, vol.Required("button"): str})),
+            vol.Required("room"): str, vol.Required("button"): str, vol.Optional("expected_activity"): str})),
         "run_activity_macro": (run_macro, vol.Schema({
-            vol.Required("room"): str, vol.Required("macro"): str})),
+            vol.Required("room"): str, vol.Required("macro"): str, vol.Optional("expected_activity"): str})),
         "control_device": (control, vol.Schema({vol.Required("room"): str, vol.Required("device"): str,
                                                 vol.Required("action"): str, vol.Optional("value"): object,
                                                 vol.Optional("expected_activity"): str})),
@@ -373,9 +394,11 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
         hass.data.pop(DOMAIN, None)
         unregister_visuals_with_foundation(hass)
         return True
-    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        return False
     context = hass.data.get(DOMAIN, {})
+    context["_unloading"] = True
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        context.pop("_unloading", None)
+        return False
     await _stop_native_updates(context)
     engine = context.get("engine")
     if engine:
@@ -384,6 +407,7 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
             task.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
+        await context["adapter"].flush()
     for name in ("start_activity", "stop_activity", "recover_activity", "inspect_room",
                  "control_device", "press_activity_button", "run_activity_macro"):
         hass.services.async_remove(DOMAIN, name)

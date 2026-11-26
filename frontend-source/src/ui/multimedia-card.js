@@ -1247,7 +1247,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(!room)return `<section class="mm-section mm-overview">
       <div class="mm-floor-room-select">${selector}<div class="mm-floor-room-buttons">${roomButtons}</div></div>
       ${rhiUxState({state:'empty',title:this.t('no_rooms'),detail:this.t('choose_other_floor')})}</section>`;
-    const activities=room.control_owner==='harmony'?[]:[...(room.activities||[])]
+    const activities=[...(room.activities||[])]
       .sort((a,b)=>Number(b.active===true)-Number(a.active===true)||
         Number(b.favorite===true)-Number(a.favorite===true));
     // Activity buttons are direct Start/Switch intents, not a separate
@@ -1265,8 +1265,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
         <span>${escape(a.name)}${room.room_areas?.[a.room_area]?
           `<small class='mm-activity-room-area'>${escape(room.room_areas[a.room_area])}</small>`:''}</span></button>`;
     }).join('');
-    const canStop=room.control_owner!=='harmony'&&rhiMmCanRun(room,'stop_activity');
-    const stop=room.control_owner!=='harmony'?`<button type='button'
+    const canStop=rhiMmCanRun(room,'stop_activity');
+    const stop=(room.control_owner!=='harmony'||canStop)?`<button type='button'
       class='mm-activity-choice mm-all-off' data-action='stop_activity'
       data-room='${escape(room.id)}' ${canStop?'':'disabled'}
       title='${escape(room.commands?.stop?.reason||'')}'
@@ -1400,22 +1400,21 @@ class HomeBrainMultimediaCard extends HTMLElement {
       degraded?this.t('device_unavailable'):'';
     const recommendation=room.attention&&room.recommended_action?
       this.t('recommend_'+room.recommended_action):'';
-    const actions=(delegated?[]:room.activities).map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}"
+    const actions=room.activities.map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}"
       data-action="start_activity" data-room="${escape(room.id)}" data-activity="${escape(a.id)}"
       aria-pressed="${!!a.active}" ${!rhiMmCanRun(room,'start_activity',a.id)?'disabled':''}
       title="${escape(a.disabled_reason||'')}"><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${escape(a.name)}</button>`).join('');
     const devicePreview=devices.map(d=>`<span class="mm-compact-device ${d.available&&d.foundation_approved?'':'mm-compact-device-warn'}"
         title="${escape(d.name+': '+rhiMmStateLabel(this._hass,d.state))}"><ha-icon icon="${d.role==='display'?'mdi:television':d.role==='receiver'?'mdi:audio-video':'mdi:play-circle-outline'}"></ha-icon>${escape(d.name)} <small>${escape(rhiMmStateLabel(this._hass,d.state))}</small></span>`).join('');
     const foot=`<div class="mm-room-foot">
-       ${!delegated&&(room.activities.length||rhiMmCanRun(room,'stop_activity'))?
+       ${((!delegated&&room.activities.length)||rhiMmCanRun(room,'stop_activity'))?
          `<button data-action="stop_activity" data-room="${escape(room.id)}" ${!rhiMmCanRun(room,'stop_activity')?'disabled':''}><ha-icon icon="mdi:stop-circle-outline"></ha-icon>${this.t('stop_activity')}</button>`:''}
        ${rhiMmCanRun(room,'recover_activity')?
          `<button data-action="recover_activity" data-room="${escape(room.id)}"><ha-icon icon="mdi:restore"></ha-icon>${this.t('recover')}</button>`:''}
        <button class="mm-link" data-nav="rooms" data-room="${escape(room.id)}">${this.t('details')} <ha-icon icon="mdi:chevron-right"></ha-icon></button></div>`;
     const media=room.now_playing?.title?`<div class="mm-nowplaying"><ha-icon icon="mdi:music-note"></ha-icon>
       <span>${escape(rhiMmMediaSubtitle(room,this._hass))}</span></div>`:'';
-    const controls=delegated?`<p class="mm-muted">${this.t('harmony_scope')}</p>`:
-      `<div class="mm-controls">${actions||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div>`;
+    const controls=`${delegated?`<p class="mm-muted">${this.t('harmony_scope')}</p>`:''}<div class="mm-controls">${actions||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div>`;
     return `<details data-persist="${escape(key)}" class="mm-compact-room ${room.attention?'mm-room-needs-attention':''}" ${this._expanded.has(key)?'open':''}>
       <summary class="mm-compact-summary">
         ${rhiMmDeviceArt(devices.find(d=>d.role==='display')||devices.find(d=>d.role==='receiver')||devices[0],this.t('illustrative_device_art'),'card')}
@@ -1442,13 +1441,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
   roomCard(room,quick=false){
     if(quick)return this.compactRoomCard(room);
     const delegated=room.control_owner==='harmony';
-    const buttons=(delegated?[]:room.activities).map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}" aria-pressed="${!!a.active}" data-action="start_activity" data-room="${rhiUxEscape(room.id)}" data-activity="${rhiUxEscape(a.id)}" ${!rhiMmCanRun(room,'start_activity',a.id)?'disabled':''} title="${rhiUxEscape(a.disabled_reason||'')}"><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${rhiUxEscape(a.name)}</button>`).join('');
+    const buttons=room.activities.map(a=>`<button type="button" class="mm-activity ${a.active?'active':''}" aria-pressed="${!!a.active}" data-action="start_activity" data-room="${rhiUxEscape(room.id)}" data-activity="${rhiUxEscape(a.id)}" ${!rhiMmCanRun(room,'start_activity',a.id)?'disabled':''} title="${rhiUxEscape(a.disabled_reason||'')}"><ha-icon icon="${rhiMmActivityIcon(a.id)}"></ha-icon>${rhiUxEscape(a.name)}</button>`).join('');
     const media=room.now_playing?`<div class="mm-nowplaying"><ha-icon icon="mdi:music-note"></ha-icon><span>${rhiUxEscape(rhiMmMediaSubtitle(room,this._hass))}</span></div>`:'';
     const status=room.attention?'warn':room.phase==='active'?'good':room.phase==='idle'?'idle':'neutral';
     return `<article class="mm-room-card"><header class="mm-room-head"><span class="mm-room-glyph"><ha-icon icon="mdi:television-classic"></ha-icon></span><div><small>${this.t('room')}</small><h3>${rhiUxEscape(room.name)}</h3></div><span class="mm-phase mm-phase-${status}">${rhiUxEscape(rhiMmRoomStatus(room,this._hass))}</span></header>
       <div class="mm-room-current"><small>${this.t('activity')}</small><b>${rhiUxEscape(delegated?(room.harmony_activity||this.t('harmony_unavailable')):(room.activity_name||this.t('no_activity')))}</b>${room.progress?`<span>${rhiUxEscape(rhiMmRoomStatus(room,this._hass))}</span>`:''}</div>${media}
-      <div class="mm-controls">${delegated?`<span class="mm-muted">${this.t('harmony_scope')}</span>`:buttons||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div><div class="mm-room-foot">
-      ${!delegated&&(room.activities.length||rhiMmCanRun(room,'stop_activity'))?`<button data-action="stop_activity" data-room="${rhiUxEscape(room.id)}" ${!rhiMmCanRun(room,'stop_activity')?'disabled':''}><ha-icon icon="mdi:power"></ha-icon> ${this.t('stop_activity')}</button>`:''}
+      <div class="mm-controls">${delegated?`<span class="mm-muted">${this.t('harmony_scope')}</span>`:''}${buttons||`<span class="mm-muted">${this.t('no_activities')}</span>`}</div><div class="mm-room-foot">
+      ${((!delegated&&room.activities.length)||rhiMmCanRun(room,'stop_activity'))?`<button data-action="stop_activity" data-room="${rhiUxEscape(room.id)}" ${!rhiMmCanRun(room,'stop_activity')?'disabled':''}><ha-icon icon="mdi:power"></ha-icon> ${this.t('stop_activity')}</button>`:''}
       ${rhiMmCanRun(room,'recover_activity')?`<button data-action="recover_activity" data-room="${rhiUxEscape(room.id)}"><ha-icon icon="mdi:restore"></ha-icon> ${this.t('recover')}</button>`:''}
       <button class="mm-link" data-nav="rooms" data-room="${rhiUxEscape(room.id)}">${this.t('details')} <ha-icon icon="mdi:chevron-right"></ha-icon></button>
       </div>${quick?this.roomManualControls(room,true):''}${this.feedback(room.id)}${room.attention?`<p class="mm-room-error">${this.t('room_attention_detail')}</p>`:''}${(room.error||room.warnings?.length)?`<details><summary>${this.t('error_detail')}</summary>${rhiUxEscape([room.error,...(room.warnings||[])].filter(Boolean).join(' · '))}</details>`:''}</article>`;
@@ -1670,7 +1669,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       data-device-action="${action}" ${value===undefined?'':`data-value="${e(JSON.stringify(value))}"`}
       aria-label="${e(device.name+' · '+label)}">
       <ha-icon icon="${icon}"></ha-icon>${e(label)}</button>`:'';
-    const harmony=room.control_owner==='harmony'&&room.harmony_controller===device.key;
+    const harmony=room.harmony_controller===device.key;
     const harmonyOff=harmony&&c.harmony_activity?.options?.includes('PowerOff')?
       button('harmony_activity',this.t('off'),'mdi:power','PowerOff'):'';
     // One obvious HA-like TV power control, not a disappearing pair of icons.
@@ -1743,8 +1742,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
   roomManualControls(room,quick=false,focused=false,part='all'){
     const labels=Object.fromEntries(Object.entries({power_on:'on',power_off:'off',volume_down:'volume_down',volume_up:'volume_up',play:'play',pause:'pause',stop:'stop',previous:'previous',next:'next',source:'input',sound_mode:'sound_mode',volume:'volume',mute:'mute',join_group:'add_player',unjoin_group:'leave_group',harmony_activity:'harmony_activity'}).map(([action,key])=>[action,this.t(key)]));
     const escape=rhiUxEscape;
-    const devices=room.devices.filter(d=>Object.keys(d.controls||{}).length&&
-      (room.control_owner!=='harmony'||d.key===room.harmony_controller));
+    const devices=room.devices.filter(d=>Object.keys(d.controls||{}).length);
     const quickKeys=new Set([room.harmony_controller,room.audio?.device_key,room.now_playing?.device_key,devices.find(d=>d.role==='display')?.key,devices.find(d=>d.role==='player')?.key]);
     if(quick&&!room.activities.length&&devices.length&&!devices.some(d=>quickKeys.has(d.key)))quickKeys.add(devices[0].key);
     if(!devices.length)return '';

@@ -126,7 +126,8 @@ function rhiMmWholeIssues(d){
 }
 function rhiMmWholeRender(d,t,escape){
   const e=escape;
-  if(!d)return `<p role='alert'>Unable to read the saved Multimedia configuration.</p>`;
+  const count=(n,kind)=>n+' '+e(t('wh_count_'+(n===1?kind:kind==='activity'?'activities':kind+'s')));
+  if(!d)return `<p role='alert'>${e(t('wh_unreadable'))}</p>`;
   const local=!!d.localScope;
   const specialist=(id,label)=>local?'':`<button type='button' data-wh-action='specialist' data-wh-id='${id}'>${escape(label)}</button>`;
   const entry=(id,label,active,action)=>`<button type='button' data-wh-action='${action}'
@@ -140,7 +141,7 @@ function rhiMmWholeRender(d,t,escape){
     items.map(([id,label])=>`<option value='${e(id)}' ${value===id?'selected':''}>${e(label)}</option>`).join('')+
     '</select>';
   const sections=[
-    ['discovery','Discovered devices','mdi:devices'],
+    ['discovery',t('wh_discovered'),'mdi:devices'],
     ['rooms',t('settings_floor_rooms'),'mdi:floor-plan'],
     ['devices',t('devices'),'mdi:television'],
     ['activities',t('activities'),'mdi:play-box-multiple-outline']
@@ -159,14 +160,14 @@ function rhiMmWholeRender(d,t,escape){
     floorRooms.get(floorId).push([id,r]);
   }
   const roomButtons=[...floorRooms].map(([floorId,items])=>
-    `<div class='mm-wh-floor-group'><strong>${e(d.floors[floorId]||'Floor not published')} · ${items.length} rooms</strong>
+    `<div class='mm-wh-floor-group'><strong>${e(d.floors[floorId]||t('wh_floor_missing'))} · ${count(items.length,'room')}</strong>
       <div class='mm-wh-list'>${items.map(([id,r])=>entry(id,r.name||id,id===d.room,'select_room')).join('')}</div>
     </div>`).join('');
-  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · pending command approval'}${s.review_reason?' · needs review: '+s.review_reason:''}${s.available?'':' · unavailable'}`]);
+  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · '+ t('wh_pending_approval')}${s.review_reason?' · '+t('wh_needs_review')+': '+s.review_reason:''}${s.available?'':' · '+t('unavailable')}`]);
   const deviceRows=Object.entries(room?.devices||{});
   const activityRows=Object.entries(room?.activities||{});
   const roomAreas=Object.entries(room?.room_areas||{});
-  const roomAreaChoices=[['','Whole room'],...roomAreas.map(([id,area])=>[id,area.name])];
+  const roomAreaChoices=[['',t('wh_whole_room')],...roomAreas.map(([id,area])=>[id,area.name])];
   const currentDevice=d.device&&room?.devices?.[d.device]?d.device:deviceRows[0]?.[0]||'';
   const currentActivity=d.activity&&room?.activities?.[d.activity]?d.activity:activityRows[0]?.[0]||'';
   const selectedDevice=room?.devices?.[currentDevice];
@@ -184,7 +185,7 @@ function rhiMmWholeRender(d,t,escape){
   const currentCandidate=selectedDevice?.foundation_candidate_id||'';
   const bindingCurrent=sameNativeCandidates.some(s=>s.candidate===currentCandidate);
   const nativeBindingChoices=[
-    ...(!bindingCurrent&&selectedDevice?[ [currentCandidate,currentCandidate+' · no longer selected in Foundation'] ]:[]),
+    ...(!bindingCurrent&&selectedDevice?[ [currentCandidate,currentCandidate+' · '+ t('wh_no_longer_selected')] ]:[]),
     ...sameNativeCandidates.map(s=>[s.candidate,s.label+' · '+s.provider])
   ];
   const allDiscovered=(d.logicalDevices||[]).map(asset=>{
@@ -228,198 +229,195 @@ function rhiMmWholeRender(d,t,escape){
     const selectedRepair=repairs.find(x=>x.roomId===d.bulkRoom&&x.key===assigned?.[0]);
     const types=[...new Set((d.logicalDevices||[]).map(x=>x.logical_type).filter(Boolean))].sort();
     content=`<div class='mm-wh-grid mm-wh-discovery'><section class='mm-wh-panel'>
-      <div class='mm-wh-heading'><div><h4>Device discovery &amp; assignment</h4>
-        <p>Found ${allDiscovered.length} supported devices · ${allDiscovered.filter(x=>!x.linkedRoomIds.length).length} unassigned in this draft</p></div>
+      <div class='mm-wh-heading'><div><h4>${e(t('wh_discovery_heading'))}</h4>
+        <p>${e(t('wh_found'))} ${allDiscovered.length} ${e(t('wh_supported_devices'))} · ${allDiscovered.filter(x=>!x.linkedRoomIds.length).length} ${e(t('wh_unassigned_draft'))}</p></div>
         <div class='mm-wh-step-actions'>
           <button type='button' data-wh-action='repair_bindings'
-            ${repairs.length?'':'disabled'}>Review ${repairs.length} saved device link${repairs.length===1?'':'s'}</button>
+            ${repairs.length?'':'disabled'}>${e(t('review'))} ${repairs.length} ${e(t(repairs.length===1?'wh_saved_link':'wh_saved_links'))}</button>
           <button type='button' data-wh-action='apply_proposals'
-            ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>Review proposed home setup (${Object.keys(d.proposedRooms||{}).length} rooms)</button>
+            ${Object.keys(d.proposedRooms||{}).length?'':'disabled'}>${e(t('wh_review_setup'))} (${count(Object.keys(d.proposedRooms||{}).length,'room')})</button>
         </div></div>
-        ${repairs.length?'<p class="mm-muted">Review exact native links without replacing rooms or starting devices.</p>':''}
-        ${!Object.keys(d.proposedRooms||{}).length?`<p role='status' class='mm-muted'>No unambiguous automatic room proposals. Existing rooms are preserved; create or edit a room in Settings using a real Home Assistant Area. Native source discovery remains available.</p>
-          <button type='button' data-nav='settings'>Open Rooms &amp; Devices in Settings</button>`:''}
+        ${repairs.length?`<p class="mm-muted">${e(t('wh_review_links'))}</p>`:''}
+        ${!Object.keys(d.proposedRooms||{}).length?`<p role='status' class='mm-muted'>${e(t('wh_no_proposals'))}</p>
+          <button type='button' data-nav='settings'>${e(t('wh_open_settings'))}</button>`:''}
       <div class='mm-wh-searchfilters'>
-        <label>Search ${field('catalog_query',d.catalogQuery)}</label>
-        <label>Type ${select('catalog_type',d.catalogType,[['all','All device types'],...types.map(x=>[x,x.replaceAll('_',' ')])])}</label>
-        <label>Status ${select('catalog_filter',d.catalogFilter,
-          [['all','All supported'],['unassigned','Unassigned'],['in_room','Assigned to selected room'],['shared','Shared across rooms'],['classified','Classified'],['review','Needs review']])}</label>
+        <label>${e(t('wh_search'))} ${field('catalog_query',d.catalogQuery)}</label>
+        <label>${e(t('wh_type'))} ${select('catalog_type',d.catalogType,[['all',t('wh_all_types')],...types.map(x=>[x,x.replaceAll('_',' ')])])}</label>
+        <label>${e(t('wh_status'))} ${select('catalog_filter',d.catalogFilter,
+          [['all',t('wh_all_supported')],['unassigned',t('wh_unassigned')],['in_room',t('wh_assigned_room')],['shared',t('wh_shared_rooms')],['classified',t('wh_classified')],['review',t('wh_needs_review')]])}</label>
       </div>
-      <small>One logical device per actual endpoint. Native remotes and related entities remain linked, not duplicated. Filters never delete devices.</small>
+      <small>${e(t('wh_one_device'))}</small>
       <div class='mm-wh-tablewrap'><table class='mm-wh-table'>
-        <thead><tr><th>Pick</th><th>Discovered device</th><th>Type</th><th>Status</th><th>Assigned rooms</th><th>Action</th></tr></thead>
+        <thead><tr><th>${e(t('wh_pick'))}</th><th>${e(t('wh_discovered_device'))}</th><th>${e(t('wh_type'))}</th><th>${e(t('wh_status'))}</th><th>${e(t('wh_assigned_rooms'))}</th><th>${e(t('wh_action'))}</th></tr></thead>
         <tbody>${assets.map(asset=>{
           const primary=(asset.candidates||[]).find(x=>x.entity_id.startsWith('media_player.'))||asset.candidates?.[0];
-          const availability=primary?.available===true?'Available':'Temporarily unavailable';
-          const binding=asset.linkedRooms.length?'Configured':'Not assigned';
-          const approval=asset.approved_candidates>0?'Control approved':'Review control permission';
+          const availability=primary?.available===true?t('wh_available'):t('wh_temporarily_unavailable');
+          const binding=asset.linkedRooms.length?t('wh_configured'):t('wh_not_assigned');
+          const approval=asset.approved_candidates>0?t('wh_approved'):t('wh_review_permission');
           const reason=(asset.review_reasons||[]).join(', ');
           const chosen=d.selectedAssets.includes(asset.asset_id);
           return `<tr ${d.detailAsset===asset.asset_id?"class='mm-wh-rowactive'":''}>
             <td>${field('catalog_selected:'+asset.asset_id,chosen,'checkbox')}</td>
             <td><button type='button' data-wh-action='catalog_detail' data-wh-id='${e(asset.asset_id)}'>
-              <strong>${e(asset.name||asset.model||primary?.entity_id||'Unknown device')}</strong></button>
-              <small>${e(asset.model||asset.manufacturer||primary?.provider||'Native device')}</small></td>
+              <strong>${e(asset.name||asset.model||primary?.entity_id||t('wh_unknown_device'))}</strong></button>
+              <small>${e(asset.model||asset.manufacturer||primary?.provider||t('wh_native_device'))}</small></td>
             <td>${e((asset.logical_type||'media_player').replaceAll('_',' '))}</td>
-            <td><strong>${e(binding)}</strong><small>${e(availability)}</small><small>${e(reason?'Needs review: '+reason:approval)}</small></td>
-            <td>${e(asset.linkedRooms.join(', ')||'Not assigned')}</td>
+            <td><strong>${e(binding)}</strong><small>${e(availability)}</small><small>${e(reason?t('wh_needs_review')+': '+reason:approval)}</small></td>
+            <td>${e(asset.linkedRooms.join(', ')||t('wh_not_assigned'))}</td>
             <td><button type='button' data-wh-action='assign_catalog' data-wh-id='${e(asset.asset_id)}'
-              ${rooms.length?'':'disabled'}>${asset.linkedRoomIds.includes(d.bulkRoom)?'Edit':'Assign'}</button></td>
+              ${rooms.length?'':'disabled'}>${asset.linkedRoomIds.includes(d.bulkRoom)?t('settings_edit_step'):t('wh_assign')}</button></td>
           </tr>`;
         }).join('')}</tbody></table></div>
-      ${!assets.length?'<p>No supported candidates have been published yet, or no devices match these filters. Adjust filters or check Foundation discovery.</p>':''}
+      ${!assets.length?`<p>${e(t('wh_no_candidates'))}</p>`:''}
       <div class='mm-wh-bulk'>
-        <strong>${d.selectedAssets.length} selected</strong>
-        <label>Assign to room ${select('bulk_room',d.bulkRoom,
-          [['','Choose a room'],...rooms.map(([id,r])=>[id,r.name||id])])}</label>
+        <strong>${d.selectedAssets.length} ${e(t('wh_selected'))}</strong>
+        <label>${e(t('wh_assign_room'))} ${select('bulk_room',d.bulkRoom,
+          [['',t('wh_choose_room')],...rooms.map(([id,r])=>[id,r.name||id])])}</label>
         <button type='button' data-wh-action='bulk_assign'
-          ${!d.selectedAssets.length||!rooms.length?'disabled':''}>Assign selected devices</button>
+          ${!d.selectedAssets.length||!rooms.length?'disabled':''}>${e(t('wh_assign_selected'))}</button>
         <button type='button' data-wh-action='bulk_remove'
-          ${!d.selectedAssets.length||!rooms.length?'disabled':''}>Unassign selected from room</button>
+          ${!d.selectedAssets.length||!rooms.length?'disabled':''}>${e(t('wh_unassign_selected'))}</button>
         <button type='button' data-wh-action='clear_selected'
-          ${d.selectedAssets.length?'':'disabled'}>Clear selection</button>
+          ${d.selectedAssets.length?'':'disabled'}>${e(t('wh_clear_selection'))}</button>
       </div>
-      ${(d.proposalExceptions||[]).length?`<details><summary>${d.proposalExceptions.length} routes or locations need review</summary>
+      ${(d.proposalExceptions||[]).length?`<details><summary>${d.proposalExceptions.length} ${e(t('wh_routes_review'))}</summary>
         ${d.proposalExceptions.map(x=>`<div>${e(x)}</div>`).join('')}</details>`:''}
     </section><section class='mm-wh-panel mm-wh-detail'>
-      <h4>${e(currentAsset?.name||currentAsset?.model||'Select a discovered device')}</h4>
-      ${currentAsset?`<p>Type: ${e(currentAsset.logical_type||'Unknown')} ·
-        ${e(currentAsset.linkedRooms?.join(', ')||'Unassigned')}</p>
-        <label>Room to configure ${select('bulk_room',d.bulkRoom,
-          [['','Choose a room'],...rooms.map(([id,r])=>[id,r.name||id])])}</label>
-        ${d.doc.rooms[d.bulkRoom]?`<small>HA Area:
-          ${e(d.areas[d.doc.rooms[d.bulkRoom].area_id]||'Not assigned')} · Floor:
-          ${e(d.floors[d.areaFloors[d.doc.rooms[d.bulkRoom].area_id]]||'Not published')}</small>`:''}
+      <h4>${e(currentAsset?.name||currentAsset?.model||t('wh_select_discovered'))}</h4>
+      ${currentAsset?`<p>${e(t('wh_type'))}: ${e(currentAsset.logical_type||'Unknown')} ·
+        ${e(currentAsset.linkedRooms?.join(', ')||t('wh_unassigned'))}</p>
+        <label>${e(t('wh_room_configure'))} ${select('bulk_room',d.bulkRoom,
+          [['',t('wh_choose_room')],...rooms.map(([id,r])=>[id,r.name||id])])}</label>
+        ${d.doc.rooms[d.bulkRoom]?`<small>${e(t('wh_native_ha_area'))}:
+          ${e(d.areas[d.doc.rooms[d.bulkRoom].area_id]||t('wh_not_assigned'))} · ${e(t('wh_floor'))}:
+          ${e(d.floors[d.areaFloors[d.doc.rooms[d.bulkRoom].area_id]]||t('not_published'))}</small>`:''}
         ${currentBinding?`
-          <p role='status' class='mm-muted'>Native control: ${e(currentBinding.control_approved===true?'requested for this exact source':'not yet approved in this draft')} · ${e(connected?.review_reason||(!connected?'current candidate not found; reselect in Devices':'review exact registry identity before Save'))}</p>
-          ${currentAsset.linkedRoomIds?.length>1&&['television','display'].includes(currentAsset.logical_type)?`<p class='mm-room-error'>This display is linked to multiple rooms. Verify its physical placement and remove only an incorrect room link; nothing is reassigned automatically.</p>`:''}
-          <button type='button' data-wh-action='focus_binding'>Review binding, permission and Wake-on-LAN in Settings</button>
+          <p role='status' class='mm-muted'>${e(t('wh_native_control'))}: ${e(currentBinding.control_approved===true?t('wh_exact_source'):t('wh_not_yet_approved'))} · ${e(connected?.review_reason||(!connected?t('wh_candidate_missing'):t('wh_registry_review')))}</p>
+          ${currentAsset.linkedRoomIds?.length>1&&['television','display'].includes(currentAsset.logical_type)?`<p class='mm-room-error'>${e(t('wh_display_multiple'))}</p>`:''}
+          <button type='button' data-wh-action='focus_binding'>${e(t('wh_review_binding'))}</button>
           ${selectedRepair?`<button type='button' data-wh-action='repair_binding'
             data-wh-id='${e(selectedRepair.roomId+':'+selectedRepair.key)}'>
-            Review this device link (one-device test)</button>`:''}
-          <label>Display name ${field('device_name',currentBinding.name||'')}</label>
-          <label>Role ${select('device_role',currentBinding.role||'player',
-            [['display','TV / Display'],['receiver','Receiver / Audio zone'],['player','Media player'],['remote','Remote / Hub']])}</label>
-          ${Object.keys(d.doc.rooms[d.bulkRoom]?.room_areas||{}).length?`<label>Zone within room
+            ${e(t('wh_review_one_link'))}</button>`:''}
+          <label>${e(t('wh_display_name'))} ${field('device_name',currentBinding.name||'')}</label>
+          <label>${e(t('wh_role'))} ${select('device_role',currentBinding.role||'player',
+            [['display',t('wh_tv_display')],['receiver',t('wh_receiver_zone')],['player',t('role_player')],['remote',t('wh_remote_hub')]])}</label>
+          ${Object.keys(d.doc.rooms[d.bulkRoom]?.room_areas||{}).length?`<label>${e(t('wh_zone'))}
             ${select('device_room_area',currentBinding.room_area||'',
-              [['','Whole room'],...Object.entries(d.doc.rooms[d.bulkRoom].room_areas)
+              [['',t('wh_whole_room')],...Object.entries(d.doc.rooms[d.bulkRoom].room_areas)
                 .map(([id,area])=>[id,area.name])])}</label>`:''}
-          <label>Power ${select('device_power',currentBinding.power_mode||'native',
-            [['native','Native / configured wake'],['passive','Passive · observe only']])}</label>
+          <label>${e(t('wh_power'))} ${select('device_power',currentBinding.power_mode||'native',
+            [['native',t('wh_native_wake')],['passive',t('wh_passive')]])}</label>
           <label class='mm-wh-check'>HDMI-CEC ${field('device_cec',currentBinding.hdmi_cec_enabled===true,'checkbox')}</label>
           <label>Wake-on-LAN ${select('device_wol_mode',enabledWol?'directed':'native',
-            [['native','Native power-on'],['directed','Use verified native MAC']])}</label>
-          <label>Native MAC ${select('device_wol_mac',
-            wol?currentBinding.power_on.data.mac:'',[['','Choose exact native MAC'],
+            [['native',t('wh_native_power')],['directed',t('wh_verified_mac')]])}</label>
+          <label>${e(t('wh_native_mac'))} ${select('device_wol_mac',
+            wol?currentBinding.power_on.data.mac:'',[['',t('wh_choose_mac')],
               ...rhiMmWholeVerifiedMacs(d,currentBinding).map(m=>[m,m])])}</label>
-          ${wol?`<label>Destination IPv4 ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
-            <label>UDP port ${field('device_wol_port',currentBinding.power_on.data.broadcast_port??9,'number','min="1" max="65535"')}</label>`:''}
-          <label>After power-on (ms) ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
-          <details><summary>Native identity and related entities</summary>
-            <p>${e(currentBinding.entity)} · ${e(connected?.provider||'unknown provider')}</p>
-            <button type='button' data-more-info='${e(currentBinding.entity)}'>Open native Home Assistant player</button>
+          ${wol?`<label>${e(t('wh_ipv4'))} ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
+            <label>${e(t('wh_port'))} ${field('device_wol_port',currentBinding.power_on.data.broadcast_port??9,'number','min="1" max="65535"')}</label>`:''}
+          <label>${e(t('wh_after_power'))} ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
+          <details><summary>${e(t('wh_native_identity'))}</summary>
+            <p>${e(currentBinding.entity)} · ${e(connected?.provider||t('wh_unknown_provider'))}</p>
+            <button type='button' data-more-info='${e(currentBinding.entity)}'>${e(t('wh_open_native'))}</button>
             ${(connected?.related_entities||[]).map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.availability)}
-              <button type='button' data-more-info='${e(x.entity_id)}'>Inspect source</button></div>`).join('')}
+              <button type='button' data-more-info='${e(x.entity_id)}'>${e(t('wh_inspect_source'))}</button></div>`).join('')}
           </details>
-        `:`<p>Assign this discovered device to the selected room to configure controls. Discovery alone never activates physical commands.</p>
+        `:`<p>${e(t('wh_assign_to_configure'))}</p>
         <button type='button' data-wh-action='assign_catalog' data-wh-id='${e(currentAsset.asset_id)}'
-          ${!rooms.length?'disabled':''}>Assign to room</button>`}
+          ${!rooms.length?'disabled':''}>${e(t('wh_assign_room'))}</button>`}
       ${currentBinding?`<button type='button' class='danger' data-wh-action='remove_catalog'
-        data-wh-id='${e(currentAsset.asset_id)}'>Unassign from this room</button>`:''}
-      `:'<p>Pick any device in the table to view exact native sources and configure its role, power and CEC.</p>'}
+        data-wh-id='${e(currentAsset.asset_id)}'>${e(t('wh_unassign_room'))}</button>`:''}
+      `:`<p>${e(t('wh_pick_detail'))}</p>`}
     </section></div>`;
   }else if(d.tab==='rooms'){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
-      <h4>Home structure <small>Native HA Floor / Area</small></h4>
-      ${roomButtons||'<p>No rooms configured yet</p>'}
-      <a class='mm-wh-native-link' href='/config/areas/dashboard'>Create, edit or remove floors and Areas in Home Assistant</a>
-      <small>HA owns these locations. After changes in HA, reopen Multimedia Settings to load updated locations.</small>
-      <h4>Link Multimedia room</h4>
-      <label>Name${field('new_room',d.newRoom)}</label>
-      <label>Native HA Area${select('new_area',d.newArea,
-        [['','Unassigned'],...Object.entries(d.areas)])}</label>
-      <button type='button' data-wh-action='add_room'>Add room</button>
+      <h4>${e(t('wh_home_structure'))} <small>${e(t('wh_ha_floor_area'))}</small></h4>
+      ${roomButtons||`<p>${e(t('wh_no_rooms'))}</p>`}
+      <a class='mm-wh-native-link' href='/config/areas/dashboard'>${e(t('wh_manage_areas'))}</a>
+      <small>${e(t('wh_ha_locations'))}</small>
+      <h4>${e(t('wh_link_room'))}</h4>
+      <label>${e(t('wh_name'))}${field('new_room',d.newRoom)}</label>
+      <label>${e(t('wh_native_ha_area'))}${select('new_area',d.newArea,
+        [['',t('wh_unassigned')],...Object.entries(d.areas)])}</label>
+      <button type='button' data-wh-action='add_room'>${e(t('setup_add_room'))}</button>
     </section><section class='mm-wh-panel'>
-      <h4>${e(room?.name||'Choose a room')}</h4>
-      ${room?`<label>Room name${field('room_name',room.name)}</label>
-        <label>Native Home Assistant Area${select('room_area',room.area_id||'',
-          [['','No native area'],...Object.entries(d.areas)])}</label>
-        <small>Native HA Area: ${e(d.areas[room.area_id]||'Unassigned')} · Floor: ${e(d.floors[d.areaFloors[room.area_id]]||'Not published')}. Floor and Area creation, rename and removal remain in Home Assistant.</small>
-        <details class='mm-wh-room-areas'><summary>Room Areas (optional subdivisions)</summary>
-          <small>Group AV setups within one room. Room Areas do not create native HA Areas or controllers.</small>
+      <h4>${e(room?.name||t('wh_choose_room'))}</h4>
+      ${room?`<label>${e(t('wh_room_name'))}${field('room_name',room.name)}</label>
+        <label>${e(t('wh_native_home_area'))}${select('room_area',room.area_id||'',
+          [['',t('wh_no_native_area')],...Object.entries(d.areas)])}</label>
+        <small>${e(t('wh_native_ha_area'))}: ${e(d.areas[room.area_id]||t('wh_unassigned'))} · ${e(t('wh_floor'))}: ${e(d.floors[d.areaFloors[room.area_id]]||t('not_published'))}. ${e(t('wh_ha_owns_locations'))}</small>
+        <details class='mm-wh-room-areas'><summary>${e(t('wh_subdivisions'))}</summary>
+          <small>${e(t('wh_subdivision_help'))}</small>
           ${roomAreas.map(([id,area])=>`<div class='mm-wh-area'>
-            <label>Area name ${field('room_area_name:'+id,area.name)}</label>
+            <label>${e(t('wh_area_name'))} ${field('room_area_name:'+id,area.name)}</label>
             <button type='button' data-wh-action='delete_room_area'
-              data-wh-id='${e(id)}'>Remove</button></div>`).join('')}
-          <label>New Room Area ${field('new_room_area',d.newRoomArea)}</label>
-          <button type='button' data-wh-action='add_room_area'>Add Room Area</button>
+              data-wh-id='${e(id)}'>${e(t('wh_remove'))}</button></div>`).join('')}
+          <label>${e(t('wh_new_room_area'))} ${field('new_room_area',d.newRoomArea)}</label>
+          <button type='button' data-wh-action='add_room_area'>${e(t('wh_add_room_area'))}</button>
         </details>
-        <details><summary>Advanced room settings</summary>${specialist('harmony_owner','Harmony / Premium ownership')}${specialist('speech_endpoint','Speaker announcements')}${specialist('cec_device','HDMI-CEC device policy')}${specialist('tv_wake','Device wake settings')}</details>
-        <p>${Object.keys(room.devices||{}).length} devices · ${Object.keys(room.activities||{}).length} activities</p>
-        ${local?'':`<button type='button' class='danger' data-wh-action='delete_room'>Remove room</button>`}`:''}
+        <details><summary>${e(t('wh_advanced_room'))}</summary>${specialist('harmony_owner',t('setup_harmony_owner'))}${specialist('speech_endpoint',t('wh_announcements'))}${specialist('cec_device',t('wh_cec_policy'))}${specialist('tv_wake',t('wh_wake_settings'))}</details>
+        <p>${count(Object.keys(room.devices||{}).length,'device')} · ${count(Object.keys(room.activities||{}).length,'activity')}</p>
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_room'>${e(t('settings_remove_room'))}</button>`}`:''}
     </section></div>`;
   }else if(d.tab==='devices'){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
-      <h4>Devices · ${e(room?.name||'No room')}</h4>
+      <h4>${e(t('devices'))} · ${e(room?.name||t('wh_no_room'))}</h4>
       <div class='mm-wh-list'>${deviceRows.map(([id,x])=>entry(id,x.name||id,id===currentDevice,'select_device')).join('')}</div>
-      <h4>Assign supported device</h4>
-      <label>Foundation supported source${select('new_source',d.newSource,
-        [['','Choose a discovered source'],...sourceRows])}</label>
-      <button type='button' data-wh-action='add_device' ${d.newSource===''||!room?'disabled':''}>Assign device</button>
-      <small>Source binding and explicit control choice are reviewed together in one Multimedia Save; no separate Foundation wizard.</small>
+      <h4>${e(t('wh_assign_supported'))}</h4>
+      <label>${e(t('wh_foundation_source'))}${select('new_source',d.newSource,
+        [['',t('wh_choose_discovered_source')],...sourceRows])}</label>
+      <button type='button' data-wh-action='add_device' ${d.newSource===''||!room?'disabled':''}>${e(t('wh_assign_device'))}</button>
+      <small>${e(t('wh_single_save'))}</small>
     </section><section class='mm-wh-panel'>
-      <h4>${e(selectedDevice?.name||'Select a device')}</h4>
+      <h4>${e(selectedDevice?.name||t('wh_select_device'))}</h4>
       ${selectedDevice?`<small>${e(selectedDevice.name||currentDevice)} · ${e(selectedDevice.foundation_concept||'')}</small>
-        <label>Display name${field('device_name',selectedDevice.name||'')}</label>
-        <label class='mm-wh-check'>Enable native Premium controls after Review &amp; Save ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
-        <small>Allowed only for this exact currently registered Foundation/native identity; HA permissions and capabilities are rechecked before each command.</small>
-        ${unresolvedDevice?`<label>Choose the actual device for this role
-          ${select('device_resolve','',[['','Select compatible native device'],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||'Area not assigned')+' · '+s.provider])])}</label>
-          <small>The room role and activity references are preserved. A replacement device needs fresh control approval. No device is started.</small>
-          ${!resolveChoices.length?`<p class='mm-muted'>No compatible native device is currently discovered. Check the Home Assistant integration and refresh discovery.</p>`:''}`:
-          `<details><summary>Native device identity</summary><label>Foundation candidate
+        <label>${e(t('wh_display_name'))}${field('device_name',selectedDevice.name||'')}</label>
+        <label class='mm-wh-check'>${e(t('wh_enable_controls'))} ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
+        <small>${e(t('wh_exact_permissions'))}</small>
+        ${unresolvedDevice?`<label>${e(t('wh_choose_actual'))}
+          ${select('device_resolve','',[['',t('wh_compatible_native')],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||t('wh_area_not_assigned'))+' · '+s.provider])])}</label>
+          <small>${e(t('wh_preserve_role'))}</small>
+          ${!resolveChoices.length?`<p class='mm-muted'>${e(t('wh_no_compatible'))}</p>`:''}`:
+          `<details><summary>${e(t('wh_native_device_identity'))}</summary><label>${e(t('wh_foundation_candidate'))}
           ${select('device_candidate',currentCandidate,nativeBindingChoices,sameNativeCandidates.length?'':'disabled')}</label></details>`}
-        ${unresolvedDevice?`<p class='mm-room-error'>Device link is missing. Choose an existing native device above.</p>`:
-          !bindingCurrent?`<p class='mm-room-error'>The saved link needs review. Select its current native candidate.</p>`:
+        ${unresolvedDevice?`<p class='mm-room-error'>${e(t('wh_link_missing'))}</p>`:
+          !bindingCurrent?`<p class='mm-room-error'>${e(t('wh_link_review'))}</p>`:
           sameNativeCandidates.every(x=>!x.approved)?
-          '<p class="mm-room-error">Device is linked; control approval is pending.</p>':
-          sameNativeCandidates.every(x=>!x.available)?'<p class="mm-muted">Device is linked but currently unavailable. Keep its identity; check native connectivity when needed.</p>':''}
-        <details><summary>Native identity and related entities</summary><p class='mm-selectable'>${e(selectedDevice.entity||'')} · ${e(currentDevice)}</p>
+          `<p class="mm-room-error">${e(t('wh_approval_pending'))}</p>`:
+          sameNativeCandidates.every(x=>!x.available)?`<p class="mm-muted">${e(t('wh_linked_offline'))}</p>`:''}
+        <details><summary>${e(t('wh_native_identity'))}</summary><p class='mm-selectable'>${e(selectedDevice.entity||'')} · ${e(currentDevice)}</p>
           ${(d.sources.find(x=>x.entity===selectedDevice.entity&&
             x.candidate===selectedDevice.foundation_candidate_id)?.related_entities||[])
             .map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.provider||x.domain||'native')}
               · ${e(x.availability)}</div>`).join('')}
         </details>
-        <label>Role${select('device_role',selectedDevice.role||'player',
-          [['display','TV / Display'],['receiver','Receiver / Audio zone'],['player','Media player'],['remote','Remote / Hub']])}</label>
-        ${roomAreas.length?`<label>Room Area (optional)${select('device_room_area',selectedDevice.room_area||'',roomAreaChoices)}</label>`:''}
-        <label>Power behaviour${select('device_power',selectedDevice.power_mode||'native',
-          [['native','Automatic · use configured WoL for Power On'],['passive','Passive (observe only)']])}</label>
-        <label class='mm-wh-check'>HDMI-CEC enabled for this device ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>
-        <label>After power-on (ms)${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
+        <label>${e(t('wh_role'))}${select('device_role',selectedDevice.role||'player',
+          [['display',t('wh_tv_display')],['receiver',t('wh_receiver_zone')],['player',t('role_player')],['remote',t('wh_remote_hub')]])}</label>
+        ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('device_room_area',selectedDevice.room_area||'',roomAreaChoices)}</label>`:''}
+        <label>${e(t('wh_power_behaviour'))}${select('device_power',selectedDevice.power_mode||'native',
+          [['native',t('wh_auto_wol')],['passive',t('wh_passive_observe')]])}</label>
+        <label class='mm-wh-check'>${e(t('wh_cec_enabled'))} ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>
+        <label>${e(t('wh_after_power'))}${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
         <details class='mm-wh-device-wol' ${currentWake?'open':''}>
-          <summary>Wake-on-LAN · optional per device</summary>
-          <label>Power-on method${select('device_wol_mode',currentWake&&selectedDevice.wol_enabled!==false?'directed':'native',
-            [['native','Use native HA power-on (no WoL override)'],['directed','Wake-on-LAN · MAC + optional LAN IPv4']])}</label>
-          <label>MAC address (verified native) ${select('device_wol_mac',
-            currentWake?.mac||'',[['','Choose exact native MAC'],...verifiedMacs.map(mac=>[mac,mac])])}</label>
-          ${currentWake?`<label>Destination IPv4 (optional)
+          <summary>${e(t('wh_wol_optional'))}</summary>
+          <label>${e(t('wh_power_method'))}${select('device_wol_mode',currentWake&&selectedDevice.wol_enabled!==false?'directed':'native',
+            [['native',t('wh_native_no_wol')],['directed',t('wh_wol_lan')]])}</label>
+          <label>${e(t('wh_mac_verified'))} ${select('device_wol_mac',
+            currentWake?.mac||'',[['',t('wh_choose_mac')],...verifiedMacs.map(mac=>[mac,mac])])}</label>
+          ${currentWake?`<label>${e(t('wh_ipv4_optional'))}
             ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
-            <label>UDP port ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
-          <small>Verified MACs: ${e(verifiedMacs.join(', ')||'none published by native HA')}.
-            WOL is used automatically by the ordinary On button and activity startup if
-            configured and approved. Test Wake-on-LAN is on the native logical HA Device.
-            Save never sends a packet; Off stays native. Actual wake requires HA Wake-on-LAN service
-            and fresh readback.</small>
+            <label>${e(t('wh_port'))} ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
+          <small>${e(t('wh_verified_macs'))}: ${e(verifiedMacs.join(', ')||t('wh_no_mac'))}.
+            ${e(t('wh_wol_help'))}</small>
           ${selectedDevice.power_mode==='passive'?
-            '<small>Passive mode disables direct power-on. Choose Native power behaviour to use WOL.</small>':''}
+            `<small>${e(t('wh_passive_wol'))}</small>`:''}
         </details>
-        <small>HDMI-CEC and Wake-on-LAN are separate options. Shared physical devices keep a single power and CEC policy.</small>
-        ${local?'':`<button type='button' class='danger' data-wh-action='delete_device'>Remove device</button>`}`:''}
+        <small>${e(t('wh_separate_cec_wol'))}</small>
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_device'>${e(t('wh_remove_device'))}</button>`}`:''}
     </section></div>`;
   }else{
     const cast=selectedActivity?.devices||[];
-    const typeOptions=RHI_MM_WHOLE_TYPES.map(x=>[x,x.replaceAll('_',' ')]);
+    const typeOptions=RHI_MM_WHOLE_TYPES.map(x=>[x,t(({"watch_tv":"wh_watch_tv","watch_hdmi":"wh_watch_hdmi","watch_source":"wh_watch_source","listen_music":"wh_listen_music","play_game":"wh_play_game"})[x])]);
     const targets=deviceRows.filter(([,x])=>['display','amplifier'].includes(x.foundation_concept)&&
       x.entity.startsWith('media_player.'));
     const players=deviceRows.filter(([,x])=>x.entity.startsWith('media_player.')&&
@@ -436,81 +434,81 @@ function rhiMmWholeRender(d,t,escape){
     const needsRoute=d.newType!=='listen_music'||!!offeredInputs.length;
     const renderSteps=phase=>{
       const steps=Array.isArray(selectedActivity?.[phase])?selectedActivity[phase]:[];
-      return `<section class='mm-wh-steps'><h4>${phase==='steps'?'Start actions':'Stop / All Off actions'}</h4>
+      return `<section class='mm-wh-steps'><h4>${phase==='steps'?t('wh_start_actions'):t('wh_stop_actions')}</h4>
         ${steps.map((step,i)=>{
           const currentSource=room?.devices?.[step.device];
           const selected=d.sources.find(s=>s.entity===currentSource?.entity&&s.candidate===currentSource?.foundation_candidate_id);
           const options=step.type==='sound_mode'?selected?.sound_mode_list||[]:selected?.source_list||[];
           const original=(step.candidates||[])[0]||'';
-          const list=[['','Choose verified native input'],...options.map(x=>[x,x])];
-          if(original&&!options.includes(original))list.push([original,original+' · not in current native list']);
+          const list=[['',t('wh_choose_input')],...options.map(x=>[x,x])];
+          if(original&&!options.includes(original))list.push([original,original+' · '+ t('wh_not_in_list')]);
           let val='';
           if(['source','sound_mode'].includes(step.type))
-            val=`<label>Native ${step.type}${select(`step_value:${phase}:${i}`,original,list)}</label>
-              ${!options.length?`<small class='mm-room-error'>No native ${step.type} choices are published. Verify Foundation/provider.</small>`:''}`;
-          else if(step.type==='volume')val=`<label>Volume 0–1${field(`step_value:${phase}:${i}`,step.level??.5,'number','min="0" max="1" step="0.01"')}</label>`;
-          else if(step.type==='remote_key')val=`<label>Native key${field(`step_value:${phase}:${i}`,step.value||'')}</label>`;
-          else if(step.type==='delay')val=`<label>Delay ms${field(`step_value:${phase}:${i}`,step.milliseconds??0,'number','min="0" max="30000" step="1"')}</label>`;
-          else if(step.type==='wait_until')val=`<label>Wait for actual HA state${select(`step_state:${phase}:${i}`,step.states?.[0]||'on',
+            val=`<label>${e(t('script_action_'+step.type))}${select(`step_value:${phase}:${i}`,original,list)}</label>
+              ${!options.length?`<small class='mm-room-error'>${e(t('action_unavailable'))}</small>`:''}`;
+          else if(step.type==='volume')val=`<label>${e(t('wh_volume_scale'))}${field(`step_value:${phase}:${i}`,step.level??.5,'number','min="0" max="1" step="0.01"')}</label>`;
+          else if(step.type==='remote_key')val=`<label>${e(t('wh_native_key'))}${field(`step_value:${phase}:${i}`,step.value||'')}</label>`;
+          else if(step.type==='delay')val=`<label>${e(t('wh_delay'))}${field(`step_value:${phase}:${i}`,step.milliseconds??0,'number','min="0" max="30000" step="1"')}</label>`;
+          else if(step.type==='wait_until')val=`<label>${e(t('wh_wait_state'))}${select(`step_state:${phase}:${i}`,step.states?.[0]||'on',
               ['on','off','playing','paused','idle','standby','buffering'].map(x=>[x,x]))}</label>
-              <label>Timeout s${field(`step_timeout:${phase}:${i}`,step.timeout??15,'number','min="1" max="300" step="1"')}</label>`;
+              <label>${e(t('wh_timeout'))}${field(`step_timeout:${phase}:${i}`,step.timeout??15,'number','min="1" max="300" step="1"')}</label>`;
           return `<div class='mm-wh-step'><strong>${i+1}</strong>
-            <label>Device${select(`step_device:${phase}:${i}`,step.device||'',
+            <label>${e(t('device'))}${select(`step_device:${phase}:${i}`,step.device||'',
               cast.map(k=>[k,room?.devices?.[k]?.name||k]))}</label>
-            <label>Action${select(`step_type:${phase}:${i}`,step.type,
-              RHI_MM_WHOLE_STEPS.map(x=>[x,x.replaceAll('_',' ')]))}</label>
+            <label>${e(t('wh_action'))}${select(`step_type:${phase}:${i}`,step.type,
+              RHI_MM_WHOLE_STEPS.map(x=>[x,t('script_action_'+x)]))}</label>
             ${val}
-            ${!['wait_until','delay'].includes(step.type)?`<label>Override delay ms${field(`step_override:${phase}:${i}`,step.delay_ms??'','number','min="0" max="30000" step="1"')}</label>`:''}
+            ${!['wait_until','delay'].includes(step.type)?`<label>${e(t('wh_override_delay'))}${field(`step_override:${phase}:${i}`,step.delay_ms??'','number','min="0" max="30000" step="1"')}</label>`:''}
             <div class='mm-wh-step-actions'>
-              <button type='button' data-wh-action='step_up' data-phase='${phase}' data-index='${i}' ${i===0?'disabled':''} aria-label='Move action up'>↑</button>
-              <button type='button' data-wh-action='step_down' data-phase='${phase}' data-index='${i}' ${i===steps.length-1?'disabled':''} aria-label='Move action down'>↓</button>
-              <button type='button' class='danger' data-wh-action='step_remove' data-phase='${phase}' data-index='${i}' aria-label='Remove action'>×</button>
+              <button type='button' data-wh-action='step_up' data-phase='${phase}' data-index='${i}' ${i===0?'disabled':''} aria-label='${e(t('move_step_up'))}'>↑</button>
+              <button type='button' data-wh-action='step_down' data-phase='${phase}' data-index='${i}' ${i===steps.length-1?'disabled':''} aria-label='${e(t('move_step_down'))}'>↓</button>
+              <button type='button' class='danger' data-wh-action='step_remove' data-phase='${phase}' data-index='${i}' aria-label='${e(t('wh_remove_action'))}'>×</button>
             </div>
           </div>`;
         }).join('')}
-        <button type='button' data-wh-action='step_add' data-phase='${phase}' ${cast.length?'':'disabled'}>Add ${phase==='steps'?'start':'stop'} action</button>
+        <button type='button' data-wh-action='step_add' data-phase='${phase}' ${cast.length?'':'disabled'}>${e(t(phase==='steps'?'wh_add_start':'wh_add_stop'))}</button>
       </section>`;
     };
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
-      <h4>Activities · ${e(room?.name||'No room')}</h4>
+      <h4>${e(t('activities'))} · ${e(room?.name||t('wh_no_room'))}</h4>
       <div class='mm-wh-list'>${activityRows.map(([id,x])=>entry(id,x.name||id,id===currentActivity,'select_activity')).join('')}</div>
-      <h4>Add activity</h4>
-      <label>Name${field('new_activity',d.newActivity)}</label>
-      <label>Type${select('new_type',d.newType,typeOptions)}</label>
+      <h4>${e(t('setup_add_activity'))}</h4>
+      <label>${e(t('wh_name'))}${field('new_activity',d.newActivity)}</label>
+      <label>${e(t('wh_type'))}${select('new_type',d.newType,typeOptions)}</label>
       ${(needsPlayer||d.newType==='listen_music')&&players.length?
-        `<label>Media source ${select('new_activity_source',d.newActivitySource,
-           [['','Choose a source'],...players.map(([key,x])=>[key,x.name||key])])}</label>`:''}
-      ${targets.length?`<label>TV / receiver for route
+        `<label>${e(t('role_source'))} ${select('new_activity_source',d.newActivitySource,
+           [['',t('wh_choose_source')],...players.map(([key,x])=>[key,x.name||key])])}</label>`:''}
+      ${targets.length?`<label>${e(t('wh_route_target'))}
         ${select('new_activity_target',preferredTarget,
-           [['','Choose destination'],...targets.map(([key,x])=>[key,x.name||key])])}</label>`:''}
-      ${needsRoute?`<label>Verified native input
+           [['',t('wh_destination')],...targets.map(([key,x])=>[key,x.name||key])])}</label>`:''}
+      ${needsRoute?`<label>${e(t('wh_verified_input'))}
         ${select('new_activity_input',d.newActivityInput,
-          [['','Select actual source / HDMI input'],...offeredInputs.map(x=>[x,x])])}</label>
-        <small>Only the actual native input list is selectable. HDMI/CEC cables are never guessed.</small>`:''}
-      <button type='button' data-wh-action='add_activity'>Create configured activity</button>
+          [['',t('wh_actual_input')],...offeredInputs.map(x=>[x,x])])}</label>
+        <small>${e(t('wh_input_help'))}</small>`:''}
+      <button type='button' data-wh-action='add_activity'>${e(t('wh_create_activity'))}</button>
     </section><section class='mm-wh-panel'>
-      <h4>${e(selectedActivity?.name||'Choose an activity')}</h4>
-      ${selectedActivity?`<label>Activity name${field('activity_name',selectedActivity.name||'')}</label>
-        <label>Type${select('activity_type',selectedActivity.activity_type||'watch_tv',typeOptions)}</label>
-        ${roomAreas.length?`<label>Room Area (optional)${select('activity_room_area',selectedActivity.room_area||'',roomAreaChoices)}</label>`:''}
-        <h4>Step 1 — Devices involved</h4>
+      <h4>${e(selectedActivity?.name||t('wh_choose_activity'))}</h4>
+      ${selectedActivity?`<label>${e(t('wh_activity_name'))}${field('activity_name',selectedActivity.name||'')}</label>
+        <label>${e(t('wh_type'))}${select('activity_type',selectedActivity.activity_type||'watch_tv',typeOptions)}</label>
+        ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('activity_room_area',selectedActivity.room_area||'',roomAreaChoices)}</label>`:''}
+        <h4>${e(t('wh_step_devices'))}</h4>
         <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('activity_cast:'+key,cast.includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
-        <h4>Step 2 — Tune actions and sequence</h4>
+        <h4>${e(t('wh_step_actions'))}</h4>
         ${renderSteps('steps')}${renderSteps('stop_steps')}
-        <details><summary>Advanced activity settings</summary>${specialist('cec_activity','HDMI-CEC relationships')}${specialist('button_mapping','Remote button mapping')}${specialist('macro_manage','One-touch shortcuts')}${specialist('script_step','Detailed action editor')}</details>
-        ${local?'':`<button type='button' class='danger' data-wh-action='delete_activity'>Remove activity</button>`}`:''}
+        <details><summary>${e(t('wh_advanced_activity'))}</summary>${specialist('cec_activity',t('wh_cec_relationships'))}${specialist('button_mapping',t('wh_remote_mapping'))}${specialist('macro_manage',t('wh_shortcuts'))}${specialist('script_step',t('wh_action_editor'))}</details>
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_activity'>${e(t('settings_remove_activity'))}</button>`}`:''}
     </section></div>`;
   }
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
     <header class='mm-wh-header'><div><h2>${e(t('setup_editor'))}</h2>
       <p>${local?e(t('expert_selected')):[t('rooms'),t('devices'),t('activities')].map(e).join(' · ')}</p></div>
       <span class='mm-wh-draft'>${e(t(d.dirty?'whole_home_leave_title':'expert_saved'))}</span></header>
-    ${localSections.length?`<nav class='mm-wh-tabs' aria-label='Multimedia object categories'>
+    ${localSections.length?`<nav class='mm-wh-tabs' aria-label='${e(t('wh_categories'))}'>
       ${localSections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
         data-wh-id='${id}' aria-pressed='${d.tab===id}'>
         <ha-icon icon='${icon}'></ha-icon>${e(label)}</button>`).join('')}
     </nav>`:''}
-    ${!local&&d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>Room
+    ${!local&&d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>${e(t('wh_room'))}
       ${select('room_select',d.room,rooms.map(([id,r])=>[id,r.name||id]))}</label></div>`:''}
     ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
       <strong>${e(t(d.validationStale?'expert_validation_stale':'expert_attention'))}</strong>
@@ -521,17 +519,17 @@ function rhiMmWholeRender(d,t,escape){
       <details><summary>${e(t('expert_details'))}</summary><p style='white-space:pre-wrap'>${e(d.validationDetail)}</p></details>
     </section>`;})():''}
     ${d.error&&d.error!==d.validationDetail?`<div class='mm-room-error mm-selectable' role='alert'><p style='white-space:pre-wrap'>${e(d.error)}</p>${!d.validationDetail?`<button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.error)}</textarea>`:''}</div>`:''}
-    ${d.rawDraft==null&&d.error&&!d.validationDetail?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>Review ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
+    ${d.rawDraft==null&&d.error&&!d.validationDetail?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>${e(t('review'))} ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
     ${d.rawDraft==null?content:''}
     <details class='mm-wh-expert' ${d.rawDraft!=null?'open':''}>
       <summary>${e(t(local?'expert_local_text':'expert_global_text'))}</summary>
       <div class='mm-wh-global' ${local?"style='display:none'":''}>
-        <label>Default delay between activity steps (ms)
+        <label>${e(t('wh_global_delay'))}
           ${field('global_delay',d.doc.default_step_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
-        <label class='mm-wh-check'>Enable Multimedia UX
+        <label class='mm-wh-check'>${e(t('wh_enable_ux'))}
           ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
       </div>
-      ${!local&&d.rawDraft==null?`<details><summary>Local Dell display registrations</summary><small>Changes are staged in this configuration until Save. Native discovery follows registration.</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||'No registered displays'}</p>${specialist('dell_add','Add display')}${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit','Rename display')+specialist('dell_remove','Remove display'):''}</details>`:''}
+      ${!local&&d.rawDraft==null?`<details><summary>${e(t('wh_dell_registrations'))}</summary><small>${e(t('wh_dell_help'))}</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||t('wh_no_displays')}</p>${specialist('dell_add',t('wh_add_display'))}${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit',t('wh_rename_display'))+specialist('dell_remove',t('wh_remove_display')):''}</details>`:''}
       <h4>${e(t('expert_heading'))}</h4>
       <p>${e(t(local?'expert_local_help':'expert_global_help'))}</p>
       <textarea data-wh-raw spellcheck='false' rows='15'
@@ -541,8 +539,8 @@ function rhiMmWholeRender(d,t,escape){
       ${d.rawDraft!=null?`<button type='button' data-wh-action='discard_raw'>${e(t('expert_undo'))}</button>`:''}
     </details>
     <footer class='mm-wh-footer'>
-      <span>${rooms.length} rooms · ${rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0)} devices ·
-        ${rooms.reduce((n,[,r])=>n+Object.keys(r.activities||{}).length,0)} activities</span>
+      <span>${count(rooms.length,'room')} · ${count(rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0),'device')} ·
+        ${count(rooms.reduce((n,[,r])=>n+Object.keys(r.activities||{}).length,0),'activity')}</span>
       <button type='button' class='mm-wh-save' data-wh-action='review'>${e(t('whole_home_review_save'))}</button>
       <button type='button' data-mm-option-cancel>${e(t('setup_cancel'))}</button>
     </footer>
@@ -680,7 +678,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
         return fail('WOL requires an authorized native media device');
       if(d.sources.some(x=>x.entity===device.entity&&
           x.candidate===device.foundation_candidate_id&&x.provider==='harmony'))
-        return fail('Harmony keeps exclusive control of this device');
+        return fail('Harmony hub power is only available through native activity control');
       const macs=rhiMmWholeVerifiedMacs(d,device);
       if(!macs.length)return fail('No verified native MAC published for this exact source. Check its HA Device Registry and current Foundation binding.');
       const existing=device.power_on?.action==='wake_on_lan.send_magic_packet'

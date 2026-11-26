@@ -17,6 +17,7 @@ from homeassistant.helpers import selector
 
 from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
 from .dell_c8621qt import valid_host
+from .engine import execution_in_progress
 from .foundation import authorized_source, reviewed_native_source, selected_native_macs, projection_source_reads
 from .source_discovery import (area_choices, av_sources, discovered_av_sources,
                                logical_av_catalog, proposed_room_setup, source_lists, speech_player_eligible,
@@ -576,7 +577,7 @@ class _Wizard:
         for room in self._rooms.values():
             lines.append(f"{room.get('name', 'Room')}:")
             if room.get("harmony_controller"):
-                lines.append("  Harmony owns every declared endpoint; Premium activities retained but disabled.")
+                lines.append("  Harmony reserves declared endpoints while active or unverified; confirmed PowerOff permits authorized Premium controls.")
             for key, device in room["devices"].items():
                 state = native_state(self.hass, device["entity"])
                 intent = " · native control approval requested" if device.get("control_approved") is True else ""
@@ -704,7 +705,7 @@ class _Wizard:
                                             if source.concept == device.get("foundation_concept")
                                             and source.entity_id == device["entity"]
                                             and source.candidate_id == device.get("foundation_candidate_id")), None)
-                    if (room.get("harmony_controller") or not speech_player_eligible(
+                    if (not speech_player_eligible(
                             self.hass, device, approved_speech) or tts_id not in tts_choices(self.hass)):
                         problems.append(f"rooms.{room_id}.devices.{key}.speech_tts_registry_id: speech requires an exact selected Cast source and native TTS provider")
                 # The visual whole-home editor and scoped/global YAML share
@@ -886,6 +887,9 @@ class _Wizard:
             elif (getattr(self, "_yaml_deleted_rooms", None)
                   and not user_input.get("confirm_remove")):
                 errors["base"] = "yaml_confirm_remove"
+            elif (hasattr(self, "_entry") and execution_in_progress(
+                    self.hass.data.get(DOMAIN, {}).get("engine"))):
+                errors["base"] = "configuration_busy"
             else:
                 try:
                     reason = self._review_configuration()
@@ -2114,7 +2118,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         selected = {(s.concept, s.entity_id): s for s in sources}
         players = {key: device for key, device in room["devices"].items()
                    if device.get("speech_tts_registry_id") or (
-                       not room.get("harmony_controller") and speech_player_eligible(
+                       speech_player_eligible(
                            self.hass, device, selected.get((device.get("foundation_concept"), device["entity"]))))}
         choices = tts_choices(self.hass)
         errors = {}
@@ -2123,7 +2127,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             target = user_input.get("tts", NONE)
             source = selected.get((device.get("foundation_concept"), device["entity"]))
             if (not user_input.get("confirm") or
-                    target != NONE and (target not in choices or room.get("harmony_controller")
+                    target != NONE and (target not in choices
                                         or not speech_player_eligible(self.hass, device, source))):
                 errors["base"] = "speech_invalid"
             else:
@@ -2157,10 +2161,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         approved = {(source.entity_id, source.candidate_id) for source in sources
                     if source.provider == "harmony" and source.concept == "source"
                     and source.entity_id.startswith("remote.")}
-        options = {NONE: "Premium owns the room"}
+        options = {NONE: "No mapped Harmony controller"}
         for key, device in room["devices"].items():
             if (device["entity"], device.get("foundation_candidate_id")) in approved:
-                options[key] = "Harmony owns the room: " + device["entity"]
+                options[key] = "Harmony declared resource scope: " + device["entity"]
         prior = room.get("harmony_controller", NONE)
         if prior != NONE and prior not in options:
             options[prior] = "Existing Harmony controller (selection needs review)"
