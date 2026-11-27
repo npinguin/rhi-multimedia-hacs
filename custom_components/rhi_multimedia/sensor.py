@@ -185,21 +185,24 @@ def logical_asset_projection_specs(hass, rooms: dict) -> dict:
     # historical IDs; the same native device cannot create another RHI wrapper.
     discovered, _ = logical_av_catalog(hass, rooms)
     configured_sources = {
-        (device.get("foundation_concept"), device["entity"]): device
+        device["entity"]: device
         for row in rooms.values() for device in row.get("devices", {}).values()
     }
     for asset in discovered:
         candidates = asset.get("candidates") or []
         if not candidates:
             continue
-        configured = next(
-            (configured_sources[(c["concept"], c["entity_id"])] for c in candidates
-             if (c["concept"], c["entity_id"]) in configured_sources), None)
+        # Presentation identity is the exact native endpoint, not a semantic
+        # concept. The saved binding and command authorization remain untouched.
+        configured = [configured_sources[c["entity_id"]] for c in candidates
+                      if c["entity_id"] in configured_sources]
         # A configured media_player already owns a stable logical projection.
-        # A standalone configured remote does not: retain its historical asset
-        # ID when publishing the same native remote's read-only status.
-        if configured and configured["entity"].startswith("media_player."):
+        # Prefer that projection even when a configured companion remote is
+        # listed first or Foundation no longer publishes the saved concept.
+        if any(device["entity"].startswith("media_player.") for device in configured):
             continue
+        # A standalone configured remote retains its historical logical ID.
+        configured = next(iter(configured), None)
         primary = next(
             (c for c in candidates if c["entity_id"].startswith("media_player.")),
             None)

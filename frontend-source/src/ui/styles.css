@@ -22,7 +22,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-native-media-link:focus-visible{outline:2px solid #1267be;outline-offset:2px}
 .mm-cockpit-remote-fold{min-width:0;border:1px solid #dce6f0;border-radius:12px;padding:10px;background:#fff}
 .mm-cockpit-remote-fold>summary{cursor:pointer;min-height:36px;display:flex;align-items:center;font-size:12px;font-weight:650;color:#155ca6}
-.mm-cockpit-remote-fold .mm-focused-remote{margin:8px 0 0;border:0;box-shadow:none;padding:4px}
+.mm-cockpit-remote-fold .mm-focused-remote{margin:4px 0 0;border:0;box-shadow:none;padding:0}
 .mm-shell .rhiUxPageHero{border-radius:17px}
 .mm-shell .rhiUxPageHeroArt:before{background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.94) 9%,rgba(255,255,255,.62) 28%,transparent 66%)}
 .mm-hero-frame{position:relative;min-width:0}
@@ -56,7 +56,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 
 .mm-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 12px}.mm-title h2{font-size:20px;margin:0}.mm-title a{text-decoration:none}.mm-quick-controls{display:grid;gap:5px;margin-top:8px}.mm-quick-controls .mm-native-device{gap:5px}.mm-context{margin-top:10px}.mm-context-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px}.mm-context-item{border:1px solid var(--rhi-color-line);padding:8px;border-radius:8px;min-width:0}.mm-context-item button{min-height:44px;width:100%;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;font:inherit;font-weight:600;cursor:pointer}.mm-context-item button[aria-expanded=true]{background:#eaf3ff;color:#1253a5}.mm-context-item [data-mm-summary]{min-height:24px;overflow-wrap:anywhere;font-size:12px}.mm-context [data-mm-expanded]{margin-top:8px}.mm-room-card button,.mm-native-buttons button,.mm-native-device select,.mm-room-picker button{min-height:44px}.mm-shell button:focus-visible,.mm-shell a:focus-visible,.mm-shell input:focus-visible,.mm-shell select:focus-visible{outline:2px solid #1267be;outline-offset:2px}.mm-native-device label{font-size:13px}.mm-device-row button{min-width:44px;min-height:44px}.mm-native-device input[type=range]{min-height:44px}.mm-room-head h3,.mm-device-row b{overflow-wrap:anywhere;white-space:normal}.mm-phase{white-space:normal;text-align:center}
 
-.mm-remote{padding:2px 0}.mm-remote-navigation{display:grid;grid-template-columns:repeat(3,minmax(44px,60px));grid-template-rows:repeat(3,minmax(44px,auto));gap:6px;justify-content:center;margin:10px 0}.mm-remote-key{display:flex;min-width:0}.mm-remote-key button{width:100%;min-height:44px}.mm-remote-key-up{grid-area:1 / 2}.mm-remote-key-left{grid-area:2 / 1}.mm-remote-key-ok{grid-area:2 / 2}.mm-remote-key-right{grid-area:2 / 3}.mm-remote-key-down{grid-area:3 / 2}.mm-remote-key-extra{grid-column:span 3;justify-self:center;width:auto}.mm-remote>details{margin:5px 0 0;padding:4px 8px;background:var(--card-background-color,#fff);border:1px solid var(--rhi-color-line);border-radius:8px}.mm-remote>details summary{min-height:44px;display:flex;align-items:center}.mm-remote>details .mm-native-buttons{padding:6px 0}.mm-remote-key button:focus-visible,.mm-remote>details summary:focus-visible{outline:2px solid #1267be;outline-offset:2px}
+.mm-remote{padding:2px 0}.mm-remote-navigation{display:grid;grid-template-columns:repeat(3,minmax(44px,60px));grid-template-rows:repeat(3,minmax(44px,auto));gap:6px;justify-content:center;margin:10px 0}.mm-remote-key{display:flex;min-width:0}.mm-remote-key button{width:100%;min-height:44px}.mm-remote-key-up{grid-area:1 / 2}.mm-remote-key-left{grid-area:2 / 1}.mm-remote-key-ok{grid-area:2 / 2}.mm-remote-key-right{grid-area:2 / 3}.mm-remote-key-down{grid-area:3 / 2} .mm-remote-layout{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;margin:6px 0}.mm-remote-layout .mm-remote-navigation{flex:none;margin:0}.mm-remote-auxiliary{flex:1 1 100px;align-content:center;justify-content:center;max-width:220px}.mm-remote-auxiliary .mm-remote-command{flex:0 0 auto;min-width:44px}.mm-remote>details{margin:5px 0 0;padding:4px 8px;background:var(--card-background-color,#fff);border:1px solid var(--rhi-color-line);border-radius:8px}.mm-remote>details summary{min-height:44px;display:flex;align-items:center}.mm-remote>details .mm-native-buttons{padding:6px 0}.mm-remote-key button:focus-visible,.mm-remote>details summary:focus-visible{outline:2px solid #1267be;outline-offset:2px}
 
 
 /* Compact room-first Premium overview. Actual room health/readback comes from
@@ -178,7 +178,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 /* Room picker and active remote are content-only, not shared shell overrides. */
 .mm-room-picker>button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:44px}
 .mm-room-picker>button small{font-size:10px;font-weight:400;opacity:.8}
-.mm-focused-remote{margin:10px 0}.mm-focused-remote .mm-native-device{padding:12px}
+.mm-focused-remote{margin:6px 0}.mm-focused-remote .mm-native-device{padding:6px 0;gap:5px}
 .mm-focused-remote .mm-native-buttons button{min-height:44px;min-width:44px}
 .mm-focused-remote .mm-remote-navigation{max-width:270px;margin:10px auto}
 .mm-context-settings{margin:10px 0}
@@ -223,7 +223,8 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-floor-room-buttons{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
 .mm-floor-room-buttons button{min-height:44px;padding:7px 12px;background:#fff;border:1px solid #d6e2ee;border-radius:9px;color:#295377;font:inherit;font-size:12px;cursor:pointer}
 .mm-floor-room-buttons button.active{background:#e8f3ff;border-color:#99c2ef;color:#0e5daa;font-weight:700}
-.mm-cockpit{display:grid;grid-template-columns:minmax(165px,.9fr) minmax(230px,1.4fr) minmax(175px,1fr);align-items:start;gap:10px}
+.mm-overview{container-name:mm-overview;container-type:inline-size}
+.mm-cockpit{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.25fr) minmax(0,1.1fr);align-items:start;gap:10px}
 /* Without a native remote, keep device actions visible instead of reserving a blank panel. */
 .mm-cockpit>.mm-surface,.mm-cockpit>.mm-cockpit-controls,.mm-cockpit-controls>.mm-focused-remote{min-width:0;margin:0}
 .mm-cockpit-activities,.mm-cockpit-devices{display:grid;gap:8px}
@@ -257,7 +258,7 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-cockpit-device-details{border-top:1px solid #e7eef8;margin-top:8px}
 .mm-cockpit-device-details>summary{min-height:40px;display:flex;align-items:center;
   font-size:11px;color:#365e84;cursor:pointer}
-.mm-device-basic{display:grid;gap:7px;margin-top:7px}
+.mm-device-basic{display:grid;gap:4px;margin-top:5px}
 .mm-device-basic-buttons{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .mm-device-basic-buttons button{display:inline-flex;align-items:center;justify-content:center;
   flex:1 1 70px;min-width:0;min-height:44px;gap:4px;padding:6px 8px;border:1px solid #c9dbea;
@@ -274,21 +275,18 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
   border:1px solid #cbdbea;border-radius:8px;background:#fff;color:#245680;
   padding:6px 8px;font:inherit}
 .mm-device-basic-volume input{width:100%;min-height:28px;accent-color:#2765a8}
-.mm-device-basic-audio{display:grid;gap:6px}
+.mm-device-basic-audio{display:grid;gap:4px}
 .mm-device-basic small{color:#5e738a}
-@media(min-width:1090px) and (max-width:1450px){
-  .mm-device-basic-buttons button{flex-basis:100%}
-}
 .mm-cockpit-device-body{border-top:1px solid #e7eef8;margin-top:5px;padding-top:9px}
 .mm-cockpit-device-body small{font-size:11px;color:#60758e}
 .mm-cockpit-device-body button{min-height:44px}
 .mm-cockpit-diagnostics{margin-top:12px}
-.mm-remote-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 12px}
+.mm-remote-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:4px 0 6px}
 .mm-remote-tabs button{min-height:44px;flex:1;border:1px solid #d6e4f1;border-radius:8px;background:#fff;font:inherit;font-size:12px;cursor:pointer}
 .mm-remote-tabs button[aria-pressed=true]{background:#e9f3ff;border-color:#9bc6ed;color:#1259a5;font-weight:700}
 .mm-remote-numbers{display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:6px;max-width:220px;margin:10px auto}
 .mm-remote-numbers button{min-height:44px;border:1px solid #d5e4f1;border-radius:9px;background:#fff;font:inherit;cursor:pointer}
-@media(max-width:700px){.mm-cockpit{grid-template-columns:1fr}.mm-cockpit-devices{grid-column:auto}.mm-floor-room-select{align-items:start;flex-direction:column}.mm-cockpit-device-heading{grid-template-columns:minmax(0,1fr) auto}.mm-cockpit-device-heading .mm-native-media-link{grid-column:1/-1;justify-self:start}}
+@media(max-width:700px){ .mm-floor-room-select{align-items:start;flex-direction:column}.mm-cockpit-device-heading{grid-template-columns:minmax(0,1fr) auto}.mm-cockpit-device-heading .mm-native-media-link{grid-column:1/-1;justify-self:start}}
 
 .mm-remote-text-input{display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:8px 0}
 .mm-remote-text-input label{display:grid;gap:5px;flex:1;min-width:165px;color:#627a94;font-size:12px}
@@ -355,7 +353,6 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 
 /* Multimedia Premium resident experience: one coherent action/button grammar.
    Backend flags and native readback determine activity color/availability. */
-.mm-cockpit{grid-template-columns:minmax(185px,.8fr) minmax(260px,1.25fr) minmax(215px,1.1fr);gap:12px}
 .mm-cockpit-activity-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 .mm-cockpit-activity-list .mm-activity-choice{display:flex;align-items:center;gap:9px;min-height:48px;
   padding:8px 10px;border:1px solid #d5e0ed;background:#fff;border-radius:10px;
@@ -430,12 +427,26 @@ ha-card{background:transparent;border:0;box-shadow:none;overflow:visible}
 .mm-remote-numbers .mm-remote-command{min-width:0;width:100%}
 .mm-native-buttons .mm-remote-command{min-width:44px}
 .mm-remote-command:hover:not(:disabled),.mm-media-action:hover:not(:disabled){background:#e8f3ff}
-@media(max-width:880px){.mm-cockpit{grid-template-columns:minmax(220px,.9fr) minmax(290px,1.2fr)}
+@media(max-width:880px){.mm-cockpit{grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr)}
   .mm-cockpit-devices{grid-column:1/-1}}
 @media(max-width:700px){.mm-cockpit{grid-template-columns:minmax(0,1fr)}
   .mm-cockpit-devices{grid-column:auto}.mm-media-identity{grid-template-columns:76px minmax(0,1fr)}
   .mm-media-artwork{width:76px;height:76px}.mm-cockpit-activity-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+/* The HA sidebar and dashboard grid change the actual card width independently
+   of the viewport. Container queries override the older browser fallback. */
+@container mm-overview (min-width:700px){
+  .mm-cockpit{grid-template-columns:minmax(0,.8fr) minmax(0,1.25fr) minmax(0,1.1fr)}
+  .mm-cockpit-devices{grid-column:auto}
+}
+@container mm-overview (min-width:480px) and (max-width:699px){
+  .mm-cockpit{grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr)}
+  .mm-cockpit-devices{grid-column:1/-1}
+}
+@container mm-overview (max-width:479px){
+  .mm-cockpit{grid-template-columns:minmax(0,1fr)}
+  .mm-cockpit-devices{grid-column:auto}
+}
 /* Activity authoring stays inside the existing two-column Settings pane. */
 .mm-activity-wizard-stages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 14px}
 .mm-activity-wizard-stages button{display:flex;align-items:center;gap:9px;min-height:48px;padding:9px 11px;

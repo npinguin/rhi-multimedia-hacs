@@ -1,5 +1,5 @@
 const RHI_MM_WHOLE_TYPES=['watch_tv','watch_hdmi','watch_source','listen_music','play_game'];
-const RHI_MM_WHOLE_STEPS=['source','volume','sound_mode','play','pause','remote_key','delay','wait_until'];
+const RHI_MM_WHOLE_STEPS=['source','volume','mute','sound_mode','play','pause','remote_key','delay','wait_until'];
 function rhiMmWholeFromStep(step){
   const yaml=(step?.data_schema||[]).find(x=>x.name==='yaml_text');
   const raw=yaml?.description?.suggested_value??yaml?.default;
@@ -20,7 +20,7 @@ function rhiMmWholeFromStep(step){
   return {doc,areas,floors,areaFloors,sources,logicalDevices,proposedRooms,proposalExceptions,localScope,room,
     device:localScope?.[0]==='device'?localScope[2]:'',activity:localScope?.[0]==='activity'?localScope[2]:'',tab,
     catalogFilter:'all',catalogType:'all',catalogQuery:'',bulkRoom:room,selectedAssets:[],detailAsset:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
-    newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:''};
+    newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:'',captureDevices:[],captureVolume:false,captureMute:false};
 }
 function rhiMmWholeSlug(name){
   return String(name||'').normalize('NFKD').toLowerCase()
@@ -63,6 +63,37 @@ function rhiMmWholeRepairable(d){
   }
   return rows;
 }
+// Presentation matching is not command authorization. Preserve the saved
+// endpoint/asset identity independently of a changed Foundation concept.
+function rhiMmWholeSharedRole(d,role){
+  const result=JSON.parse(JSON.stringify(role));
+  const existing=Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{}))
+    .find(x=>x.entity===result.entity);
+  if(!existing)return result;
+  result.physical_id=existing.physical_id||existing.entity;
+  result.asset_id=existing.asset_id||result.physical_id;
+  for(const field of ['power_mode','power_on','power_off','wol_enabled',
+      'hdmi_cec_enabled','post_power_on_delay_ms','timeout','on_states','speech_tts_registry_id']){
+    if(Object.prototype.hasOwnProperty.call(existing,field))
+      result[field]=JSON.parse(JSON.stringify(existing[field]));
+    else delete result[field];
+  }
+  if(existing.control_approved===false)result.control_approved=false;
+  if(result.speech_tts_registry_id&&result.foundation_concept!=='source')
+    return null;
+  return result;
+}
+function rhiMmWholeAssetMatches(asset,device){
+  if(!asset||!device)return false;
+  return !!((device.asset_id&&device.asset_id===asset.asset_id)||
+    (device.physical_id&&device.physical_id===asset.asset_id)||
+    (asset.candidates||[]).some(c=>c.entity_id===device.entity||
+      (device.foundation_entity_registry_id&&
+       device.foundation_entity_registry_id===c.entity_registry_id)));
+}
+function rhiMmWholeAssetBindings(room,asset){
+  return Object.entries(room?.devices||{}).filter(([,device])=>rhiMmWholeAssetMatches(asset,device));
+}
 function rhiMmWholeVerifiedMacs(d,device){
   // Native Device Registry MAC evidence is read-only before Review/Save.
   // Command rights remain enforced by the backend and must not follow discovery.
@@ -80,6 +111,7 @@ function rhiMmWholeCurrent(d){
     if(scope==='activity')d.activity=id;
   }
   const room=d.doc.rooms[d.room];
+  if(d.captureRoom!==d.room){d.captureRoom=d.room;d.captureDevices=[];}
   if(room){
     if(!Object.prototype.hasOwnProperty.call(room.devices||{},d.device))
       d.device=Object.keys(room.devices||{})[0]||'';
@@ -96,6 +128,16 @@ function rhiMmWholeText(d){
   const object={...(scope==='room'?room:scope==='device'?device:activity)};
   if(scope==='room'){delete object.devices;delete object.activities;}
   return JSON.stringify({scope,room:roomId,id,object},null,2);
+}
+// Translate only known editor feedback. Unknown native/backend evidence
+// stays verbatim and copyable; never translate entity IDs or route values.
+function rhiMmWholeLocalMessage(message,t){
+  const raw=String(message||'');
+  const entries=Object.entries(RHI_MM_TEXT.en).filter(([key])=>key.startsWith('wh_msg_'));
+  const exact=entries.find(([,english])=>english===raw);
+  if(exact)return t(exact[0]);
+  const prefix=entries.find(([,english])=>english.endsWith(': ')&&raw.startsWith(english));
+  return prefix?t(prefix[0])+rhiMmWholeLocalMessage(raw.slice(prefix[1].length),t):raw;
 }
 function rhiMmWholeIssues(d){
   const detail=d.validationDetail||'';
@@ -124,7 +166,17 @@ function rhiMmWholeIssues(d){
   }
   return {groups:[...groups.values()],general};
 }
-function rhiMmWholeRender(d,t,escape){
+function rhiMmWholeCaptureRequest(d,update=false){
+  const {room,activity}=rhiMmWholeCurrent(d);
+  const devices=(d.captureDevices||[]).filter(key=>room?.devices?.[key]);
+  if(d.localScope||!room||!devices.length||d.rawDraft!=null)return null;
+  if(update&&(!activity||devices.some(key=>!activity.devices.includes(key))))return null;
+  if(!update&&!d.newActivity.trim())return null;
+  return {room:d.room,activity:update?d.activity:'',name:update?(activity.name||d.activity):d.newActivity,
+    activity_type:update?(activity.activity_type||'watch_tv'):d.newType,
+    devices,include_volume:d.captureVolume===true,include_mute:d.captureMute===true};
+}
+function rhiMmWholeRender(d,t,escape,remediation=''){
   const e=escape;
   const count=(n,kind)=>n+' '+e(t('wh_count_'+(n===1?kind:kind==='activity'?'activities':kind+'s')));
   if(!d)return `<p role='alert'>${e(t('wh_unreadable'))}</p>`;
@@ -189,15 +241,7 @@ function rhiMmWholeRender(d,t,escape){
     ...sameNativeCandidates.map(s=>[s.candidate,s.label+' · '+s.provider])
   ];
   const allDiscovered=(d.logicalDevices||[]).map(asset=>{
-    const linkedRoomIds=rooms.filter(([,r])=>Object.values(r.devices||{}).some(x=>
-      // The configured logical asset is stable even when Foundation reissues
-      // a candidate or HA renames its entity. Never infer a link by label.
-      (x.asset_id&&x.asset_id===asset.asset_id)||
-      (x.physical_id&&x.physical_id===asset.asset_id)||
-      (asset.candidates||[]).some(c=>x.foundation_concept===c.concept&&
-        (x.foundation_candidate_id===c.candidate_id||
-         x.entity===c.entity_id))
-    )).map(([id])=>id);
+    const linkedRoomIds=rooms.filter(([,r])=>rhiMmWholeAssetBindings(r,asset).length).map(([id])=>id);
     const linkedRooms=linkedRoomIds.map(id=>d.doc.rooms[id]?.name||id);
     return {...asset,linkedRoomIds,linkedRooms};
   });
@@ -217,9 +261,8 @@ function rhiMmWholeRender(d,t,escape){
   if(d.tab==='discovery'){
     const currentAsset=discovered.find(x=>x.asset_id===d.detailAsset)||
       (d.logicalDevices||[]).find(x=>x.asset_id===d.detailAsset);
-    const assigned=room&&currentAsset?Object.entries(room.devices||{}).find(([,x])=>
-      (x.asset_id||x.physical_id)===currentAsset.asset_id||
-      (currentAsset.candidates||[]).some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept)):null;
+    const bindings=rhiMmWholeAssetBindings(room,currentAsset);
+    const assigned=bindings.length===1?bindings[0]:null;
     const currentBinding=assigned?.[1];
     const connected=d.sources.find(x=>x.entity===currentBinding?.entity&&x.candidate===currentBinding?.foundation_candidate_id);
     const wol=currentBinding?.power_on?.action==='wake_on_lan.send_magic_packet';
@@ -291,7 +334,7 @@ function rhiMmWholeRender(d,t,escape){
         ${d.doc.rooms[d.bulkRoom]?`<small>${e(t('wh_native_ha_area'))}:
           ${e(d.areas[d.doc.rooms[d.bulkRoom].area_id]||t('wh_not_assigned'))} · ${e(t('wh_floor'))}:
           ${e(d.floors[d.areaFloors[d.doc.rooms[d.bulkRoom].area_id]]||t('not_published'))}</small>`:''}
-        ${currentBinding?`
+        ${bindings.length>1?`<p class='mm-room-error' role='alert'>${e(t('wh_ambiguous_binding'))}</p>`:currentBinding?`
           <p role='status' class='mm-muted'>${e(t('wh_native_control'))}: ${e(currentBinding.control_approved===true?t('wh_exact_source'):t('wh_not_yet_approved'))} · ${e(connected?.review_reason||(!connected?t('wh_candidate_missing'):t('wh_registry_review')))}</p>
           ${currentAsset.linkedRoomIds?.length>1&&['television','display'].includes(currentAsset.logical_type)?`<p class='mm-room-error'>${e(t('wh_display_multiple'))}</p>`:''}
           <button type='button' data-wh-action='focus_binding'>${e(t('wh_review_binding'))}</button>
@@ -447,6 +490,7 @@ function rhiMmWholeRender(d,t,escape){
             val=`<label>${e(t('script_action_'+step.type))}${select(`step_value:${phase}:${i}`,original,list)}</label>
               ${!options.length?`<small class='mm-room-error'>${e(t('action_unavailable'))}</small>`:''}`;
           else if(step.type==='volume')val=`<label>${e(t('wh_volume_scale'))}${field(`step_value:${phase}:${i}`,step.level??.5,'number','min="0" max="1" step="0.01"')}</label>`;
+          else if(step.type==='mute')val=`<label>${e(t('script_action_mute'))}${select(`step_value:${phase}:${i}`,String(step.value===true),[['true',t('mute')],['false',t('unmute')]])}</label>`;
           else if(step.type==='remote_key')val=`<label>${e(t('wh_native_key'))}${field(`step_value:${phase}:${i}`,step.value||'')}</label>`;
           else if(step.type==='delay')val=`<label>${e(t('wh_delay'))}${field(`step_value:${phase}:${i}`,step.milliseconds??0,'number','min="0" max="30000" step="1"')}</label>`;
           else if(step.type==='wait_until')val=`<label>${e(t('wh_wait_state'))}${select(`step_state:${phase}:${i}`,step.states?.[0]||'on',
@@ -486,6 +530,14 @@ function rhiMmWholeRender(d,t,escape){
           [['',t('wh_actual_input')],...offeredInputs.map(x=>[x,x])])}</label>
         <small>${e(t('wh_input_help'))}</small>`:''}
       <button type='button' data-wh-action='add_activity'>${e(t('wh_create_activity'))}</button>
+      ${!local&&deviceRows.length?`<section class='mm-wh-steps'>
+        <h4>${e(t('capture_title'))}</h4><p class='mm-muted'>${e(t('capture_help'))}</p>
+        <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('capture_device:'+key,(d.captureDevices||[]).includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
+        <label class='mm-wh-check'>${field('capture_volume',d.captureVolume===true,'checkbox')}${e(t('capture_volume'))}</label>
+        <label class='mm-wh-check'>${field('capture_mute',d.captureMute===true,'checkbox')}${e(t('capture_mute'))}</label>
+        <button type='button' data-wh-action='capture_new' ${rhiMmWholeCaptureRequest(d)?'':'disabled'}>${e(t('capture_create'))}</button>
+        ${selectedActivity?`<button type='button' data-wh-action='capture_update' ${rhiMmWholeCaptureRequest(d,true)?'':'disabled'}>${e(t('capture_update'))} · ${e(selectedActivity.name||d.activity)}</button>`:''}
+        <small>${e(t('capture_review'))}</small></section>`:''}
     </section><section class='mm-wh-panel'>
       <h4>${e(selectedActivity?.name||t('wh_choose_activity'))}</h4>
       ${selectedActivity?`<label>${e(t('wh_activity_name'))}${field('activity_name',selectedActivity.name||'')}</label>
@@ -513,12 +565,13 @@ function rhiMmWholeRender(d,t,escape){
     ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
       <strong>${e(t(d.validationStale?'expert_validation_stale':'expert_attention'))}</strong>
       <p>${e(t(d.validationStale?'expert_recheck':'expert_correct'))}</p>
-      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(item.message)}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>${e(t('expert_fix'))}</button>`:''}</div>`).join('')}</div>`).join('')}
+      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(rhiMmWholeLocalMessage(item.message,t))}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>${e(t('expert_fix'))}</button>`:''}</div>`).join('')}</div>`).join('')}
       ${issues.general.map(line=>`<p>${e(line)}</p>`).join('')}
+      ${remediation}
       <button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.validationDetail)}</textarea>
       <details><summary>${e(t('expert_details'))}</summary><p style='white-space:pre-wrap'>${e(d.validationDetail)}</p></details>
     </section>`;})():''}
-    ${d.error&&d.error!==d.validationDetail?`<div class='mm-room-error mm-selectable' role='alert'><p style='white-space:pre-wrap'>${e(d.error)}</p>${!d.validationDetail?`<button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.error)}</textarea>`:''}</div>`:''}
+    ${d.error&&d.error!==d.validationDetail?`<div class='mm-room-error mm-selectable' role='alert'><p style='white-space:pre-wrap'>${e(rhiMmWholeLocalMessage(d.error,t))}</p>${!d.validationDetail?`<button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.error)}</textarea>`:''}</div>`:''}
     ${d.rawDraft==null&&d.error&&!d.validationDetail?`<div class='mm-wh-step-actions'>${[...new Set((d.error.match(/rooms\.[a-z][a-z0-9_]*(?:\.(?:devices|activities)\.[a-z][a-z0-9_]*)?/g)||[]))].filter(path=>d.doc.rooms[path.split('.')[1]]).map(path=>`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(path)}'>${e(t('review'))} ${e(path.split('.').slice(1).join(' / '))}</button>`).join('')}</div>`:''}
     ${d.rawDraft==null?content:''}
     <details class='mm-wh-expert' ${d.rawDraft!=null?'open':''}>
@@ -562,7 +615,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   const fail=message=>{d.error=message;return false;};
   if(key==='room_select'){
     if(!d.doc.rooms[value])return fail('Unknown room');
-    d.room=value;d.device='';d.activity='';d.error='';return true;
+    d.room=value;d.device='';d.activity='';d.captureDevices=[];d.error='';return true;
   }
   if(key==='global_enable'){d.doc.enable_ux=checked;d.dirty=true;}
   else if(key==='global_delay'){
@@ -581,10 +634,8 @@ function rhiMmWholeChange(d,key,value,checked=false){
     d.bulkRoom=value;d.room=value||d.room;d.selectedAssets=[];
     if(d.detailAsset){
       const asset=d.logicalDevices.find(x=>x.asset_id===d.detailAsset);
-      const linked=Object.entries(d.doc.rooms[d.room]?.devices||{}).find(([,x])=>
-        (x.asset_id||x.physical_id)===asset?.asset_id||
-        asset?.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
-      d.device=linked?.[0]||'';
+      const linked=rhiMmWholeAssetBindings(d.doc.rooms[d.room],asset);
+      d.device=linked.length===1?linked[0][0]:'';
     }
   }
   else if(parts[0]==='catalog_selected'){
@@ -594,6 +645,14 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(checked){if(!d.selectedAssets.includes(assetId))d.selectedAssets.push(assetId);}
     else d.selectedAssets=d.selectedAssets.filter(x=>x!==assetId);
   }
+  else if(parts[0]==='capture_device'){
+    if(!room?.devices?.[parts[1]])return fail('Choose an existing room device');
+    d.captureDevices=d.captureDevices||[];
+    if(checked&&!d.captureDevices.includes(parts[1]))d.captureDevices.push(parts[1]);
+    else if(!checked)d.captureDevices=d.captureDevices.filter(key=>key!==parts[1]);
+  }
+  else if(key==='capture_volume')d.captureVolume=checked;
+  else if(key==='capture_mute')d.captureMute=checked;
   else if(key==='new_activity')d.newActivity=value;
   else if(key==='new_type'){d.newType=value;d.newActivityInput='';d.newActivitySource='';}
   else if(key==='new_activity_target'){d.newActivityTarget=value;d.newActivityInput='';}
@@ -738,7 +797,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(step&&parts[0]==='step_device'&&activity?.devices?.includes(value)){step.device=value;d.dirty=true;}
   else if(step&&parts[0]==='step_type'&&RHI_MM_WHOLE_STEPS.includes(value)){
     const device=step.device;const delay_ms=step.delay_ms;
-    const defaults={source:{candidates:[]},sound_mode:{candidates:[]},volume:{level:.5},
+    const defaults={source:{candidates:[]},sound_mode:{candidates:[]},volume:{level:.5},mute:{value:false},
       remote_key:{value:''},delay:{milliseconds:0},wait_until:{states:['on'],timeout:15}};
     Object.assign(step,{});
     for(const k of Object.keys(step))delete step[k];
@@ -750,6 +809,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(['source','sound_mode'].includes(step.type))step.candidates=value?[value]:[];
     else if(step.type==='remote_key')step.value=value;
     else if(step.type==='volume'){if(!Number.isFinite(int)||int<0||int>1)return fail('Volume must be 0–1');step.level=int;}
+    else if(step.type==='mute'){if(!['true','false'].includes(value))return false;step.value=value==='true';}
     else if(step.type==='delay'){if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');step.milliseconds=int;}
     d.dirty=true;
   }
@@ -809,22 +869,24 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!Object.keys(proposed).length)return fail('No safe native room suggestions available');
     let changed=0;
     // Suggestions only: never overwrite an already edited user role, room,
-    // activity, physical identity or command policy.
+    // activity, physical identity or command policy. Resolve physical policy
+    // against the current unsaved draft rather than the older proposal.
     for(const [roomId,suggestion] of Object.entries(proposed)){
-      const original=d.doc.rooms[roomId];
-      if(!original){
-        d.doc.rooms[roomId]=JSON.parse(JSON.stringify(suggestion));
-        changed++;continue;
-      }
-      if(original.area_id!==suggestion.area_id)continue;
+      const existing=d.doc.rooms[roomId];
+      if(existing&&existing.area_id!==suggestion.area_id)continue;
+      const original=existing||{...JSON.parse(JSON.stringify(suggestion)),devices:{},activities:{}};
       for(const [key,device] of Object.entries(suggestion.devices||{})){
         if(original.devices[key]||Object.values(original.devices).some(x=>x.entity===device.entity))continue;
-        original.devices[key]=JSON.parse(JSON.stringify(device));changed++;
+        const role=rhiMmWholeSharedRole(d,device);
+        if(!role)continue;
+        original.devices[key]=role;changed++;
       }
       for(const [key,activity] of Object.entries(suggestion.activities||{})){
-        if(original.activities[key]||!activity.devices.every(k=>original.devices[k]))continue;
+        if(original.activities[key]||!activity.devices.every(k=>original.devices[k]&&
+            original.devices[k].control_approved!==false))continue;
         original.activities[key]=JSON.parse(JSON.stringify(activity));changed++;
       }
+      if(!existing&&Object.keys(original.devices).length){d.doc.rooms[roomId]=original;changed++;}
     }
     if(!changed)return fail('Existing setup preserved; review the listed source exceptions');
     d.room=Object.keys(d.doc.rooms)[0]||'';d.bulkRoom=d.room;d.device='';d.activity='';
@@ -834,9 +896,7 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose the exact room before reviewing source access');
     const asset=(d.logicalDevices||[]).find(x=>x.asset_id===d.detailAsset);
     if(!asset)return fail('Choose the exact discovered device first');
-    const matches=Object.entries(d.doc.rooms[d.bulkRoom].devices||{}).filter(([,x])=>
-      (x.asset_id||x.physical_id)===asset.asset_id||
-      asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
+    const matches=rhiMmWholeAssetBindings(d.doc.rooms[d.bulkRoom],asset);
     if(matches.length!==1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
     d.room=d.bulkRoom;d.device=matches[0][0];d.tab='devices';
     d.settingsTab='devices';d.workspace='settings';d.error='';return true;
@@ -867,21 +927,18 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!asset)return fail('Unknown discovered device');
     d.detailAsset=id;
     if(d.bulkRoom&&d.doc.rooms[d.bulkRoom])d.room=d.bulkRoom;
-    const linked=Object.entries(d.doc.rooms[d.room]?.devices||{}).find(([,x])=>
-      (x.asset_id||x.physical_id)===id||
-      asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
-    d.device=linked?.[0]||'';d.error='';return true;
+    const linked=rhiMmWholeAssetBindings(d.doc.rooms[d.room],asset);
+    d.device=linked.length===1?linked[0][0]:'';d.error='';return true;
   }
   if(action==='remove_catalog'){
     if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose a room first');
     const asset=d.logicalDevices.find(x=>x.asset_id===id);
     if(!asset)return fail('Unknown discovered device');
     const targetRoom=d.doc.rooms[d.bulkRoom];
-    const linked=Object.entries(targetRoom.devices||{}).find(([,x])=>
-      (x.asset_id||x.physical_id)===id||
-      asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
-    if(!linked)return fail('This device is not assigned to this room');
-    const [key]=linked;
+    const linked=rhiMmWholeAssetBindings(targetRoom,asset);
+    if(!linked.length)return fail('This device is not assigned to this room');
+    if(linked.length!==1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
+    const [key]=linked[0];
     if(Object.values(targetRoom.activities||{}).some(a=>(a.devices||[]).includes(key)||
       [...(a.steps||[]),...(a.stop_steps||[])].some(step=>step.device===key)||
       Object.values(a.button_map||{}).some(b=>b.device===key)||
@@ -899,9 +956,7 @@ function rhiMmWholeAction(d,action,id,phase,index){
       const asset=d.logicalDevices.find(x=>x.asset_id===assetId);
       if(!asset){d.doc.rooms=before;d.dirty=previousDirty;d.device=previousDevice;
         return fail('Unknown selected device');}
-      const exists=Object.values(d.doc.rooms[d.bulkRoom].devices||{}).some(x=>
-        (x.asset_id||x.physical_id)===assetId||
-        asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
+      const exists=rhiMmWholeAssetBindings(d.doc.rooms[d.bulkRoom],asset).length;
       if(!exists)continue;
       if(!rhiMmWholeAction(d,'remove_catalog',assetId)){
         const message=d.error;
@@ -916,19 +971,18 @@ function rhiMmWholeAction(d,action,id,phase,index){
   if(action==='bulk_assign'){
     if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose a room for assignment');
     const before=JSON.parse(JSON.stringify(d.doc.rooms)),selected=d.selectedAssets.slice();
-    const oldRoom=d.room,oldDevice=d.device,oldTab=d.tab,oldDirty=d.dirty,oldDetail=d.detailAsset;
+    const previous={room:d.room,device:d.device,tab:d.tab,dirty:d.dirty,detailAsset:d.detailAsset,newSource:d.newSource};
+    const restore=()=>{d.doc.rooms=before;Object.assign(d,previous);};
     let done=0;
     for(const assetId of selected){
       const asset=d.logicalDevices.find(x=>x.asset_id===assetId);
-      if(!asset){d.doc.rooms=before;return fail('Unknown selected logical device');}
-      const exists=Object.values(d.doc.rooms[d.bulkRoom].devices||{}).some(x=>
-        (x.asset_id||x.physical_id)===assetId||
-        asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
+      if(!asset){restore();return fail('Unknown selected logical device');}
+      const exists=rhiMmWholeAssetBindings(d.doc.rooms[d.bulkRoom],asset).length;
+      if(exists>1){restore();return fail('Ambiguous or missing room binding. Review the native source and room assignments.');}
       if(exists)continue;
       if(!rhiMmWholeAction(d,'assign_catalog',assetId)){
         const message=d.error;
-        d.doc.rooms=before;d.room=oldRoom;d.device=oldDevice;d.tab=oldTab;
-        d.dirty=oldDirty;d.detailAsset=oldDetail;
+        restore();
         return fail('No devices assigned: '+message);
       }
       done++;
@@ -944,10 +998,9 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!target){d.tab='rooms';return fail('Create a room before assigning a source');}
     const asset=(d.logicalDevices||[]).find(x=>x.asset_id===id);
     if(!asset)return fail('Unknown logical device');
-    const existing=Object.entries(target.devices||{}).find(([,x])=>
-      (x.asset_id||x.physical_id)===id||
-      asset.candidates?.some(c=>c.entity_id===x.entity&&c.concept===x.foundation_concept));
-    if(existing){d.device=existing[0];d.detailAsset=id;d.tab='discovery';d.error='';return true;}
+    const existing=rhiMmWholeAssetBindings(target,asset);
+    if(existing.length>1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
+    if(existing.length===1){d.device=existing[0][0];d.detailAsset=id;d.tab='discovery';d.error='';return true;}
     const candidate=(asset.candidates||[]).find(x=>x.entity_id.startsWith('media_player.'))||
       asset.candidates?.[0];
     const index=d.sources.findIndex(s=>s.entity===candidate?.entity_id&&
@@ -995,25 +1048,23 @@ function rhiMmWholeAction(d,action,id,phase,index){
       return fail('Conflicting Foundation candidates for this native entity. Review the source in Foundation before linking.');
     if(Object.values(room.devices||{}).some(x=>x.entity===source.entity))
       return fail('This native device is already assigned to the room');
-    // Preserve the canonical identity of a shared AVR/TV already configured
-    // in another room; never make a second physical resource or reservation.
-    const existing=Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{}))
-      .find(x=>x.entity===source.entity);
+    // The shared role helper retains existing physical resource policy.
     const base=source.concept==='display'?'screen':source.concept==='amplifier'?'amplifier':'source';
     let key=base,n=2;while(Object.prototype.hasOwnProperty.call(room.devices,key))key=base+'_'+n++;
-    room.devices[key]={name:source.label,entity:source.entity,
+    const role=rhiMmWholeSharedRole(d,{name:source.label,entity:source.entity,
       foundation_concept:source.concept,foundation_candidate_id:source.candidate,
       foundation_entity_registry_id:source.entity_registry_id,
       foundation_config_entry_id:source.config_entry_id,
       foundation_device_registry_id:source.native_device_id,
       foundation_provider:source.provider,
       control_approved:source.available===true&&!source.review_reason,
-      physical_id:existing?(existing.physical_id||existing.entity):(source.logical_asset_id||source.entity),
-      asset_id:existing?(existing.asset_id||existing.physical_id||existing.entity):
-        (source.logical_asset_id||source.entity),
+      physical_id:source.logical_asset_id||source.entity,
+      asset_id:source.logical_asset_id||source.entity,
       role:source.concept==='display'?'display':source.concept==='amplifier'?'receiver':
         source.entity.startsWith('remote.')?'remote':'player',
-      power_mode:source.entity.startsWith('remote.')?'passive':'native'};
+      power_mode:source.entity.startsWith('remote.')?'passive':'native'});
+    if(!role)return fail('Choose the existing speech-capable source for this shared device');
+    room.devices[key]=role;
     d.device=key;d.newSource='';
   }else if(action==='delete_device'){
     if(!room?.devices?.[d.device])return false;

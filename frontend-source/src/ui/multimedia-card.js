@@ -429,6 +429,17 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     const floor=event.target?.closest?.('[data-floor]');
     if(floor){event.preventDefault();const target={view:'overview',room:'',floor:floor.getAttribute('data-floor')||''};if(this.hasUnsavedOptions()){this._pendingNavigation=target;this._optionRefresh();return;}if(this._optionsStep)await this.cancelOptions();this.navigate(target.view,target.room,target.floor);return;}
+    const stopBlocked=event.target?.closest?.('[data-mm-stop-blocked-room]');
+    if(stopBlocked){
+      event.preventDefault();
+      const blocked=this.configurationBlocker(this._optionsStep);
+      if(!stopBlocked.disabled&&blocked?.intent&&
+          blocked.room.id===stopBlocked.getAttribute('data-mm-stop-blocked-room')&&
+          blocked.intent.data.expected_activity===stopBlocked.getAttribute('data-activity')){
+        await this.executeIntent(blocked.room.id,blocked.intent,blocked.contract);
+      }
+      return;
+    }
     const wholeAction=event.target?.closest?.('[data-wh-action]');
     if(wholeAction&&this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
       event.preventDefault();
@@ -440,6 +451,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
         }
         this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
         await this.submitOptions({specialist:name});
+      }else if(action==='capture_new'||action==='capture_update'){
+        const capture=rhiMmWholeCaptureRequest(this._wholeHome,action==='capture_update');
+        if(!capture||!(this._optionsStep.data_schema||[]).some(field=>field.name==='capture_request')){
+          this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
+        }
+        this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+        await this.submitOptions({visual:true,capture});
       }else if(action==='review'||action==='review_yaml'){
         this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
         await this.submitOptions({save:action==='review',visual:action==='review_yaml'});
@@ -799,7 +817,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }
   }
-  async submitOptions({save=false,visual=false,specialist=''}={}){
+  async submitOptions({save=false,visual=false,specialist='',capture=null}={}){
     const step=this._optionsStep;
     if(!step||this._optionsBusy||!this._hass?.user?.is_admin)return;
     if(!(step.data_schema||[]).every(rhiMmOptionSupported)){
@@ -811,6 +829,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const payload={...this._optionsData};
       if(save&&step.step_id==='review'&&['true','false'].includes(step.description_placeholders?.explicit_confirmation))payload.confirm=true;
       if((step.data_schema||[]).some(field=>field.name==='visual_edit'))payload.visual_edit=visual;
+      if((step.data_schema||[]).some(field=>field.name==='capture_request'))
+        payload.capture_request=capture?JSON.stringify(capture):'';
       if((step.data_schema||[]).some(field=>field.name==='specialist_action')){
         payload.specialist_action=specialist;
         payload.specialist_room=specialist?this._wholeHome?.room||'':'';
@@ -859,6 +879,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
             for(const key of ['doc','areas','floors','areaFloors','sources','logicalDevices','proposedRooms','proposalExceptions'])
               this._wholeHome[key]=normalized[key];
             this._wholeHome.rawDraft=null;this._wholeHome.dirty=true;
+            if(capture&&response.description_placeholders?.captured_activity){
+              this._wholeHome.room=capture.room;
+              this._wholeHome.activity=response.description_placeholders.captured_activity;
+              this._wholeHome.tab='activities';this._wholeHome.newActivity='';
+              this._wholeHome.captureDevices=[];
+            }
             rhiMmWholeCurrent(this._wholeHome);
           }
         }
@@ -942,13 +968,36 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }
     return `<label class="mm-option-field">${label}${control}${error?`<small class="mm-room-error">${error}</small>`:''}</label>`;
   }
+  configurationBlocker(step){
+    if(!this._hass?.user?.is_admin||step?.errors?.base!=='stop_room_before_edit')return null;
+    let context;
+    try{context=JSON.parse(step.description_placeholders?.blocked_room_json||'null');}catch(_){return null;}
+    if(!context||typeof context.room!=='string'||typeof context.expected_activity!=='string')return null;
+    const contract=rhiMmRooms(this._hass);
+    const room=contract.ready?contract.rooms.find(r=>r.id===context.room):null;
+    if(!room)return null;
+    const intent=(room.activity_id||'')===context.expected_activity?
+      rhiMmIntent(room,'stop_activity'):null;
+    return {room,intent,contract};
+  }
+  configurationStopAction(step){
+    const blocker=this.configurationBlocker(step);
+    if(!blocker)return '';
+    const {room,intent}=blocker,e=rhiUxEscape;
+    const pending=this._feedback.get(room.id)?.state==='pending';
+    return `<div class="mm-wh-step-actions">
+      ${intent?`<button type="button" data-mm-stop-blocked-room="${e(room.id)}"
+        data-activity="${e(intent.data.expected_activity)}" ${pending?'disabled':''}>
+        ${e(this.t('stop'))} · ${e(room.name)}</button>`:''}
+      <small>${e(this.t('config_retry_save'))}</small>${this.feedback(room.id)}</div>`;
+  }
   renderCompleteSetup(step){
     if(!this._wholeHome){
       try{this._wholeHome=rhiMmWholeFromStep(step);}
       catch(_){return `<p class='mm-room-error'>${this.t('setup_flow_failed')}</p>`;}
     }
     return `${this._optionsError?`<p class="mm-room-error" role="alert">${rhiUxEscape(this._optionsError)}</p>`:''}
-      ${this.leaveDecision()}${rhiMmWholeRender(this._wholeHome,key=>this.t(key),rhiUxEscape)}`;
+      ${this.leaveDecision()}${rhiMmWholeRender(this._wholeHome,key=>this.t(key),rhiUxEscape,this.configurationStopAction(step))}`;
   }
   renderOptionsEditor(){
     // HA's actual administrator permission remains authoritative on every
@@ -978,6 +1027,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
       ${nativeReview&&step.description_placeholders?.native_preview?`<details class="mm-selectable"><summary>Native device and route details</summary><p style="white-space:pre-wrap">${escape(step.description_placeholders.native_preview)}</p></details>`:''}
       ${base?`<div role="alert" class="mm-room-error mm-selectable"><p style="white-space:pre-wrap">${escape(base)}</p><button type="button" data-mm-copy="issues">${rhiUxEscape(this.t('copy_issues'))}</button><span data-mm-clipboard-status role="status"></span><textarea readonly hidden data-mm-copy-fallback aria-label="${rhiUxEscape(this.t('copy_issues_manual'))}" rows="6">${escape(base)}</textarea></div>`:''}
+      ${this.configurationStopAction(step)}
       ${this._optionsNotice?`<p role="status">${escape(this._optionsNotice)}</p>`:''}
       ${step?.type==='form'?`<div class="mm-option-fields">
         ${(step.data_schema||[]).filter(field=>!['visual_edit','return_to_yaml'].includes(field.name)&&!(this._wholeHomeFlow&&field.name==='return_to_setup')&&!(nativeReview&&field.name==='confirm'))
@@ -1299,11 +1349,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
         ${step.candidates?.length?' · '+escape(step.candidates.join(', ')):''}</li>`).join('')||
         (!focus.target_state?.targets?.length?`<li>${this.t('settings_no_steps')}</li>`:'')}</ol>
       </details>`:'';
-    const renderDevice=d=>{
+    const renderDevice=({device:d,related})=>{
       const key=room.id+':device:'+d.key;
       const needsBinding=d.foundation_approved!==true;
       const unavailable=d.available!==true;
-      const advanced=['play','pause','stop','previous','next','remote_key','sound_mode']
+      const advanced=['play','pause','stop','previous','next','remote_key','remote_text','sound_mode','join_group','unjoin_group','harmony_activity']
         .some(action=>d.controls?.[action]?.enabled===true);
       const nativeAction=this.nativeMediaPlayerAction(d,room);
       const stateLabel=needsBinding?this.t('media_needs_configuration'):
@@ -1319,7 +1369,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
           this.roomDeviceBasicActions(room,d)}
         <details class="mm-cockpit-device-details" data-persist="${escape(key)}"
           ${this._expanded.has(key)?'open':''}>
-          <summary>${this.t('details')}</summary>
+          <summary>${this.t('details')}${related.length?' · '+related.length+' '+this.t('related_native_roles'):''}</summary>
           <div class="mm-cockpit-device-body">
             <small>${escape(rhiMmRoleLabel(this._hass,d.role))} ${d.shared?' · '+this.t('shared_source'):''}</small>
             ${!needsBinding?nativeAction:''}
@@ -1329,6 +1379,16 @@ class HomeBrainMultimediaCard extends HTMLElement {
                 ${d.source?' · '+escape(d.source):''}</p>`:''}
             ${advanced?this.roomManualControls({...room,activities:[],devices:[d]},true,false,'advanced'):''}
             ${this.productSpecifications(d)}
+            ${related.map(role=>`<div class="mm-native-device">
+              <b>${escape(role.name)} · ${escape(rhiMmRoleLabel(this._hass,role.role))}</b>
+              <small>${escape(role.room_area&&room.room_areas?.[role.room_area]||'')} ${escape(role.foundation_approved?rhiMmStateLabel(this._hass,role.state):this.t('media_needs_configuration'))}</small>
+              ${this.nativeMediaPlayerAction(role,room)}
+              ${role.foundation_approved?this.roomDeviceBasicActions(room,role)+
+                this.roomManualControls({...room,activities:[],devices:[role]},true,false,'advanced'):
+                this._hass?.user?.is_admin===true?`<button type="button" class="mm-source-repair"
+                  data-mm-settings-open="devices" data-room="${escape(room.id)}"
+                  data-device="${escape(role.key)}">${this.t('source_repair_action')}</button>`:''}
+            </div>`).join('')}
             ${Object.entries(d.controls||{}).filter(([,cap])=>cap?.enabled===false&&typeof cap.reason==='string')
               .map(([action,cap])=>`<small class="mm-muted">${escape(action)}: ${escape(cap.reason)}</small>`).join('')}
           </div>
@@ -1338,17 +1398,18 @@ class HomeBrainMultimediaCard extends HTMLElement {
     // One optional Room Area groups distinct setups (e.g. Loewe and SIM)
     // without creating another HA Area, room, physical device or controller.
     const roomAreas=Object.entries(room.room_areas||{});
+    const deviceGroups=rhiMmRoomDeviceGroups(room);
     const groupedDevices=roomAreas.map(([id,label])=>{
-      const members=(room.devices||[]).filter(d=>d.room_area===id);
+      const members=deviceGroups.filter(({device})=>device.room_area===id);
       return members.length?`<section class='mm-device-room-area'>
         <h4>${escape(label)}</h4>
         <div class='mm-device-area-members'>${members.map(renderDevice).join('')}</div>
       </section>`:'';
     }).join('');
-    const ungrouped=(room.devices||[]).filter(d=>!room.room_areas?.[d.room_area]);
+    const ungrouped=deviceGroups.filter(({device})=>!room.room_areas?.[device.room_area]);
     const devices=roomAreas.length?
       groupedDevices+ungrouped.map(renderDevice).join(''):
-      (room.devices||[]).map(renderDevice).join('');
+      deviceGroups.map(renderDevice).join('');
     const unbound=(room.devices||[]).filter(d=>d.foundation_approved!==true);
     const bindingNotice=unbound.length?`<div class="mm-room-binding-notice" role="status">
       <ha-icon icon="mdi:link-variant-off"></ha-icon>
@@ -1358,7 +1419,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         `<button type="button" class="mm-source-repair"
           data-mm-option-action="complete_setup">${this.t('source_repair_action')}</button>`:''}
     </div>`:'';
-    const remote=this.roomFocusedRemote(room);
+    const remote=this.roomFocusedRemote(room,false);
     const remoteKey=room.id+':remote';
     return `<section class="mm-section mm-overview">
       <div class="mm-floor-room-select">${selector}
@@ -1470,7 +1531,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       </details>
       </section>`;
   }
-  roomFocusedRemote(room){
+  roomFocusedRemote(room,showHeading=true){
     // Presentation only: choose within the published activity cast. Multiple
     // equally applicable endpoints require explicit resident selection.
     const active=room.activities.find(a=>a.id===room.activity_id&&a.active);
@@ -1513,7 +1574,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         </div>`:'';
     if(!primary&&!audioPanel&&!shortcuts&&!buttons)return '';
     return `<article class="mm-surface mm-focused-remote" data-remote-room="${e(room.id)}">
-      <div class="mm-heading"><h3>${this.t('remote_keys')} · ${e(room.name)}</h3></div>
+      ${showHeading?'<div class="mm-heading"><h3>'+this.t('remote_keys')+' · '+e(room.name)+'</h3></div>':''}
       ${buttons}${primary}${audioPanel}${shortcuts}${missing}
       </article>`;
   }
@@ -1757,8 +1818,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const buttons=actions.map(action=>button(action,labels[action])).join('');
       const volume=part!=='primary'&&part!=='advanced'&&c.volume?.enabled===true&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
       const mute=part!=='primary'&&part!=='advanced'&&typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
-      const remote=part!=='audio'&&c.remote_key?.enabled===true?(()=>{
-        const sections=rhiMmRemoteGroups(c.remote_key.options);
+      const remote=part!=='audio'&&(c.remote_key?.enabled===true||c.remote_text?.enabled===true)?(()=>{
+        const sections=rhiMmRemoteGroups(c.remote_key?.enabled===true?c.remote_key.options:[]);
         const key=room.id+':'+d.key+':remote';
         const contextAttrs=`data-activity="${escape(room.activity_id||'')}" data-native-entity="${escape(d.entity_id||'')}"`;
         const renderKey=k=>{
@@ -1792,14 +1853,27 @@ class HomeBrainMultimediaCard extends HTMLElement {
             <option value="">${escape(this.t('select'))}</option>${cap.options.map(k=>`<option value="${escape(k)}">${escape(k)}</option>`).join('')}</select></label>`;
         }).join('');
         const timedPanel=timed?`<details class="mm-remote-timed"><summary>${escape(this.t('remote_timed_actions'))}</summary>${timed}</details>`:'';
-        const navigation=main?`<div class="mm-remote-navigation" role="group" aria-label="${this.t('remote_navigation')}">${main.keys.map(k=>`<span class="mm-remote-key mm-remote-key-${escape(position(k))}">${renderKey(k)}</span>`).join('')}</div>`:'';
+        const directional=(main?.keys||[]).filter(k=>position(k)!=='extra');
+        const auxiliary=(main?.keys||[]).filter(k=>position(k)==='extra');
+        const navigation=main?`<div class="mm-remote-layout">
+          ${directional.length?`<div class="mm-remote-navigation" role="group" aria-label="${this.t('remote_navigation')}">${directional.map(k=>`<span class="mm-remote-key mm-remote-key-${escape(position(k))}">${renderKey(k)}</span>`).join('')}</div>`:''}
+          ${auxiliary.length?`<div class="mm-native-buttons mm-remote-auxiliary">${auxiliary.map(renderKey).join('')}</div>`:''}
+          </div>`:'';
+        const textPanel=c.remote_text?.enabled===true?
+          `<div class="mm-remote-text-input"><label>${this.t('remote_text')}
+            <input type="text" maxlength="256" data-device-text data-room="${escape(room.id)}"
+              data-device="${escape(d.key)}" autocomplete="off"
+              placeholder="${this.t('remote_text_placeholder')}"></label>
+            <button type="button" data-device-text-submit data-room="${escape(room.id)}"
+              data-device="${escape(d.key)}" ${contextAttrs}>${this.t('remote_text_send')}</button></div>`:
+          `<p class="mm-muted">${this.t('remote_text_unavailable')}</p>`;
         const extra=sections.filter(s=>s.name!=='navigation').map(section=>{
           const persist=key+':'+section.name;
           return `<details data-persist="${escape(persist)}" ${this._expanded.has(persist)?'open':''}><summary>${this.t('remote_'+section.name)}</summary><div class="mm-native-buttons">${section.keys.map(renderKey).join('')}</div></details>`;
         }).join('');
         if(focused){
           const tabKey=room.id+':'+d.key;
-          const chosen=this._remoteTabs.get(tabKey)||'buttons';
+          const chosen=this._remoteTabs.get(tabKey)||(c.remote_key?.enabled===true?'buttons':'text');
           const numbers=sections.find(section=>section.name==='numbers');
           const media=sections.find(section=>section.name==='media');
           const extras=sections.filter(section=>!['navigation','media','numbers'].includes(section.name))
@@ -1819,21 +1893,14 @@ class HomeBrainMultimediaCard extends HTMLElement {
             (numbers?.keys.length?`<div class="mm-remote-numbers" role="group" aria-label="${this.t('remote_numbers')}">
               ${numbers.keys.map(renderKey).join('')}</div>`:
               `<p class="mm-muted">${this.t('remote_not_supported')}</p>`):
-            chosen==='text'?(c.remote_text?.enabled?
-              `<div class="mm-remote-text-input"><label>${this.t('remote_text')}
-                <input type="text" maxlength="256" data-device-text data-room="${escape(room.id)}"
-                  data-device="${escape(d.key)}" autocomplete="off"
-                  placeholder="${this.t('remote_text_placeholder')}"></label>
-                <button type="button" data-device-text-submit data-room="${escape(room.id)}"
-                  data-device="${escape(d.key)}" ${contextAttrs}>${this.t('remote_text_send')}</button></div>`:
-              `<p class="mm-muted">${this.t('remote_text_unavailable')}</p>`):
+            chosen==='text'?textPanel:
             `${navigation}${media?`<div class="mm-native-buttons" role="group"
                aria-label="${this.t('remote_media')}">${media.keys.map(renderKey).join('')}</div>`:''}${extras}`;
           return selector+content+(chosen==='buttons'?timedPanel:'');
         }
-        return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}${timedPanel}</details>`;
+        return `<details class="mm-remote" data-persist="${escape(key)}" ${this._expanded.has(key)?'open':''}><summary>${this.t('remote_keys')}</summary>${navigation}${extra}${timedPanel}${c.remote_text?.enabled===true?textPanel:''}</details>`;
       })():'';
-      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'||part==='advanced'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(part==='advanced'?options('sound_mode',d.sound_mode)+remote:room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
+      return `<div class="mm-native-device"><b>${escape(d.name)}</b><small>${escape(rhiMmStateLabel(this._hass,d.state))}${d.shared?' · '+this.t('shared_source'):''}${d.group_members?.length>1?' · '+this.t('grouped')+' ('+d.group_members.length+' '+this.t('players')+')':''}</small><div class="mm-native-buttons">${buttons}${mute}</div>${volume}${part==='audio'?'':options('harmony_activity',d.current_activity)}${focused?(part==='audio'?'':remote):quick?(part==='advanced'?options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote:room.activities.length?'':options('source',d.source)+options('sound_mode',d.sound_mode)+remote):options('source',d.source)+options('sound_mode',d.sound_mode)+options('join_group',null)+button('unjoin_group',labels.unjoin_group)+remote}${!quick?Object.entries(c).filter(([,cap])=>!cap.enabled&&cap.reason).map(([action,cap])=>`<small>${escape(labels[action]||action)}: ${escape(cap.reason)}</small>`).join(''):''}</div>`;
     }).join('');
     if(!body)return '';
     return quick?`<div class="mm-quick-controls">${body}</div>`:
@@ -1974,6 +2041,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         const renderSteps=(rows,kind)=>rows.map(step=>{
           const detail=step.action==='volume'&&typeof step.level==='number'?
             Math.round(step.level*100)+'%':
+            step.action==='mute'&&typeof step.value==='boolean'?this.t(step.value?'mute':'unmute'):
             step.action==='delay'&&typeof step.milliseconds==='number'?
             step.milliseconds+' ms':
             step.action==='wait_until'?
