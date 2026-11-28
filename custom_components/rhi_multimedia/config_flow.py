@@ -24,7 +24,7 @@ from .source_discovery import (area_choices, av_sources, discovered_av_sources,
                                native_source_evidence,
                                tts_choices)
 from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
-                         native_state, native_choices, native_feature_mask, cec_links_for_activity, route_status, validate_action,
+                         native_state, native_choices, native_feature_mask, activity_computer_device, cec_links_for_activity, route_status, validate_action,
                          validate_rooms, validate_step_delay)
 
 NONE = "__none__"
@@ -357,6 +357,15 @@ class _Wizard:
                        and (v["entity"].startswith("media_player.") or k in previous.get("devices", []))}
         errors = {}
         choices = dict(_activity_choices(self.hass))
+        computer_keys = {k: v["entity"] for k, v in devices.items()
+                         if v.get("foundation_concept") == "network" and v.get("role") == "computer"}
+        display_keys = {k: v["entity"] for k, v in devices.items()
+                        if v.get("foundation_concept") == "display" and v["entity"].startswith("media_player.")}
+        from .validation import computer_application_ids
+        app_choices = {app: app.replace("_", " ") for key in computer_keys
+                       for app in sorted(computer_application_ids(devices[key]))}
+        if computer_keys or previous.get("activity_type") == "work_on_pc":
+            choices["work_on_pc"] = "Work on PC / SIM Racing"
         if not editing:
             choices[DIRECT_ONLY] = "Direct device control only (no activity)"
         if user_input is not None:
@@ -365,7 +374,13 @@ class _Wizard:
             if kind == DIRECT_ONLY and not editing:
                 return await self.async_step_next()
             source = NONE if kind == "watch_hdmi" else user_input.get("primary_source", NONE)
-            if kind not in ACTIVITIES:
+            computer_display = user_input.get("computer_display", NONE)
+            application = user_input.get("computer_application", NONE)
+            if kind == "work_on_pc" and (source not in computer_keys or
+                    computer_display not in (NONE, *display_keys) or
+                    (application != NONE and application not in computer_application_ids(devices[source]))):
+                errors["base"] = "source_required"
+            elif kind not in ACTIVITIES and kind != "work_on_pc":
                 errors["base"] = "invalid_activity"
             elif kind in ("watch_tv", "watch_hdmi", "watch_source", "play_game") and "screen" not in devices:
                 errors["base"] = "screen_required"
@@ -384,12 +399,17 @@ class _Wizard:
                         errors["base"] = "activity_exists"
                     else:
                         cast = []
-                        if kind != "listen_music" and "screen" in devices:
-                            cast.append("screen")
-                        if "amplifier" in devices:
-                            cast.append("amplifier")
-                        if source in source_keys:
+                        if kind == "work_on_pc":
                             cast.append(source)
+                            if computer_display != NONE:
+                                cast.append(computer_display)
+                        else:
+                            if kind != "listen_music" and "screen" in devices:
+                                cast.append("screen")
+                            if "amplifier" in devices:
+                                cast.append("amplifier")
+                            if source in source_keys:
+                                cast.append(source)
                         self._activity_key = key
                         self._activity_name = label
                         self._activity_cast = cast
@@ -401,16 +421,21 @@ class _Wizard:
                         # A changed cast needs explicit new routing.
                         same_cast = previous.get("devices") == cast
                         self._activity_previous = deepcopy(previous) if same_cast else {}
+                        if kind == "work_on_pc" and application != NONE:
+                            self._activity_previous["computer_application"] = application
+                        else:
+                            self._activity_previous.pop("computer_application", None)
                         self._steps = deepcopy(self._activity_previous.get("steps", []))
                         self._route_cursor = 0
                         return await self.async_step_route()
         label = previous.get("name", "Watch TV")
         previous_cast = previous.get("devices", [])
-        previous_source = next((key for key in previous_cast if key in source_keys), NONE)
+        previous_source = next((key for key in previous_cast
+                                if key in source_keys or key in computer_keys), NONE)
         default_kind = previous.get("activity_type")
         if not editing and self._guided_activity_type in ACTIVITIES:
             default_kind = self._guided_activity_type
-        if default_kind not in ACTIVITIES:
+        if default_kind not in choices:
             default_kind = ("listen_music" if previous_cast and "screen" not in previous_cast
                             else "watch_source" if previous_source != NONE else "watch_tv")
         # The guided flow already captured intent; never ask twice or allow
@@ -419,9 +444,16 @@ class _Wizard:
                   vol.Optional("favorite", default=previous.get("favorite", False)): bool}
         if editing or self._guided_activity_type not in ACTIVITIES:
             schema[vol.Required("activity_type", default=default_kind)] = vol.In(choices)
-        if source_keys:
+        if source_keys or computer_keys:
             schema[vol.Required("primary_source", default=previous_source)] = vol.In(
-                {NONE: "None / built-in TV", **source_keys})
+                {NONE: "None / built-in TV", **source_keys, **computer_keys})
+        if computer_keys and display_keys:
+            prior_display = next((key for key in previous_cast if key in display_keys), NONE)
+            schema[vol.Optional("computer_display", default=prior_display)] = vol.In(
+                {NONE: "No display", **display_keys})
+        if app_choices:
+            schema[vol.Optional("computer_application", default=previous.get("computer_application", NONE))] = vol.In(
+                {NONE: "Default computer readiness", **app_choices})
         return self.async_show_form(step_id="activity", errors=errors,
                                     data_schema=vol.Schema(schema),
                                     description_placeholders={"room": room["name"]})
@@ -473,6 +505,16 @@ class _Wizard:
             and devices[key]["entity"].startswith("media_player.")
             for key in self._activity_cast
         )
+        if self._activity_type == "work_on_pc":
+            for key in self._activity_cast:
+                if devices[key].get("foundation_concept") != "display":
+                    continue
+                if not any(step["type"] == "source" and step["device"] == key for step in self._steps):
+                    self._route_cursor = self._activity_cast.index(key)
+                    options = source_lists(self.hass, devices[key]["entity"])
+                    return self.async_show_form(step_id="route", errors={"base": "source_route_required"},
+                        data_schema=vol.Schema(self._route_fields(options, [])),
+                        description_placeholders={"device": devices[key]["entity"]})
         if (self._activity_type == "watch_hdmi" or routed_external) and not any(
                 step["type"] == "source" and step["device"] in ("screen", "amplifier")
                 for step in self._steps):
@@ -582,6 +624,8 @@ class _Wizard:
                 state = native_state(self.hass, device["entity"])
                 intent = " · native control approval requested" if device.get("control_approved") is True else ""
                 lines.append(f"  {key}: {device['entity']} ({state.state if state else 'unavailable'}){intent}")
+                for role, endpoint in sorted(device.get("computer_io", {}).items()):
+                    lines.append(f"    Computer {role}: {endpoint['entity']} (explicit native binding)")
             for activity in room["activities"].values():
                 lines.append(f"  {activity.get('name', 'Activity')}:")
                 for step in activity.get("steps", []):
@@ -701,6 +745,21 @@ class _Wizard:
                         and previous.get("devices", {}).get(key) != device):
                     problems.append(f"rooms.{room_id}.devices.{key}: {device.get('entity')} not in Foundation-supported discovery; select the exact current candidate")
                     continue
+                if device.get("windows_native") and device != previous.get("devices", {}).get(key):
+                    observed = native_state(self.hass, device["entity"])
+                    address = ((observed.attributes.get("ip") or observed.attributes.get("ip_address")) if observed else None)
+                    if (device.get("control_approved") is not True or authorized_source(self.hass, device) is None
+                            or address != device["windows_native"]["host"]):
+                        problems.append(f"rooms.{room_id}.devices.{key}.windows_native: review the exact network computer and its native IPv4 address")
+                if device.get("computer_agent") and device != previous.get("devices", {}).get(key):
+                    from .foundation import computer_agent_source
+                    if computer_agent_source(self.hass, device) is None:
+                        problems.append(f"rooms.{room_id}.devices.{key}.computer_agent: select a current exact HASS.Agent media endpoint")
+                if device.get("computer_io") and device != previous.get("devices", {}).get(key):
+                    from .foundation import computer_io_source
+                    for intent in device["computer_io"]:
+                        if computer_io_source(self.hass, device, intent) is None:
+                            problems.append(f"rooms.{room_id}.devices.{key}.computer_io.{intent}: select an exact current HASS.Agent native endpoint")
                 tts_id = device.get("speech_tts_registry_id")
                 if tts_id and tts_id != previous.get("devices", {}).get(key, {}).get("speech_tts_registry_id"):
                     approved_speech = next((source for source in command_sources
@@ -724,7 +783,7 @@ class _Wizard:
                                          and source.candidate_id == device.get("foundation_candidate_id")), None)
                     if (approved_wol is None
                             or approved_wol.provider == "harmony"
-                            or not device["entity"].startswith(("media_player.", "remote."))
+                            or not device["entity"].startswith(("media_player.", "remote.", "device_tracker."))
                             or str(wol.get("data", {}).get("mac", "")).lower()
                             not in selected_native_macs(self.hass, approved_wol)):
                         problems.append(f"rooms.{room_id}.devices.{key}.power_on: Wake-on-LAN MAC must belong to the authorized native device; choose a verified native MAC")
@@ -751,6 +810,13 @@ class _Wizard:
                             (device.get("foundation_concept"), device["entity"],
                              device.get("foundation_candidate_id")) not in selected):
                         problems.append(f"rooms.{room_id}.activities.{activity_id}.devices.{key}: changed activity includes revoked source or pending command approval")
+                    if (activity.get("computer_application") and device.get("foundation_concept") == "network"
+                            and not device.get("windows_native")):
+                        from .foundation import computer_io_source
+                        app = activity["computer_application"]
+                        if any(computer_io_source(self.hass, device, prefix + app) is None
+                               for prefix in ("launch_", "process_")):
+                            problems.append(f"rooms.{room_id}.activities.{activity_id}: review exact application launch/process sources")
                 # Expert/global YAML and Assisted must enforce the same actual
                 # native input/sound-mode choices. A name-only edit retains
                 # existing routes even if their native source is currently
@@ -961,7 +1027,8 @@ class _Wizard:
                 key: (device.get("entity"), device.get("foundation_candidate_id"),
                       device.get("foundation_concept"), device.get("physical_id"),
                       device.get("control_approved"), device.get("passive"),
-                      device.get("power_on"), device.get("power_off"))
+                      device.get("power_on"), device.get("power_off"),
+                      device.get("computer_agent"), device.get("computer_io"), device.get("windows_native"))
                 for key, device in room.get("devices", {}).items()
             })
         removed = (set(previous) - set(proposed) or any(
@@ -1037,12 +1104,12 @@ YAML_SCOPED_FIELDS = {
                          "foundation_concept", "foundation_candidate_id",
                          "hdmi_cec_enabled", "post_power_on_delay_ms", "power_mode", "power_on",
                          "power_off", "timeout", "on_states", "speech_tts_registry_id",
-                         "room_area", "wol_enabled", "control_approved",
+                         "room_area", "wol_enabled", "control_approved", "computer_agent", "computer_io", "windows_native",
                          "foundation_entity_registry_id", "foundation_config_entry_id",
                          "foundation_device_registry_id", "foundation_provider"}),
     "activity": frozenset({"name", "activity_type", "devices", "steps",
                            "stop_steps", "cec_links", "favorite",
-                           "button_map", "macros", "room_area"}),
+                           "button_map", "macros", "room_area", "computer_application"}),
 }
 
 
@@ -1330,6 +1397,43 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
             vol.Required("action"): vol.In(methods)}))
 
+    def _capture_state(self, device, path, definition=None, key=None):
+        """Current authorized native observations only; no commands or new discovery."""
+        if authorized_source(self.hass, device) is None or device.get("control_approved") is False:
+            raise ValueError(f"{path}: Review the exact native device binding before capture")
+        state = native_state(self.hass, device["entity"])
+        if state is None or state.state not in device.get("on_states", READY_STATES):
+            raise ValueError(f"{path}: Bring this device to the desired operating state before capture")
+        if device.get("foundation_concept") == "network":
+            if device.get("role") != "computer" or state.state != "home":
+                raise ValueError(f"{path}: Capture needs current computer connectivity")
+            effective = activity_computer_device(device, definition or {}, key)
+            if effective.get("windows_native") or effective.get("computer_agent") or any(role in (effective.get("computer_io") or {}) for role in ("session", "process")):
+                adapter = self.hass.data.get(DOMAIN, {}).get("adapter")
+                if adapter is None or not adapter.computer_ready(effective):
+                    raise ValueError(f"{path}: Confirm current configured computer readiness before capture")
+        elif not device["entity"].startswith("media_player."):
+            raise ValueError(f"{path}: Capture needs native media-player readback, not blind remote keys")
+        return state
+
+    def _capture_candidates(self, text):
+        """Read-only proposal from the same draft and native eligibility as capture."""
+        try:
+            rooms = _yaml_document(text).get("rooms", {})
+            candidates = {}
+            for room_id, room in rooms.items():
+                rows = []
+                for key, device in room.get("devices", {}).items():
+                    try:
+                        self._capture_state(device, key)
+                    except (ValueError, KeyError, TypeError, AttributeError):
+                        continue
+                    rows.append(key)
+                candidates[room_id] = rows
+            return candidates
+        except (ValueError, KeyError, TypeError, AttributeError, RecursionError):
+            return {}
+
     def _capture_activity(self, text, request):
         """Build an unsaved activity from exact live native observations.
 
@@ -1352,7 +1456,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         name, kind = request["name"], request["activity_type"]
         if (not isinstance(room_id, str) or room_id not in doc["rooms"]
                 or not isinstance(activity_id, str) or not isinstance(name, str)
-                or not 0 < len(name.strip()) <= 80 or kind not in ACTIVITIES
+                or not 0 < len(name.strip()) <= 80 or kind not in (*ACTIVITIES, "work_on_pc")
                 or type(request["include_volume"]) is not bool
                 or type(request.get("include_mute", False)) is not bool
                 or not isinstance(cast, list) or not cast
@@ -1373,18 +1477,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         for device_key in cast:
             device = devices[device_key]
             path = f"rooms.{room_id}.devices.{device_key}"
-            source = authorized_source(self.hass, device)
-            if source is None or device.get("control_approved") is False:
-                raise ValueError(f"{path}: Review the exact native device binding before capture")
+            state = self._capture_state(device, path, prior, device_key)
             identity = device.get("physical_id", device["entity"])
             if identity in physical:
                 raise ValueError(f"{path}: Select the physical endpoint only once")
             physical.add(identity)
-            state = native_state(self.hass, device["entity"])
-            if state is None or state.state not in device.get("on_states", READY_STATES):
-                raise ValueError(f"{path}: Bring this device to the desired operating state before capture")
-            if not device["entity"].startswith("media_player."):
-                raise ValueError(f"{path}: Capture needs native media-player readback, not blind remote keys")
+            if device.get("foundation_concept") == "network":
+                if kind != "work_on_pc":
+                    raise ValueError(f"{path}: Choose a computer activity to capture this device")
+                continue
             attrs = state.attributes or {}
             features = native_feature_mask(attrs.get("supported_features")) or 0
             # Players may publish an application/content list as source.
@@ -1412,11 +1513,19 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 steps.append({"type": "mute", "device": device_key, "value": muted})
         full_cast = prior["devices"] if prior is not None else cast
         concepts = {devices[item].get("foundation_concept") for item in full_cast}
-        if kind != "listen_music" and "display" not in concepts:
+        if kind == "work_on_pc":
+            computers = [item for item in full_cast if devices[item].get("foundation_concept") == "network"]
+            if len(computers) != 1:
+                raise ValueError("Choose exactly one configured computer")
+            for item in cast:
+                if devices[item].get("foundation_concept") == "display" and not any(
+                        step["device"] == item and step["type"] == "source" for step in steps):
+                    raise ValueError("Capture a verified computer display input")
+        if kind not in ("listen_music", "work_on_pc") and "display" not in concepts:
             raise ValueError("Video activities need a configured display")
         if kind in ("watch_source", "play_game") and "source" not in concepts:
             raise ValueError("Choose a configured native source for this activity")
-        if prior is None and kind != "listen_music" and not any(step["type"] == "source" for step in steps):
+        if prior is None and kind not in ("listen_music", "work_on_pc") and not any(step["type"] == "source" for step in steps):
             raise ValueError("Capture a verified TV or receiver input for this video activity")
         if prior is None:
             proposed = {"name": name.strip(), "activity_type": kind,
@@ -1456,6 +1565,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             if user_input.get("capture_request"):
                 try:
                     request = json.loads(user_input["capture_request"])
+                    if (isinstance(request, dict) and set(request) == {"refresh"}
+                            and request["refresh"] is True):
+                        if getattr(self, "_yaml_focus", None) is not None:
+                            raise ValueError("Open the full Activities editor to capture current settings")
+                        if set(_yaml_document(proposed)) != {"rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
+                            raise ValueError("Capture requires the complete editable configuration")
+                        return await self._complete_setup_form(text=proposed)
                     text, captured = self._capture_activity(proposed, request)
                 except (ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
                     return await self._complete_setup_form(text=proposed,
@@ -1678,7 +1794,20 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             for asset in logical_devices for row in asset["candidates"]
         }
         from .foundation import discovered_sources
+        from .source_discovery import network_address_choices
         native_sources, _ = discovered_sources(self.hass)
+        from homeassistant.helpers import entity_registry as er
+        registry = er.async_get(self.hass)
+        computer_io = []
+        for src in native_sources:
+            if src.concept != "computer_io" or src.review_reason:
+                continue
+            record = registry.async_get(src.entity_id)
+            if record is None or not record.id or not record.config_entry_id or not src.device_registry_id:
+                continue
+            computer_io.append({"entity": src.entity_id, "label": getattr(record, "name", None) or getattr(record, "original_name", None) or src.entity_id,
+                                "candidate": src.candidate_id, "entity_registry_id": record.id,
+                                "config_entry_id": record.config_entry_id, "native_device_id": src.device_registry_id})
         # Native MAC evidence is read-only and can be shown before command
         # consent; it authorizes no WoL packet without reviewed Save.
         approved_macs = {
@@ -1695,7 +1824,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         }
         sources = []
         for src in discovered:
-            if src.concept not in ("display", "amplifier", "source"):
+            if src.concept not in ("display", "amplifier", "source", "network"):
                 continue
             state = native_state(self.hass, src.entity_id)
             attrs = getattr(state, "attributes", {}) or {} if state else {}
@@ -1714,6 +1843,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                                                src.candidate_id) in reviewed_keys),
                 "verified_macs": approved_macs.get(
                     (src.concept, src.candidate_id, src.entity_id), []),
+                "network_ipv4_choices": network_address_choices(self.hass, src),
                 "review_reason": src.review_reason,
                 "logical_type": src.logical_type,
                 "logical_asset_id": asset_by_candidate.get(
@@ -1755,6 +1885,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "floors_json": json.dumps(floors, ensure_ascii=False),
                 "area_floors_json": json.dumps(area_floors, ensure_ascii=False),
                 "sources_json": json.dumps(sources, ensure_ascii=False),
+                "capture_candidates_json": json.dumps(self._capture_candidates(text)),
+                "computer_io_json": json.dumps(computer_io, ensure_ascii=False),
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
                 "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),
                 "proposal_exceptions_json": json.dumps(proposals["exceptions"], ensure_ascii=False),
@@ -2192,7 +2324,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         choices = {}
         macs_by_key = {}
         for key, device in room["devices"].items():
-            if not device["entity"].startswith(("media_player.", "remote.")):
+            if not device["entity"].startswith(("media_player.", "remote.", "device_tracker.")):
                 continue
             approved = approvals.get((
                 device.get("foundation_concept"), device["entity"],

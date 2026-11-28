@@ -23,7 +23,8 @@ _PRIVATE_VALUE = re.compile(
 _PRIVATE_KEYS = {"password", "passwd", "token", "access_token", "refresh_token", "api_key",
                  "secret", "authorization", "credentials", "mac", "mac_address", "ip",
                  "ip_address", "broadcast_address", "host", "media_title", "media_artist",
-                 "media_album_name", "media_content_id", "message", "power_on", "power_off"}
+                 "media_album_name", "media_content_id", "message", "power_on", "power_off",
+                 "credential_ref", "computer_name", "ca_file"}
 
 
 def _redact_evidence(value):

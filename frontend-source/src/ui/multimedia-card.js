@@ -451,8 +451,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
         }
         this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
         await this.submitOptions({specialist:name});
-      }else if(action==='capture_new'||action==='capture_update'){
-        const capture=rhiMmWholeCaptureRequest(this._wholeHome,action==='capture_update');
+      }else if(['capture_new','capture_update','capture_refresh'].includes(action)){
+        if(this._wholeHome.rawDraft!=null)return;
+        const capture=action==='capture_refresh'?{refresh:true}:rhiMmWholeCaptureRequest(this._wholeHome,action==='capture_update');
         if(!capture||!(this._optionsStep.data_schema||[]).some(field=>field.name==='capture_request')){
           this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
         }
@@ -876,9 +877,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
             const normalized=rhiMmWholeFromStep(response);
             // Refresh native evidence too: specialist edits may alter the
             // available choices, but the active room and category stay put.
-            for(const key of ['doc','areas','floors','areaFloors','sources','logicalDevices','proposedRooms','proposalExceptions'])
+            for(const key of ['doc','areas','floors','areaFloors','sources','computerIO','captureCandidates','logicalDevices','proposedRooms','proposalExceptions'])
               this._wholeHome[key]=normalized[key];
-            this._wholeHome.rawDraft=null;this._wholeHome.dirty=true;
+            this._wholeHome.rawDraft=null;
+            if(capture?.refresh===true){
+              this._wholeHome.captureRoom=undefined;
+            }else this._wholeHome.dirty=true;
             if(capture&&response.description_placeholders?.captured_activity){
               this._wholeHome.room=capture.room;
               this._wholeHome.activity=response.description_placeholders.captured_activity;
@@ -1543,7 +1547,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const navigation=devices.filter(d=>d.controls.remote_key?.enabled||d.controls.remote_text?.enabled);
     const players=navigation.filter(d=>d.role==='player');
     const candidates=players.length?players:navigation.length?navigation:
-      devices.filter(d=>Object.entries(d.controls).some(([action,cap])=>cap.enabled&&['play','pause','previous','next','harmony_activity','power_on','power_off'].includes(action)));
+      devices.filter(d=>Object.entries(d.controls).some(([action,cap])=>cap.enabled&&['play','pause','previous','next','harmony_activity','power_on','power_off','computer_shutdown','computer_restart','computer_launch'].includes(action)));
     const selectionKey=room.id+':'+(active?.id||'manual');
     const requested=this._remoteSelections.get(selectionKey);
     const target=candidates.find(d=>d.key===requested)||(candidates.length===1?candidates[0]:null);
@@ -1727,7 +1731,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const attrs=`data-room="${e(room.id)}" data-device="${e(device.key)}"`;
     const allowed=action=>device.foundation_approved===true&&c[action]?.enabled===true;
     const button=(action,label,icon,value)=>allowed(action)?`<button type="button" ${attrs}
-      data-device-action="${action}" ${value===undefined?'':`data-value="${e(JSON.stringify(value))}"`}
+      data-device-action="${action}" ${action==='computer_launch'?`data-activity="${e(room.activity_id||'')}"`:''} ${value===undefined?'':`data-value="${e(JSON.stringify(value))}"`}
       aria-label="${e(device.name+' · '+label)}">
       <ha-icon icon="${icon}"></ha-icon>${e(label)}</button>`:'';
     const harmony=room.harmony_controller===device.key;
@@ -1742,7 +1746,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const shouldShowPower=!!c.power_on||!!c.power_off||
       !!device.entity_id?.startsWith('media_player.')||
       device.role==='display'||device.concept==='display';
-    const off=['off','unknown','unavailable'].includes(device.state);
+    const off=['off','unknown','unavailable','not_home'].includes(device.state);
     const powerAction=off?'power_on':'power_off';
     const powerLabel=this.t(off?'on':'off');
     const powerReady=allowed(powerAction);
@@ -1760,7 +1764,17 @@ class HomeBrainMultimediaCard extends HTMLElement {
           data-mm-settings-open='devices' data-room='${e(room.id)}'
           data-device='${e(device.key)}'>${this.t('source_repair_action')}</button>`:''}`:''}
     </div>`:'';
-    const power=harmony?harmonyOff:normalPower;
+    const computer=device.concept==='network'&&device.role==='computer';
+    // WOL only wakes; a network tracker does not implement generic Off.
+    const power=harmony?harmonyOff:computer&&!off?'':normalPower;
+    const pcActions=computer?[
+      button('computer_launch',this.t('computer_launch')+(device.computer_application?' · '+device.computer_application:''),'mdi:application'),
+      button('computer_restart',this.t('computer_restart'),'mdi:restart'),
+      button('computer_shutdown',this.t('computer_shutdown'),'mdi:power')
+    ].join(''):'';
+    const pcObservations=computer&&device.foundation_approved===true&&Array.isArray(device.computer_observations)?
+      device.computer_observations.filter(row=>['computer_os','computer_session','computer_process'].includes(row.type)).map(row=>
+        `<small class="mm-muted">${e(this.t(row.type==='computer_os'?'pc_os_readiness':row.type==='computer_session'?'pc_session_readiness':'pc_application_readiness'))}: ${e(this.t(row.status==='observed'?'target_observed':'pc_readiness_unconfirmed'))}</small>`).join(''):'';
     const sources=Array.isArray(c.source?.options)?c.source.options:[];
     const source=allowed('source')&&sources.length?`<label class="mm-device-basic-source">
       ${this.t('input')}<select ${attrs} data-device-input="source"
@@ -1788,11 +1802,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const owners=Array.isArray(device.reserved_by_rooms)?
       device.reserved_by_rooms.filter(r=>typeof r.name==='string'&&r.name.trim())
         .map(r=>e(r.name)).join(', '):'';
-    if(!owners&&!power&&!source&&!slider&&!volumeButtons&&!mute&&!playback)return '';
+    if(!owners&&!power&&!source&&!slider&&!volumeButtons&&!mute&&!playback&&!pcActions&&!pcObservations)return '';
     return `<div class="mm-device-basic" role="group"
       aria-label="${e(device.name+' · '+this.t('device_basic_actions'))}">
       ${owners?`<small class="mm-device-reservation">${this.t('reserved_by')}: ${owners}</small>`:''}
       ${power?`<div class="mm-device-basic-buttons">${power}</div>`:''}
+      ${pcObservations}
+      ${pcActions?`<div class="mm-device-basic-buttons">${pcActions}</div>`:''}
       ${source}
       ${slider||volumeButtons||mute?`<div class="mm-device-basic-audio">
         ${slider}<div class="mm-device-basic-buttons">${volumeButtons}${mute}</div>
@@ -1810,12 +1826,12 @@ class HomeBrainMultimediaCard extends HTMLElement {
     const body=devices.filter(d=>focused||!quick||quickKeys.has(d.key)).map(d=>{
       const c=d.controls, attrs=`data-room="${escape(room.id)}" data-device="${escape(d.key)}"`;
       const disabled=cap=>cap.enabled?'':`disabled title="${escape(cap.reason||this.t('unavailable'))}"`;
-      const button=(action,label,value)=>c[action]?.enabled===true?`<button type="button" ${attrs} data-device-action="${action}" ${value===undefined?'':`data-value="${escape(JSON.stringify(value))}"`} ${disabled(c[action])}>${escape(label)}</button>`:'';
+      const button=(action,label,value)=>c[action]?.enabled===true?`<button type="button" ${attrs} data-device-action="${action}" ${action==='computer_launch'?`data-activity="${escape(room.activity_id||'')}"`:''} ${value===undefined?'':`data-value="${escape(JSON.stringify(value))}"`} ${disabled(c[action])}>${escape(label)}</button>`:'';
       const options=(action,current)=>c[action]?.enabled===true&&Array.isArray(c[action].options)&&c[action].options.length?`<label>${labels[action]}<select ${attrs} data-device-input="${action}" ${disabled(c[action])}><option value="">${escape(current||this.t('select'))}</option>${c[action].options.map(v=>`<option value="${escape(v)}" ${v===current?'selected':''}>${escape(c[action].option_labels?.[v]||v)}</option>`).join('')}</select></label>`:'';
       const actions=part==='advanced'?['previous','stop','next']:
         focused?(part==='audio'?['volume_down','volume_up']:['power_on','power_off','previous','play','pause','stop','next',...(part==='all'?['volume_down','volume_up']:[])]):
         quick?['power_on','power_off','play','pause',...(!c.volume?['volume_down','volume_up']:[])]:['power_on','power_off','volume_down','volume_up','previous','play','pause','stop','next'];
-      const buttons=actions.map(action=>button(action,labels[action])).join('');
+      const buttons=actions.map(action=>button(action,labels[action])).join('')+(!quick||focused?['computer_shutdown','computer_restart','computer_launch'].filter(()=>part!=='audio').map(action=>button(action,this.t(action))).join(''):'');
       const volume=part!=='primary'&&part!=='advanced'&&c.volume?.enabled===true&&typeof d.volume_level==='number'?`<label>${this.t('volume')} ${Math.round(d.volume_level*100)}%<input type="range" min="0" max="1" step="0.01" value="${d.volume_level}" ${attrs} data-device-input="volume" ${disabled(c.volume)}></label>`:'';
       const mute=part!=='primary'&&part!=='advanced'&&typeof d.is_volume_muted==='boolean'?button('mute',d.is_volume_muted?this.t('unmute'):this.t('mute'),!d.is_volume_muted):'';
       const remote=part!=='audio'&&(c.remote_key?.enabled===true||c.remote_text?.enabled===true)?(()=>{

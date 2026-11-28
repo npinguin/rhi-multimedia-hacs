@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from copy import deepcopy
+from datetime import datetime
 
 import voluptuous as vol
 from homeassistant.const import Platform
@@ -21,7 +22,7 @@ from .experience import queue_native_update, cancel_native_update
 from .adapter import HAAdapter
 from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
-from .validation import reconciliation_changed, validate_rooms, validate_step_delay
+from .validation import native_state, reconciliation_changed, validate_rooms, validate_step_delay
 from .foundation import (SELECTION_CHANGED_EVENT, register_with_foundation,
                           unregister_visuals_with_foundation, projection_source_reads)
 
@@ -76,6 +77,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     # revalidates the exact Foundation selection before every native write.
     store = Store(hass, STORE_VERSION, f"rhi_multimedia_{entry.entry_id}")
     adapter = HAAdapter(hass, store)
+    adapter.configured_rooms = rooms
     delay_ms = validate_step_delay(entry.options.get("default_step_delay_ms", 0))
     engine = ActivityEngine(rooms, adapter, default_step_delay_ms=delay_ms)
     previous = await store.async_load() or {}
@@ -113,18 +115,32 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         # No domain-wide HA device discovery or guessed relationships.
         watched_entities: dict[str, set[str]] = {}
         unsubscribe_sources = None
+        unsubscribe_reports = None
+        readiness_trackers: dict[str, set[str]] = {}
         heos_entities = set()
         dirty_sources, dirty_rooms, dirty_presentation = set(), set(), set()
         harmony_entities = {spec["devices"][spec["harmony_controller"]]["entity"]
                             for spec in rooms.values() if spec.get("harmony_controller")}
 
         def refresh_source_tracker() -> None:
-            nonlocal unsubscribe_sources
+            nonlocal unsubscribe_sources, unsubscribe_reports
             updated: dict[str, set[str]] = {}
+            reports: dict[str, set[str]] = {}
             with projection_source_reads(hass):
                 for room, specification in rooms.items():
                     for device in specification["devices"].values():
                         updated.setdefault(device["entity"], set()).add(room)
+                        from .foundation import computer_agent_source, computer_io_source
+                        for role in device.get("computer_io", {}):
+                            source = computer_io_source(hass, device, role)
+                            if source:
+                                updated.setdefault(source.entity_id, set()).add(room)
+                                from .validation import computer_sensor_role
+                                if computer_sensor_role(role):
+                                    reports.setdefault(source.entity_id, set()).add(device["entity"])
+                        companion = computer_agent_source(hass, device)
+                        if companion:
+                            updated.setdefault(companion.entity_id, set()).add(room)
                         remote = adapter.paired_remote(device)
                         if remote:
                             updated.setdefault(remote["entity"], set()).add(room)
@@ -133,18 +149,29 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             heos_entities.clear()
             heos_entities.update(entity for entity in updated
                                  if getattr(registry.async_get(entity), "platform", None) == "heos")
-            if updated == watched_entities and unsubscribe_sources is not None:
-                return
-            if unsubscribe_sources is not None:
-                unsubscribe_sources()
-            watched_entities.clear()
-            watched_entities.update(updated)
-            unsubscribe_sources = async_track_state_change_event(
-                hass, tuple(watched_entities), source_changed)
+            if updated != watched_entities or unsubscribe_sources is None:
+                if unsubscribe_sources is not None:
+                    unsubscribe_sources()
+                watched_entities.clear()
+                watched_entities.update(updated)
+                unsubscribe_sources = async_track_state_change_event(
+                    hass, tuple(watched_entities), source_changed)
+            if reports != readiness_trackers:
+                if unsubscribe_reports is not None:
+                    unsubscribe_reports()
+                    unsubscribe_reports = None
+                readiness_trackers.clear()
+                readiness_trackers.update(reports)
+                if readiness_trackers:
+                    from homeassistant.helpers.event import async_track_state_report_event
+                    unsubscribe_reports = async_track_state_report_event(
+                        hass, tuple(readiness_trackers), source_reported)
 
         def remove_source_tracker() -> None:
             if unsubscribe_sources is not None:
                 unsubscribe_sources()
+            if unsubscribe_reports is not None:
+                unsubscribe_reports()
         async def drain_native_changes() -> None:
             # One entry-owned task; at most one reconciliation per affected
             # room in each batch, no queue of historical telemetry events.
@@ -172,6 +199,30 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
                 # bounded sets and are processed on the next loop turn.
                 await asyncio.sleep(0)
 
+        def readiness_crossed(entity, previous, reported) -> bool:
+            if not isinstance(reported, datetime) or reported.tzinfo is None:
+                return False
+            for tracker in readiness_trackers.get(entity, ()):
+                network = native_state(hass, tracker)
+                since = getattr(network, "last_changed", None)
+                if (network is not None and network.state == "home"
+                        and isinstance(since, datetime) and since.tzinfo is not None
+                        and reported >= since
+                        and (not isinstance(previous, datetime) or previous.tzinfo is None
+                             or previous < since)):
+                    return True
+            return False
+
+        @callback
+        def source_reported(event) -> None:
+            # HA emits state_reported (not state_changed) when an unchanged
+            # sensor value is reported again. Only the first report crossing
+            # the selected PC's online boundary needs room reconciliation.
+            if readiness_crossed(event.data.get("entity_id"),
+                                 event.data.get("old_last_reported"),
+                                 event.data.get("last_reported")):
+                source_changed(event)
+
         @callback
         def source_changed(event) -> None:
             if hass.data.get(DOMAIN) is not runtime or runtime.get("_native_reconcile_closed"):
@@ -182,7 +233,9 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
                 return
             dirty_sources.add(entity)
             before, after = event.data.get("old_state"), event.data.get("new_state")
-            if reconciliation_changed(before, after):
+            if (reconciliation_changed(before, after)
+                    or readiness_crossed(entity, getattr(before, "last_reported", None),
+                                         getattr(after, "last_reported", None))):
                 dirty_rooms.update(affected)
             dirty_presentation.update(affected)
             # Preserve exact cross-room companion readback and actual HEOS
@@ -211,6 +264,48 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         # room locks and live state reconciliation run in the bounded task.
         refresh_source_tracker()
         entry.async_on_unload(remove_source_tracker)
+
+        # Native Windows has no persistent agent publishing HA events. One
+        # entry-owned bounded refresh, only for explicitly configured PCs,
+        # feeds the existing dirty-source reconciliation and projection.
+        windows_devices = {
+            device.get("physical_id", device["entity"]): device
+            for specification in rooms.values()
+            for device in specification["devices"].values()
+            if device.get("windows_native")
+        }
+        if windows_devices:
+            from datetime import timedelta
+            from homeassistant.helpers.event import async_track_time_interval
+
+            async def refresh_native_windows():
+                for device in windows_devices.values():
+                    if runtime.get("_native_reconcile_closed") or runtime.get("_unloading"):
+                        return
+                    if await adapter.refresh_windows(device):
+                        entity = device["entity"]
+                        affected = watched_entities.get(entity, ())
+                        dirty_sources.add(entity)
+                        dirty_rooms.update(affected)
+                        dirty_presentation.update(affected)
+                if (dirty_sources and not runtime.get("_native_reconcile_closed")
+                        and not runtime.get("_unloading")):
+                    task = runtime.get("_native_reconcile_task")
+                    if task is None or task.done():
+                        runtime["_native_reconcile_task"] = entry.async_create_task(
+                            hass, drain_native_changes(), "Multimedia native reconciliation", eager_start=False)
+
+            @callback
+            def schedule_native_windows(_now=None):
+                if runtime.get("_native_reconcile_closed") or runtime.get("_unloading"):
+                    return
+                task = runtime.get("_windows_refresh_task")
+                if task is None or task.done():
+                    runtime["_windows_refresh_task"] = entry.async_create_task(
+                        hass, refresh_native_windows(), "Multimedia Windows native readback", eager_start=False)
+
+            entry.async_on_unload(async_track_time_interval(hass, schedule_native_windows, timedelta(seconds=10)))
+            schedule_native_windows()
 
         async def selection_changed(event) -> None:
             if (event.data.get("domain_id") != "multimedia"
@@ -375,10 +470,12 @@ def _register_services(hass, engine, adapter, rooms: dict) -> None:
 async def _stop_native_updates(context) -> None:
     context["_native_reconcile_closed"] = True
     cancel_native_update(context)
-    task = context.pop("_native_reconcile_task", None)
-    if task is not None and not task.done():
+    tasks = [context.pop(name, None) for name in ("_native_reconcile_task", "_windows_refresh_task")]
+    pending = [task for task in tasks if task is not None and not task.done()]
+    for task in pending:
         task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry) -> bool:

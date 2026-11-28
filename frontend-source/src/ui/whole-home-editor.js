@@ -1,4 +1,5 @@
-const RHI_MM_WHOLE_TYPES=['watch_tv','watch_hdmi','watch_source','listen_music','play_game'];
+const RHI_MM_PC_KEYS=['UP','DOWN','LEFT','RIGHT','ENTER','ESC','TAB','SPACE','HOME','END','PAGEUP','PAGEDOWN','BACKSPACE','DELETE',...Array.from({length:10},(_,i)=>String(i)),...Array.from({length:12},(_,i)=>'F'+(i+1))];
+const RHI_MM_WHOLE_TYPES=['watch_tv','watch_hdmi','watch_source','listen_music','play_game','work_on_pc'];
 const RHI_MM_WHOLE_STEPS=['source','volume','mute','sound_mode','play','pause','remote_key','delay','wait_until'];
 function rhiMmWholeFromStep(step){
   const yaml=(step?.data_schema||[]).find(x=>x.name==='yaml_text');
@@ -11,16 +12,23 @@ function rhiMmWholeFromStep(step){
   const floors=JSON.parse(context.floors_json||'{}');
   const areaFloors=JSON.parse(context.area_floors_json||'{}');
   const sources=JSON.parse(context.sources_json||'[]');
+  const computerIO=JSON.parse(context.computer_io_json||'[]');
+  const captureCandidates=JSON.parse(context.capture_candidates_json||'{}');
   const logicalDevices=JSON.parse(context.logical_devices_json||'[]');
   const proposedRooms=JSON.parse(context.proposed_rooms_json||'{}');
   const proposalExceptions=JSON.parse(context.proposal_exceptions_json||'[]');
   const localScope=JSON.parse(context.expert_scope_json||'null');
   const room=localScope?.[1]||Object.keys(doc.rooms)[0]||'';
   const tab=localScope?({room:'rooms',device:'devices',activity:'activities'})[localScope[0]]:'discovery';
-  return {doc,areas,floors,areaFloors,sources,logicalDevices,proposedRooms,proposalExceptions,localScope,room,
+  return {doc,areas,floors,areaFloors,sources,computerIO,captureCandidates,logicalDevices,proposedRooms,proposalExceptions,localScope,room,
     device:localScope?.[0]==='device'?localScope[2]:'',activity:localScope?.[0]==='activity'?localScope[2]:'',tab,
     catalogFilter:'all',catalogType:'all',catalogQuery:'',bulkRoom:room,selectedAssets:[],detailAsset:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
-    newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:'',captureDevices:[],captureVolume:false,captureMute:false};
+    newPcApplication:'',newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:'',captureDevices:[],captureVolume:false,captureMute:false};
+}
+function rhiMmPcApplicationIds(device){
+  if(device?.windows_native)return [...(device.windows_native.applications||[])];
+  const io=device?.computer_io||{};
+  return Object.keys(io).filter(k=>/^launch_[a-z][a-z0-9_]{0,39}$/.test(k)&&io['process_'+k.slice(7)]).map(k=>k.slice(7)).sort();
 }
 function rhiMmWholeSlug(name){
   return String(name||'').normalize('NFKD').toLowerCase()
@@ -73,7 +81,7 @@ function rhiMmWholeSharedRole(d,role){
   result.physical_id=existing.physical_id||existing.entity;
   result.asset_id=existing.asset_id||result.physical_id;
   for(const field of ['power_mode','power_on','power_off','wol_enabled',
-      'hdmi_cec_enabled','post_power_on_delay_ms','timeout','on_states','speech_tts_registry_id']){
+      'hdmi_cec_enabled','post_power_on_delay_ms','timeout','on_states','speech_tts_registry_id','computer_agent','computer_io','windows_native']){
     if(Object.prototype.hasOwnProperty.call(existing,field))
       result[field]=JSON.parse(JSON.stringify(existing[field]));
     else delete result[field];
@@ -103,6 +111,18 @@ function rhiMmWholeVerifiedMacs(d,device){
     !s.review_reason&&s.entity_registry_id&&s.config_entry_id&&s.provider);
   return matches.length===1?matches[0].verified_macs||[]:[];
 }
+function rhiMmWholeProposeCapture(d,room){
+  // Only configured, backend-observed eligible endpoints. Never guess which
+  // of several active devices of a role belongs to this activity.
+  const roles=d.newType==='work_on_pc'?['network','display','amplifier']:
+    d.newType==='listen_music'?['amplifier','source']:
+    ['watch_source','play_game'].includes(d.newType)?['display','amplifier','source']:['display','amplifier'];
+  const keys=d.captureCandidates?.[d.room]||[];
+  return roles.flatMap(role=>{
+    const matches=keys.filter(key=>room?.devices?.[key]?.foundation_concept===role);
+    return matches.length===1?matches:[];
+  });
+}
 function rhiMmWholeCurrent(d){
   if(d.localScope){
     const [scope,room,id]=d.localScope;
@@ -111,7 +131,10 @@ function rhiMmWholeCurrent(d){
     if(scope==='activity')d.activity=id;
   }
   const room=d.doc.rooms[d.room];
-  if(d.captureRoom!==d.room){d.captureRoom=d.room;d.captureDevices=[];}
+  if(d.captureRoom!==d.room||d.captureType!==d.newType){
+    d.captureRoom=d.room;d.captureType=d.newType;
+    d.captureDevices=rhiMmWholeProposeCapture(d,room);
+  }
   if(room){
     if(!Object.prototype.hasOwnProperty.call(room.devices||{},d.device))
       d.device=Object.keys(room.devices||{})[0]||'';
@@ -215,7 +238,9 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
     `<div class='mm-wh-floor-group'><strong>${e(d.floors[floorId]||t('wh_floor_missing'))} · ${count(items.length,'room')}</strong>
       <div class='mm-wh-list'>${items.map(([id,r])=>entry(id,r.name||id,id===d.room,'select_room')).join('')}</div>
     </div>`).join('');
-  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · '+ t('wh_pending_approval')}${s.review_reason?' · '+t('wh_needs_review')+': '+s.review_reason:''}${s.available?'':' · '+t('unavailable')}`]);
+  const associatedTrackers=new Set(d.sources.filter(s=>s.concept!=='network'&&s.provider!=='hass_agent').flatMap(s=>(s.network_observations||[]).map(x=>x.candidate_id)));
+  const boundCompanions=new Set(Object.values(d.doc.rooms||{}).flatMap(r=>Object.values(r.devices||{}).map(x=>x.computer_agent?.entity).filter(Boolean)));
+  const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · '+ t('wh_pending_approval')}${s.review_reason?' · '+t('wh_needs_review')+': '+s.review_reason:''}${s.available?'':' · '+t('unavailable')}`]).filter(([index])=>!boundCompanions.has(d.sources[Number(index)].entity)&&(d.sources[Number(index)].concept!=='network'||!associatedTrackers.has(d.sources[Number(index)].candidate)));
   const deviceRows=Object.entries(room?.devices||{});
   const activityRows=Object.entries(room?.activities||{});
   const roomAreas=Object.entries(room?.room_areas||{});
@@ -227,17 +252,23 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   const currentWake=selectedDevice?.power_on?.action==='wake_on_lan.send_magic_packet'
     ?selectedDevice.power_on.data||{}:null;
   const verifiedMacs=rhiMmWholeVerifiedMacs(d,selectedDevice);
+  const agentChoices=d.sources.filter(s=>s.provider==='hass_agent'&&s.concept==='source'&&s.entity.startsWith('media_player.')&&!s.review_reason&&s.candidate&&s.entity_registry_id&&s.config_entry_id&&s.native_device_id);
+  const agentCurrent=selectedDevice?.computer_agent?.foundation_candidate_id||'';
   const sameNativeCandidates=d.sources.filter(s=>s.entity===selectedDevice?.entity&&
     s.concept===selectedDevice?.foundation_concept);
   const unresolvedDevice=!!selectedDevice&&(String(selectedDevice.entity||'').startsWith('REPLACE_WITH_')||!sameNativeCandidates.length);
   const resolveChoices=d.sources.map((source,index)=>[String(index),source]).filter(([,source])=>
     source.concept===selectedDevice?.foundation_concept&&!source.review_reason&&
     source.entity_registry_id&&source.config_entry_id&&source.candidate&&
-    (selectedDevice?.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')));
+    (selectedDevice?.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):selectedDevice?.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')));
   const currentCandidate=selectedDevice?.foundation_candidate_id||'';
-  const bindingCurrent=sameNativeCandidates.some(s=>s.candidate===currentCandidate);
+  const bindingCurrent=sameNativeCandidates.some(s=>s.candidate===currentCandidate&&
+    (!selectedDevice?.foundation_entity_registry_id||selectedDevice.foundation_entity_registry_id===s.entity_registry_id)&&
+    (!selectedDevice?.foundation_config_entry_id||selectedDevice.foundation_config_entry_id===s.config_entry_id)&&
+    (!selectedDevice?.foundation_device_registry_id||selectedDevice.foundation_device_registry_id===s.native_device_id)&&
+    (!selectedDevice?.foundation_provider||selectedDevice.foundation_provider===s.provider)&&!s.review_reason);
   const nativeBindingChoices=[
-    ...(!bindingCurrent&&selectedDevice?[ [currentCandidate,currentCandidate+' · '+ t('wh_no_longer_selected')] ]:[]),
+    ...(!bindingCurrent&&selectedDevice?[[currentCandidate,(currentCandidate||selectedDevice.entity||t('wh_compatible_native'))+' · '+t('wh_no_longer_selected')]]:[]),
     ...sameNativeCandidates.map(s=>[s.candidate,s.label+' · '+s.provider])
   ];
   const allDiscovered=(d.logicalDevices||[]).map(asset=>{
@@ -358,7 +389,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
               ...rhiMmWholeVerifiedMacs(d,currentBinding).map(m=>[m,m])])}</label>
           ${wol?`<label>${e(t('wh_ipv4'))} ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
             <label>${e(t('wh_port'))} ${field('device_wol_port',currentBinding.power_on.data.broadcast_port??9,'number','min="1" max="65535"')}</label>`:''}
-          <label>${e(t('wh_after_power'))} ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
+        <label>${e(t('wh_after_power'))} ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
           <details><summary>${e(t('wh_native_identity'))}</summary>
             <p>${e(currentBinding.entity)} · ${e(connected?.provider||t('wh_unknown_provider'))}</p>
             <button type='button' data-more-info='${e(currentBinding.entity)}'>${e(t('wh_open_native'))}</button>
@@ -387,7 +418,8 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <h4>${e(room?.name||t('wh_choose_room'))}</h4>
       ${room?`<label>${e(t('wh_room_name'))}${field('room_name',room.name)}</label>
         <label>${e(t('wh_native_home_area'))}${select('room_area',room.area_id||'',
-          [['',t('wh_no_native_area')],...Object.entries(d.areas)])}</label>
+          [['',t('wh_no_native_area')],...Object.entries(d.areas),...(room.area_id&&!d.areas[room.area_id]?[[room.area_id,room.area_id+' · '+t('wh_not_in_list')]]:[])],room.area_id&&!d.areas[room.area_id]?"aria-invalid='true' style='border-color:var(--error-color,#db4437)'":'')}</label>
+        ${room.area_id&&!d.areas[room.area_id]?`<small class='mm-room-error'>${e(rhiMmWholeLocalMessage('Choose the room in Home Assistant.',t))}</small>`:''}
         <small>${e(t('wh_native_ha_area'))}: ${e(d.areas[room.area_id]||t('wh_unassigned'))} · ${e(t('wh_floor'))}: ${e(d.floors[d.areaFloors[room.area_id]]||t('not_published'))}. ${e(t('wh_ha_owns_locations'))}</small>
         <details class='mm-wh-room-areas'><summary>${e(t('wh_subdivisions'))}</summary>
           <small>${e(t('wh_subdivision_help'))}</small>
@@ -417,12 +449,12 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
         <label>${e(t('wh_display_name'))}${field('device_name',selectedDevice.name||'')}</label>
         <label class='mm-wh-check'>${e(t('wh_enable_controls'))} ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
         <small>${e(t('wh_exact_permissions'))}</small>
-        ${unresolvedDevice?`<label>${e(t('wh_choose_actual'))}
-          ${select('device_resolve','',[['',t('wh_compatible_native')],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||t('wh_area_not_assigned'))+' · '+s.provider])])}</label>
+        ${unresolvedDevice?`<label>${e(t('device'))}
+          ${select('device_resolve','',[['',selectedDevice.entity||t('wh_compatible_native')],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||t('wh_area_not_assigned'))+' · '+s.provider])],"aria-invalid='true' style='border-color:var(--error-color,#db4437)'")}</label>
           <small>${e(t('wh_preserve_role'))}</small>
           ${!resolveChoices.length?`<p class='mm-muted'>${e(t('wh_no_compatible'))}</p>`:''}`:
-          `<details><summary>${e(t('wh_native_device_identity'))}</summary><label>${e(t('wh_foundation_candidate'))}
-          ${select('device_candidate',currentCandidate,nativeBindingChoices,sameNativeCandidates.length?'':'disabled')}</label></details>`}
+          `<label>${e(t('device'))}
+          ${select('device_candidate',currentCandidate,nativeBindingChoices,(sameNativeCandidates.length?'':'disabled')+(!bindingCurrent?" aria-invalid='true' style='border-color:var(--error-color,#db4437)'":''))}</label>`}
         ${unresolvedDevice?`<p class='mm-room-error'>${e(t('wh_link_missing'))}</p>`:
           !bindingCurrent?`<p class='mm-room-error'>${e(t('wh_link_review'))}</p>`:
           sameNativeCandidates.every(x=>!x.approved)?
@@ -435,11 +467,32 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
               · ${e(x.availability)}</div>`).join('')}
         </details>
         <label>${e(t('wh_role'))}${select('device_role',selectedDevice.role||'player',
-          [['display',t('wh_tv_display')],['receiver',t('wh_receiver_zone')],['player',t('role_player')],['remote',t('wh_remote_hub')]])}</label>
+          selectedDevice.foundation_concept==='network'?[['computer',t('wh_computer')]]:[['display',t('wh_tv_display')],['receiver',t('wh_receiver_zone')],['player',t('role_player')],['remote',t('wh_remote_hub')]])}</label>
         ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('device_room_area',selectedDevice.room_area||'',roomAreaChoices)}</label>`:''}
         <label>${e(t('wh_power_behaviour'))}${select('device_power',selectedDevice.power_mode||'native',
           [['native',t('wh_auto_wol')],['passive',t('wh_passive_observe')]])}</label>
-        <label class='mm-wh-check'>${e(t('wh_cec_enabled'))} ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>
+        ${selectedDevice.foundation_concept==='network'?`<p class='mm-muted'>${e(t('wh_network_readiness'))}</p>`:`<label class='mm-wh-check'>${e(t('wh_cec_enabled'))} ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>`}
+        ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_observations||[]).map(observation=>`<small>${e(observation.entity_id)} · ${e(observation.state)}</small>`).join('')}
+        ${selectedDevice.foundation_concept==='network'?`<label class='mm-wh-check'>${e(t('wh_windows_native'))} ${field('device_windows_enable',!!selectedDevice.windows_native,'checkbox')}</label>
+          ${selectedDevice.windows_native?`<details open><summary>${e(t('wh_windows_native'))}</summary>
+          <small>${e(t('wh_windows_help'))}</small>
+          <label>${e(t('wh_network_address'))}${select('device_windows:host',selectedDevice.windows_native.host||'',[
+            ['',t('wh_choose_source')],...Array.from(new Set([...(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]),...(selectedDevice.windows_native.host?[selectedDevice.windows_native.host]:[])])).map(ip=>[ip,ip])])}</label>
+          ${['computer_name','endpoint','credential_ref','ca_file'].map(k=>`<label>${e(t('wh_windows_'+k))}${field('device_windows:'+k,selectedDevice.windows_native[k]||'')}</label>`).join('')}
+          <label>${e(t('wh_windows_apps'))}${field('device_windows:applications',(selectedDevice.windows_native.applications||[]).join(','))}</label>
+          <small>${e(t('wh_windows_secret_help'))}</small></details>`:''}` : ''}
+        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?`<label>${e(t('wh_computer_agent'))}${select('device_computer_agent',agentCurrent,[['',t('wh_no_agent')],...(!agentChoices.some(s=>s.candidate===agentCurrent)&&agentCurrent?[[agentCurrent,selectedDevice.computer_agent.entity+' · '+t('wh_no_longer_selected')]]:[]),...agentChoices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label><small>${e(t('wh_agent_help'))}</small>`:''}
+        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?['shutdown','restart','launch','session','process',...Array.from(new Set([...Object.keys(selectedDevice.computer_io||{}).filter(k=>/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(k)).map(k=>k.slice(k.indexOf('_')+1)),...(/^[a-z][a-z0-9_]{0,39}$/.test(d.newPcApplication)?[d.newPcApplication]:[])])).sort().flatMap(id=>['launch_'+id,'process_'+id])].map(role=>{
+          const current=selectedDevice.computer_io?.[role];
+          const sensorRole=['session','process'].includes(role)||role.startsWith('process_');
+          const choices=(d.computerIO||[]).filter(s=>sensorRole?s.entity.startsWith('sensor.'):s.entity.startsWith('button.')||s.entity.startsWith('switch.'));
+          const label=/^(launch|process)_/.test(role)?t('wh_pc_'+role.split('_')[0])+' · '+role.slice(role.indexOf('_')+1):t('wh_pc_'+role);
+          return `<label>${e(label)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
+        }).join('')+`<details><summary>${e(t('wh_pc_keys'))}</summary><small>${e(t('wh_pc_keys_help'))}</small>${RHI_MM_PC_KEYS.map(key=>{
+          const role='key_'+key.toLowerCase(),current=selectedDevice.computer_io?.[role];
+          const choices=(d.computerIO||[]).filter(s=>s.entity.startsWith('button.'));
+          return `<label>${e(key)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
+        }).join('')}</details><label>${e(t('wh_pc_application_id'))}${field('new_pc_application',d.newPcApplication||'')}</label><small>${e(t('wh_pc_application_help'))}</small><small>${e(t('wh_pc_io_help'))}</small>`:''}
         <label>${e(t('wh_after_power'))}${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
         <details class='mm-wh-device-wol' ${currentWake?'open':''}>
           <summary>${e(t('wh_wol_optional'))}</summary>
@@ -449,6 +502,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
             currentWake?.mac||'',[['',t('wh_choose_mac')],...verifiedMacs.map(mac=>[mac,mac])])}</label>
           ${currentWake?`<label>${e(t('wh_ipv4_optional'))}
             ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
+            ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]).map(ip=>`<small>${e(t('wh_network_address'))}: ${e(ip)}</small>`).join('')}
             <label>${e(t('wh_port'))} ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
           <small>${e(t('wh_verified_macs'))}: ${e(verifiedMacs.join(', ')||t('wh_no_mac'))}.
             ${e(t('wh_wol_help'))}</small>
@@ -460,21 +514,24 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
     </section></div>`;
   }else{
     const cast=selectedActivity?.devices||[];
-    const typeOptions=RHI_MM_WHOLE_TYPES.map(x=>[x,t(({"watch_tv":"wh_watch_tv","watch_hdmi":"wh_watch_hdmi","watch_source":"wh_watch_source","listen_music":"wh_listen_music","play_game":"wh_play_game"})[x])]);
+    const typeOptions=RHI_MM_WHOLE_TYPES.map(x=>[x,t(({"watch_tv":"wh_watch_tv","watch_hdmi":"wh_watch_hdmi","watch_source":"wh_watch_source","listen_music":"wh_listen_music","play_game":"wh_play_game","work_on_pc":"wh_work_on_pc"})[x])]);
     const targets=deviceRows.filter(([,x])=>['display','amplifier'].includes(x.foundation_concept)&&
       x.entity.startsWith('media_player.'));
-    const players=deviceRows.filter(([,x])=>x.entity.startsWith('media_player.')&&
+    const computerActivity=d.newType==='work_on_pc';
+    const computers=deviceRows.filter(([,x])=>x.foundation_concept==='network'&&x.role==='computer');
+    const routeTargets=computerActivity?targets.filter(([,x])=>x.foundation_concept==='display'):targets;
+    const players=computerActivity?computers:deviceRows.filter(([,x])=>x.entity.startsWith('media_player.')&&
       (d.newType==='listen_music'?d.sources.some(source=>
         source.entity===x.entity&&source.candidate===x.foundation_candidate_id&&
         source.native_can_play===true):x.foundation_concept==='source'));
-    const preferredTarget=targets.find(([k])=>k===d.newActivityTarget)?.[0]||
-      (d.newType==='listen_music'?'':targets.length===1?targets[0][0]:'');
+    const preferredTarget=routeTargets.find(([k])=>k===d.newActivityTarget)?.[0]||
+      (computerActivity||d.newType==='listen_music'?'':targets.length===1?targets[0][0]:'');
     const chosenTarget=room?.devices?.[preferredTarget];
     const nativeTarget=d.sources.find(x=>x.entity===chosenTarget?.entity&&
       x.candidate===chosenTarget?.foundation_candidate_id);
     const offeredInputs=nativeTarget?.source_list||[];
-    const needsPlayer=['watch_source','play_game'].includes(d.newType);
-    const needsRoute=d.newType!=='listen_music'||!!offeredInputs.length;
+    const needsPlayer=['watch_source','play_game','work_on_pc'].includes(d.newType);
+    const needsRoute=computerActivity?!!chosenTarget:d.newType!=='listen_music'||!!offeredInputs.length;
     const renderSteps=phase=>{
       const steps=Array.isArray(selectedActivity?.[phase])?selectedActivity[phase]:[];
       return `<section class='mm-wh-steps'><h4>${phase==='steps'?t('wh_start_actions'):t('wh_stop_actions')}</h4>
@@ -487,14 +544,14 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
           if(original&&!options.includes(original))list.push([original,original+' · '+ t('wh_not_in_list')]);
           let val='';
           if(['source','sound_mode'].includes(step.type))
-            val=`<label>${e(t('script_action_'+step.type))}${select(`step_value:${phase}:${i}`,original,list)}</label>
-              ${!options.length?`<small class='mm-room-error'>${e(t('action_unavailable'))}</small>`:''}`;
+            val=`<label>${e(t('script_action_'+step.type))}${select(`step_value:${phase}:${i}`,original,list,(!original||!options.includes(original))?"aria-invalid='true' style='border-color:var(--error-color,#db4437)'":'')}</label>
+              ${!options.length?`<small class='mm-room-error'>${e(t('action_unavailable'))} · ${e(t('wh_input_help'))}</small>`:!original||!options.includes(original)?`<small class='mm-room-error'>${e(rhiMmWholeLocalMessage('Choose a verified native input for this activity.',t))}</small>`:''}`;
           else if(step.type==='volume')val=`<label>${e(t('wh_volume_scale'))}${field(`step_value:${phase}:${i}`,step.level??.5,'number','min="0" max="1" step="0.01"')}</label>`;
           else if(step.type==='mute')val=`<label>${e(t('script_action_mute'))}${select(`step_value:${phase}:${i}`,String(step.value===true),[['true',t('mute')],['false',t('unmute')]])}</label>`;
           else if(step.type==='remote_key')val=`<label>${e(t('wh_native_key'))}${field(`step_value:${phase}:${i}`,step.value||'')}</label>`;
           else if(step.type==='delay')val=`<label>${e(t('wh_delay'))}${field(`step_value:${phase}:${i}`,step.milliseconds??0,'number','min="0" max="30000" step="1"')}</label>`;
           else if(step.type==='wait_until')val=`<label>${e(t('wh_wait_state'))}${select(`step_state:${phase}:${i}`,step.states?.[0]||'on',
-              ['on','off','playing','paused','idle','standby','buffering'].map(x=>[x,x]))}</label>
+              (room?.devices?.[step.device]?.foundation_concept==='network'?['home','not_home']:['on','off','playing','paused','idle','standby','buffering']).map(x=>[x,x]))}</label>
               <label>${e(t('wh_timeout'))}${field(`step_timeout:${phase}:${i}`,step.timeout??15,'number','min="1" max="300" step="1"')}</label>`;
           return `<div class='mm-wh-step'><strong>${i+1}</strong>
             <label>${e(t('device'))}${select(`step_device:${phase}:${i}`,step.device||'',
@@ -519,12 +576,13 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <h4>${e(t('setup_add_activity'))}</h4>
       <label>${e(t('wh_name'))}${field('new_activity',d.newActivity)}</label>
       <label>${e(t('wh_type'))}${select('new_type',d.newType,typeOptions)}</label>
-      ${(needsPlayer||d.newType==='listen_music')&&players.length?
-        `<label>${e(t('role_source'))} ${select('new_activity_source',d.newActivitySource,
+      ${(needsPlayer||d.newType==='listen_music')&&(players.length||computerActivity)?
+        `<label>${e(t(computerActivity?'wh_computer':'role_source'))} ${select('new_activity_source',d.newActivitySource,
            [['',t('wh_choose_source')],...players.map(([key,x])=>[key,x.name||key])])}</label>`:''}
-      ${targets.length?`<label>${e(t('wh_route_target'))}
+      ${routeTargets.length?`<label>${e(t(computerActivity?'wh_optional_display':'wh_route_target'))}
         ${select('new_activity_target',preferredTarget,
-           [['',t('wh_destination')],...targets.map(([key,x])=>[key,x.name||key])])}</label>`:''}
+           [['',t(computerActivity?'wh_no_display':'wh_destination')],...routeTargets.map(([key,x])=>[key,x.name||key])])}</label>`:''}
+      ${computerActivity?`<small>${e(t('wh_network_readiness'))}</small>`:''}
       ${needsRoute?`<label>${e(t('wh_verified_input'))}
         ${select('new_activity_input',d.newActivityInput,
           [['',t('wh_actual_input')],...offeredInputs.map(x=>[x,x])])}</label>
@@ -532,7 +590,8 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <button type='button' data-wh-action='add_activity'>${e(t('wh_create_activity'))}</button>
       ${!local&&deviceRows.length?`<section class='mm-wh-steps'>
         <h4>${e(t('capture_title'))}</h4><p class='mm-muted'>${e(t('capture_help'))}</p>
-        <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('capture_device:'+key,(d.captureDevices||[]).includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
+        <button type='button' data-wh-action='capture_refresh' ${d.rawDraft!=null?'disabled':''}>${e(t('capture_refresh'))}</button>
+        <div class='mm-wh-cast'>${deviceRows.filter(([,x])=>x.entity?.startsWith('media_player.')||(x.foundation_concept==='network'&&x.role==='computer')).map(([key,x])=>`<label class='mm-wh-check'>${field('capture_device:'+key,(d.captureDevices||[]).includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
         <label class='mm-wh-check'>${field('capture_volume',d.captureVolume===true,'checkbox')}${e(t('capture_volume'))}</label>
         <label class='mm-wh-check'>${field('capture_mute',d.captureMute===true,'checkbox')}${e(t('capture_mute'))}</label>
         <button type='button' data-wh-action='capture_new' ${rhiMmWholeCaptureRequest(d)?'':'disabled'}>${e(t('capture_create'))}</button>
@@ -542,6 +601,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <h4>${e(selectedActivity?.name||t('wh_choose_activity'))}</h4>
       ${selectedActivity?`<label>${e(t('wh_activity_name'))}${field('activity_name',selectedActivity.name||'')}</label>
         <label>${e(t('wh_type'))}${select('activity_type',selectedActivity.activity_type||'watch_tv',typeOptions)}</label>
+        ${selectedActivity.activity_type==='work_on_pc'?`<label>${e(t('wh_pc_application'))}${select('activity_computer_application',selectedActivity.computer_application||'',[['',t('wh_pc_default')],...rhiMmPcApplicationIds(deviceRows.find(([k,x])=>cast.includes(k)&&x.foundation_concept==='network'&&x.role==='computer')?.[1]).map(id=>[id,id])])}</label>`:''}
         ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('activity_room_area',selectedActivity.room_area||'',roomAreaChoices)}</label>`:''}
         <h4>${e(t('wh_step_devices'))}</h4>
         <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('activity_cast:'+key,cast.includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
@@ -565,7 +625,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
     ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
       <strong>${e(t(d.validationStale?'expert_validation_stale':'expert_attention'))}</strong>
       <p>${e(t(d.validationStale?'expert_recheck':'expert_correct'))}</p>
-      ${issues.groups.map(group=>`<div><h4>${e(group.name)}</h4>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(rhiMmWholeLocalMessage(item.message,t))}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>${e(t('expert_fix'))}</button>`:''}</div>`).join('')}</div>`).join('')}
+      ${issues.groups.map(group=>`<details><summary>${e(group.name)} · ${group.items.length}</summary>${group.items.map(item=>`<div class='mm-wh-step-actions'><span><b>${e(item.object)}</b> · ${e(rhiMmWholeLocalMessage(item.message,t))}</span>${d.rawDraft==null?`<button type='button' data-wh-action='focus_issue' data-wh-id='${e(item.path)}'>${e(t('expert_fix'))}</button>`:''}</div>`).join('')}</details>`).join('')}
       ${issues.general.map(line=>`<p>${e(line)}</p>`).join('')}
       ${remediation}
       <button type='button' data-mm-copy='issues'>${e(t('copy_issues'))}</button><span data-mm-clipboard-status role='status'></span><textarea readonly hidden data-mm-copy-fallback aria-label='${e(t('copy_issues_manual'))}' rows='6'>${e(d.validationDetail)}</textarea>
@@ -615,7 +675,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   const fail=message=>{d.error=message;return false;};
   if(key==='room_select'){
     if(!d.doc.rooms[value])return fail('Unknown room');
-    d.room=value;d.device='';d.activity='';d.captureDevices=[];d.error='';return true;
+    d.room=value;d.device='';d.activity='';d.captureRoom=undefined;d.error='';return true;
   }
   if(key==='global_enable'){d.doc.enable_ux=checked;d.dirty=true;}
   else if(key==='global_delay'){
@@ -653,8 +713,9 @@ function rhiMmWholeChange(d,key,value,checked=false){
   }
   else if(key==='capture_volume')d.captureVolume=checked;
   else if(key==='capture_mute')d.captureMute=checked;
+  else if(key==='new_pc_application')d.newPcApplication=rhiMmWholeSlug(value).slice(0,40);
   else if(key==='new_activity')d.newActivity=value;
-  else if(key==='new_type'){d.newType=value;d.newActivityInput='';d.newActivitySource='';}
+  else if(key==='new_type'){d.newType=value;d.newActivityInput='';d.newActivitySource='';d.newActivityTarget='';d.captureType=undefined;}
   else if(key==='new_activity_target'){d.newActivityTarget=value;d.newActivityInput='';}
   else if(key==='new_activity_input')d.newActivityInput=value;
   else if(key==='new_activity_source')d.newActivitySource=value;
@@ -685,7 +746,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(value===''||(!placeholder&&known)||!source||
        source.concept!==device.foundation_concept||source.review_reason||
        !source.candidate||!source.entity_registry_id||!source.config_entry_id||
-       !(device.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')))
+       !(device.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):device.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')))
       return fail('Choose an exact compatible native device');
     if(Object.values(room.devices).some(x=>x!==device&&x.entity===source.entity))
       return fail('This device is already assigned to the room');
@@ -702,6 +763,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
         foundation_device_registry_id:source.native_device_id,
         foundation_provider:source.provider});
       if(!placeholder)x.control_approved=false;
+      if(x.foundation_concept==='network'){delete x.computer_agent;delete x.computer_io;delete x.windows_native;}
     });
     d.dirty=true;
   }
@@ -714,7 +776,40 @@ function rhiMmWholeChange(d,key,value,checked=false){
     device.foundation_config_entry_id=approved.config_entry_id;
     device.foundation_device_registry_id=approved.native_device_id;
     device.foundation_provider=approved.provider;
-    device.control_approved=false;d.dirty=true;
+    device.control_approved=false;if(device.foundation_concept==='network'){delete device.computer_agent;delete device.computer_io;delete device.windows_native;}d.dirty=true;
+  }
+  else if(key==='device_windows_enable'&&device){
+    if(device.foundation_concept!=='network')return fail('Choose a network computer');
+    if(checked&&(device.computer_agent||Object.keys(device.computer_io||{}).length))
+      return fail('Remove the existing HASS.Agent bindings before selecting Windows management');
+    const addresses=d.sources.find(s=>s.entity===device.entity&&s.candidate===device.foundation_candidate_id)?.network_ipv4_choices||[];
+    rhiMmWholeForPhysical(d,device,x=>{
+      if(!checked)delete x.windows_native;
+      else if(!x.windows_native)x.windows_native={host:addresses.length===1?addresses[0]:'',computer_name:'',endpoint:'RhiMultimedia',credential_ref:'',ca_file:'',applications:[]};
+    });d.dirty=true;
+  }
+  else if(key.startsWith('device_windows:')&&device){
+    const name=key.split(':')[1];
+    if(!device.windows_native||!['host','computer_name','endpoint','credential_ref','ca_file','applications'].includes(name))
+      return fail('Choose an exact Windows management setting');
+    const target=name==='applications'?value.split(',').map(x=>x.trim()).filter(Boolean):value.trim();
+    rhiMmWholeForPhysical(d,device,x=>{x.windows_native[name]=target;});d.dirty=true;
+  }
+  else if(key==='device_computer_agent'&&device){
+    if(device.foundation_concept!=='network'||device.windows_native)return fail('Choose a network computer without native Windows management');
+    const source=d.sources.find(s=>s.candidate===value&&s.concept==='source'&&s.provider==='hass_agent'&&!s.review_reason&&s.entity.startsWith('media_player.')&&s.entity_registry_id&&s.config_entry_id&&s.native_device_id);
+    if(value&&!source)return fail('Choose a current exact HASS.Agent media endpoint');
+    if(source&&Object.values(d.doc.rooms).some(r=>Object.values(r.devices||{}).some(x=>x.entity===source.entity||(x.computer_agent?.entity===source.entity&&(x.physical_id||x.entity)!==(device.physical_id||device.entity)))))return fail('This agent belongs to another configured device');
+    rhiMmWholeForPhysical(d,device,x=>{if(!source)delete x.computer_agent;else x.computer_agent={entity:source.entity,foundation_concept:'source',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:source.provider,control_approved:true};});d.dirty=true;
+  }
+  else if(key.startsWith('device_computer_io:')&&device){
+    const role=key.split(':')[1];
+    if(device.foundation_concept!=='network'||device.windows_native||(!['shutdown','restart','launch','session','process'].includes(role)&&!/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(role)&&!RHI_MM_PC_KEYS.some(key=>'key_'+key.toLowerCase()===role)))return fail('Choose an exact computer endpoint');
+    const source=(d.computerIO||[]).find(s=>s.candidate===value);
+    if(value&&(!source||!((['session','process'].includes(role)||role.startsWith('process_'))?source.entity.startsWith('sensor.'):role.startsWith('key_')?source.entity.startsWith('button.'):source.entity.startsWith('button.')||source.entity.startsWith('switch.'))))return fail('Choose a compatible HASS.Agent endpoint');
+    if(source&&Object.entries(device.computer_io||{}).some(([k,x])=>k!==role&&(x.foundation_device_registry_id!==source.native_device_id||x.entity===source.entity)))return fail('Choose distinct endpoints on the same native HASS.Agent device');
+    if(source&&Object.values(d.doc.rooms||{}).some(r=>Object.values(r.devices||{}).some(x=>(x.physical_id||x.entity)!==(device.physical_id||device.entity)&&Object.values(x.computer_io||{}).some(b=>b.foundation_device_registry_id===source.native_device_id))))return fail('This HASS.Agent device is assigned to another computer');
+    rhiMmWholeForPhysical(d,device,x=>{x.computer_io=x.computer_io||{};if(!source)delete x.computer_io[role];else x.computer_io[role]={entity:source.entity,foundation_concept:'computer_io',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:'mqtt',control_approved:true};if(!Object.keys(x.computer_io).length)delete x.computer_io;});d.dirty=true;
   }
   else if(key==='device_role'&&device){device.role=value;d.dirty=true;}
   else if(key==='device_power'&&device){
@@ -733,7 +828,8 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(value==='native'){
       rhiMmWholeForPhysical(d,device,x=>{x.wol_enabled=false;});
     }else{
-      if(!device.entity.startsWith('media_player.')&&!device.entity.startsWith('remote.'))
+      if(!device.entity.startsWith('media_player.')&&!device.entity.startsWith('remote.')&&
+         !(device.foundation_concept==='network'&&device.entity.startsWith('device_tracker.')))
         return fail('WOL requires an authorized native media device');
       if(d.sources.some(x=>x.entity===device.entity&&
           x.candidate===device.foundation_candidate_id&&x.provider==='harmony'))
@@ -787,7 +883,12 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(value)activity.room_area=value;else delete activity.room_area;
     d.dirty=true;
   }
-  else if(key==='activity_type'&&activity){activity.activity_type=value;d.dirty=true;}
+  else if(key==='activity_type'&&activity){activity.activity_type=value;if(value!=='work_on_pc')delete activity.computer_application;d.dirty=true;}
+  else if(key==='activity_computer_application'&&activity){
+    const pc=Object.entries(room.devices||{}).find(([k,x])=>activity.devices.includes(k)&&x.foundation_concept==='network'&&x.role==='computer')?.[1];
+    if(activity.activity_type!=='work_on_pc'||(value&&!rhiMmPcApplicationIds(pc).includes(value)))return fail('Choose a complete application pair on the selected PC');
+    if(value)activity.computer_application=value;else delete activity.computer_application;d.dirty=true;
+  }
   else if(parts[0]==='activity_cast'&&activity&&room?.devices?.[parts[1]]){
     const cast=new Set(activity.devices||[]);
     if(checked)cast.add(parts[1]);else cast.delete(parts[1]);
@@ -1044,12 +1145,16 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!room)return fail('Select a room first');
     const source=d.sources[Number(d.newSource)];
     if(!source||!source.entity||!source.candidate)return fail('Choose a Foundation-supported source');
+    if(Object.values(d.doc.rooms||{}).some(r=>Object.values(r.devices||{}).some(x=>x.computer_agent?.entity===source.entity)))return fail('This media endpoint is already linked to a computer');
+    if(source.concept==='network'&&d.sources.some(s=>s.concept!=='network'&&s.provider!=='hass_agent'&&
+       (s.network_observations||[]).some(x=>x.candidate_id===source.candidate)))
+      return fail('Choose the existing AV device; this tracker supplies its network information');
     if(source.review_reason==='ambiguous_candidate_identity')
       return fail('Conflicting Foundation candidates for this native entity. Review the source in Foundation before linking.');
     if(Object.values(room.devices||{}).some(x=>x.entity===source.entity))
       return fail('This native device is already assigned to the room');
     // The shared role helper retains existing physical resource policy.
-    const base=source.concept==='display'?'screen':source.concept==='amplifier'?'amplifier':'source';
+    const base=source.concept==='network'?'computer':source.concept==='display'?'screen':source.concept==='amplifier'?'amplifier':'source';
     let key=base,n=2;while(Object.prototype.hasOwnProperty.call(room.devices,key))key=base+'_'+n++;
     const role=rhiMmWholeSharedRole(d,{name:source.label,entity:source.entity,
       foundation_concept:source.concept,foundation_candidate_id:source.candidate,
@@ -1057,11 +1162,12 @@ function rhiMmWholeAction(d,action,id,phase,index){
       foundation_config_entry_id:source.config_entry_id,
       foundation_device_registry_id:source.native_device_id,
       foundation_provider:source.provider,
-      control_approved:source.available===true&&!source.review_reason,
+      control_approved:source.concept!=='network'&&source.available===true&&!source.review_reason,
       physical_id:source.logical_asset_id||source.entity,
       asset_id:source.logical_asset_id||source.entity,
-      role:source.concept==='display'?'display':source.concept==='amplifier'?'receiver':
+      role:source.concept==='network'?'computer':source.concept==='display'?'display':source.concept==='amplifier'?'receiver':
         source.entity.startsWith('remote.')?'remote':'player',
+      ...(source.concept==='network'?{on_states:['home']}:{}),
       power_mode:source.entity.startsWith('remote.')?'passive':'native'});
     if(!role)return fail('Choose the existing speech-capable source for this shared device');
     room.devices[key]=role;
@@ -1076,6 +1182,26 @@ function rhiMmWholeAction(d,action,id,phase,index){
     const key=rhiMmWholeSlug(d.newActivity);
     if(!/^[a-z][a-z0-9_]*$/.test(key)||key.length>80)return fail('Enter an activity name');
     if(room.activities[key])return fail('Activity already exists');
+    if(d.newType==='work_on_pc'){
+      const pc=room.devices[d.newActivitySource];
+      if(!pc||pc.foundation_concept!=='network'||pc.role!=='computer')
+        return fail('Choose a configured computer in this room');
+      const target=d.newActivityTarget;
+      const screen=room.devices[target];
+      const choice=d.newActivityInput;
+      if(target){
+        if(!screen||screen.foundation_concept!=='display'||!screen.entity.startsWith('media_player.'))
+          return fail('Choose a configured native display');
+        const native=d.sources.find(x=>x.entity===screen.entity&&x.candidate===screen.foundation_candidate_id);
+        if(!choice||!(native?.source_list||[]).includes(choice))
+          return fail('Choose an input that the selected native TV or receiver actually offers');
+      }else if(choice)return fail('Choose a configured native display');
+      room.activities[key]={name:d.newActivity.trim(),activity_type:'work_on_pc',
+        devices:[d.newActivitySource,...(target?[target]:[])],
+        steps:target?[{type:'source',device:target,candidates:[choice]}]:[],stop_steps:[]};
+      d.activity=key;d.newActivity='';d.newActivityInput='';d.newActivitySource='';
+      d.newActivityTarget='';d.tab='activities';d.dirty=true;d.error='';return true;
+    }
     const entries=Object.entries(room.devices||{});
     const targets=entries.filter(([,x])=>['display','amplifier'].includes(x.foundation_concept)&&
       x.entity.startsWith('media_player.'));

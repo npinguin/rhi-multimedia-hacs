@@ -149,7 +149,8 @@ def configured_asset_projection_specs(hass, rooms: dict, *, include_links=True) 
     for room_id, spec in rooms.items():
         for device in spec["devices"].values():
             entity_id = device["entity"]
-            if not entity_id.startswith("media_player."):
+            if not (entity_id.startswith("media_player.") or
+                    (device.get("foundation_concept") == "network" and entity_id.startswith("device_tracker."))):
                 continue  # Native remotes remain related source entities, not duplicate HA devices.
             registered = registry.async_get(entity_id)
             if registered is not None and getattr(registered, "platform", None) == DOMAIN:
@@ -173,6 +174,14 @@ def configured_asset_projection_specs(hass, rooms: dict, *, include_links=True) 
             if include_links and not item["source_entities"]:
                 item["source_entities"] = related_source_entities(
                     hass, native_device_id, entity_id)
+                for endpoint in device.get("computer_io", {}).values():
+                    if all(link["entity_id"] != endpoint["entity"] for link in item["source_entities"]):
+                        item["source_entities"] += ({"entity_id": endpoint["entity"], "domain": endpoint["entity"].split(".")[0],
+                                                      "provider": "mqtt", "availability": "unavailable"},)
+                companion = device.get("computer_agent")
+                if companion and all(link["entity_id"] != companion["entity"] for link in item["source_entities"]):
+                    item["source_entities"] += ({"entity_id": companion["entity"], "domain": "media_player",
+                                                  "provider": "hass_agent", "availability": "unavailable"},)
     return assets
 
 
@@ -338,7 +347,8 @@ class LogicalAssetSensor(SensorEntity):
         attrs = getattr(state, "attributes", {}) if state else {}
         properties = {}
         if self.source_published and not self.conflicted_identity and self._fresh_native(state):
-            properties["playback_state"] = state.state
+            properties["network_connectivity" if self.device.get("foundation_concept") == "network"
+                       else "playback_state"] = state.state
             for name in ("source", "sound_mode", "media_title", "media_artist",
                          "media_content_type"):
                 value = attrs.get(name)
@@ -380,7 +390,8 @@ class LogicalAssetSensor(SensorEntity):
                          else "conflicting_physical_identity" if self.conflicted_identity
                          else "native_state_restored" if self._native_restored(
                              self.device["entity"])
-                         else "native_ha_state" if self._fresh_native(state)
+                         else ("network_connectivity" if self.device.get("foundation_concept") == "network"
+                               else "native_ha_state") if self._fresh_native(state)
                          else "native_state_unavailable"),
         }
 

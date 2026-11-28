@@ -71,7 +71,8 @@ function rhiMmDeviceIntent(room, key, action, value, expectedActivity) {
   const device=room?.devices?.find(d=>d.key===key);
   const capability=device?.controls?.[action];
   if(!device?.foundation_approved||!capability?.enabled||['starting','stopping'].includes(room.phase))return null;
-  const activityBound=['seek','remote_key','remote_text','remote_hold','remote_repeat'].includes(action);
+  const computerKey=action==='remote_key'&&device.concept==='network';
+  const activityBound=['seek','remote_key','remote_text','remote_hold','remote_repeat','computer_launch'].includes(action);
   if(activityBound&&expectedActivity!==undefined&&(expectedActivity||null)!==(room.activity_id||null))return null;
   if(Array.isArray(capability.options)){if(typeof value!=='string'||!capability.options.includes(value))return null;}
   else if(action==='volume'){if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>1)return null;}
@@ -83,7 +84,7 @@ function rhiMmDeviceIntent(room, key, action, value, expectedActivity) {
   else if(action==='remote_text'){
     if(typeof value!=='string'||value.length<1||value.length>256||/[\x00-\x1f\x7f]/.test(value))return null;
   }else if(value!==undefined&&value!==null)return null;
-  return {domain:'rhi_multimedia',service:'control_device',data:{room:room.id,device:key,action,...(value!==undefined&&value!==null?{value}:{}),...(activityBound&&room.phase==='active'&&room.activity_id?{expected_activity:room.activity_id}:{})}};
+  return {domain:'rhi_multimedia',service:'control_device',data:{room:room.id,device:key,action,...(value!==undefined&&value!==null?{value}:{}),...(action==='computer_launch'||computerKey?{expected_activity:room.activity_id||''}:activityBound&&room.phase==='active'&&room.activity_id?{expected_activity:room.activity_id}:{})}};
 }
 
 
