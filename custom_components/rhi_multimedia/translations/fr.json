@@ -151,7 +151,8 @@
         "data": {
           "activity_type": "Type d’activité",
           "activity_name": "Nom de l’activité",
-          "primary_source": "Source multimédia principale"
+          "primary_source": "Source multimédia principale",
+          "confirm_remove": "Confirmer la suppression des actions, commandes et choix d’application dépendants"
         }
       },
       "route": {
@@ -228,7 +229,7 @@
         "data": {
           "activity_name": "Nom de l'activité",
           "primary_source": "Lecteur multimédia natif participant (facultatif)",
-          "confirm_source_steps": "Confirmer la suppression des commandes du lecteur retiré",
+          "confirm_source_steps": "Confirmer la suppression des actions et commandes dépendantes",
           "favorite": "Favori · activité ou chaîne en un geste"
         }
       },
@@ -312,6 +313,75 @@
           "tts": "Fournisseur vocal",
           "confirm": "Confirmer l’appareil et toutes ses pièces associées"
         }
+      },
+      "device_add": {
+        "title": "Ajouter un appareil",
+        "description": "Sélectionnez une source native exacte. Un traceur réseau indique uniquement la connectivité. Aucune pièce ni commande physique n'est nécessaire.\n{validation_detail}",
+        "data": {
+          "name": "Nom",
+          "source": "Source native",
+          "control_approved": "Approuver cette liaison native exacte"
+        }
+      },
+      "device_select": {
+        "title": "Sélectionner un appareil",
+        "data": {
+          "device": "Appareil configuré"
+        }
+      },
+      "device_edit": {
+        "title": "Appareil – Expert YAML",
+        "description": "Modifiez la configuration centrale de l'appareil. Les liens aux pièces restent inchangés. L'identité native ne peut pas être remplacée silencieusement.\n{validation_detail}",
+        "data": {
+          "yaml_text": "Configuration de l'appareil"
+        }
+      },
+      "device_remove": {
+        "title": "Supprimer l'appareil",
+        "description": "Dissociez d'abord toutes les pièces. L'appareil natif reste dans Home Assistant.\n{validation_detail}",
+        "data": {
+          "confirm_remove": "Confirmer la suppression"
+        }
+      },
+      "device_assign": {
+        "title": "Associer à une pièce",
+        "description": "Choisissez ou créez une pièce. Seul le lien change.\n{validation_detail}",
+        "data": {
+          "room": "Pièce",
+          "room_name": "Nom de la nouvelle pièce",
+          "area": "Zone Home Assistant (facultative)"
+        }
+      },
+      "device_unassign": {
+        "title": "Dissocier l'appareil",
+        "description": "Supprimez le lien sélectionné. L'appareil et ses paramètres restent. Retirez-le d'abord des activités concernées.\n{validation_detail}",
+        "data": {
+          "membership": "Lien à la pièce",
+          "confirm_remove": "Confirmer la dissociation"
+        }
+      },
+      "device_settings": {
+        "title": "Paramètres de l'appareil",
+        "description": "Modifiez l'appareil lui-même, pas une pièce. Wake-on-LAN utilise les adresses MAC vérifiées. Les paramètres avancés restent accessibles via Expert YAML.\n{validation_detail}",
+        "data": {
+          "name": "Nom",
+          "control_approved": "Approuver cette liaison native exacte",
+          "power_mode": "Mode d'alimentation",
+          "post_power_on_delay_ms": "Délai après allumage (ms)",
+          "hdmi_cec_enabled": "HDMI-CEC",
+          "wol_enabled": "Wake-on-LAN",
+          "wol_mac": "Adresse MAC vérifiée",
+          "wol_destination": "Adresse IPv4 LAN (facultative)",
+          "wol_port": "Port UDP",
+          "wol_clear": "Supprimer la configuration Wake-on-LAN enregistrée (prioritaire sur les champs Wake-on-LAN)"
+        }
+      },
+      "devices": {
+        "title": "Appareils",
+        "description": "Ajoutez ou configurez un appareil indépendamment des pièces. Utilisez Expert YAML pour les paramètres avancés.",
+        "data": {
+          "task": "Action"
+        }
       }
     },
     "error": {
@@ -339,7 +409,7 @@
       "dell_duplicate_host": "Un autre écran Dell configuré utilise déjà cette adresse.",
       "dell_host_immutable": "L'identité réseau ne peut pas être remplacée silencieusement. Dissociez l'écran avant d'en enregistrer un autre.",
       "source_route_required": "Choisissez au moins une entrée native TV/ampli actuellement disponible pour confirmer le routage ou le changement de lecteur.",
-      "confirm_source_steps": "Confirmez la suppression des commandes du lecteur multimédia retiré.",
+      "confirm_source_steps": "Confirmer la suppression des actions, commandes et choix d’application dépendants",
       "cec_invalid": "Choisissez deux appareils CEC activés et sélectionnés dans Foundation, avec liaison HDMI vérifiée, entrée native réelle et sans conflit.",
       "cec_in_use": "Cette source partagée est encore utilisée par une activité CEC ; retirez d'abord la liaison.",
       "cec_needs_endpoints": "Cette activité nécessite un lecteur/ampli initiateur et un écran/ampli cible CEC activés avec entrée native.",

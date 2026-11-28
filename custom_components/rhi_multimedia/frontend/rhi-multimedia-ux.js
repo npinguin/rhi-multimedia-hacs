@@ -1,4 +1,4 @@
-/* Robotix Home Intelligence Multimedia UX v0.1.24; canonical RHI UX Core 1.6.4 */
+/* Robotix Home Intelligence Multimedia UX v0.1.25; canonical RHI UX Core 1.6.4 */
 (()=>{
 'use strict';
 const RHI_MM_CORE_CSS=":host,.rhi-ux-root{\n  --rhi-color-primary:#1467F5;\n  --rhi-color-primary-soft:#EAF3FF;\n  --rhi-color-text:#0F172A;\n  --rhi-color-muted:#64748B;\n  --rhi-color-muted-soft:#758399;\n  --rhi-color-line:#DCE5EF;\n  --rhi-color-line-soft:#EAF0F6;\n  --rhi-color-surface:#FFFFFF;\n  --rhi-color-surface-soft:#F8FAFC;\n  --rhi-color-ok:#22C55E;\n  --rhi-color-attention:#F59E0B;\n  --rhi-color-error:#B42318;\n  --rhi-color-unknown:#94A3B8;\n\n  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);\n  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);\n  --rhi-font-display:clamp(29px,2.55vw,42px);\n  --rhi-font-section:clamp(18px,1.4vw,22px);\n  --rhi-font-card:15px;\n  --rhi-font-body:12.5px;\n  --rhi-font-small:11px;\n  --rhi-font-label:10.5px;\n  --rhi-font-value:13px;\n  --rhi-font-diagnostic:10px;\n  --rhi-weight-regular:400;\n  --rhi-weight-medium:500;\n  --rhi-weight-strong:600;\n  --rhi-line-height-tight:1.15;\n  --rhi-line-height-body:1.42;\n\n  --rhi-space-1:4px;\n  --rhi-space-2:7px;\n  --rhi-space-3:10px;\n  --rhi-space-4:14px;\n  --rhi-space-5:18px;\n  --rhi-space-6:24px;\n  --rhi-radius-sm:9px;\n  --rhi-radius-md:12px;\n  --rhi-radius-lg:16px;\n  --rhi-radius-xl:20px;\n  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);\n  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);\n  --rhi-page-max:1640px;\n  --rhi-page-pad-x:24px;\n  --rhi-page-pad-y:14px;\n  --rhi-control-h:38px;\n  --rhi-icon-action:18px;\n  --rhi-icon-status:24px;\n  --rhi-break-phone:430px;\n  --rhi-break-tablet:760px;\n  --rhi-break-desktop:1024px;\n  --rhi-domain-accent:var(--rhi-color-primary);\n\n  color:var(--rhi-color-text);\n  font-family:var(--rhi-font-family);\n  font-size:var(--rhi-font-body);\n  font-weight:var(--rhi-weight-regular);\n  line-height:var(--rhi-line-height-body);\n}\n\n.rhiUxDomainShell{\n  --rhi-nav-active-bg:var(--rhi-color-primary-soft);\n  --rhi-nav-active-border:#CFDEF1;\n  --rhi-nav-active-text:#0F4CA4;\n  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(190px,23%,280px);\n  width:100%;margin:0 0 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-xl);\n  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));box-shadow:var(--rhi-shadow-md);overflow:hidden;\n}\n.rhiUxProductArea{min-width:0;overflow:hidden}\n.rhiUxDomainShellTop{min-height:68px;display:grid;grid-template-columns:minmax(168px,.52fr) minmax(0,1.48fr);align-items:center;gap:14px;padding:10px 22px 9px}\n.rhiUxDomainIdentity{display:grid;align-content:center;gap:2px;min-width:0;min-height:48px;padding:2px 0 0 4px}\n.rhiUxDomainIdentity span{font-size:13px;line-height:1.15;font-weight:var(--rhi-weight-regular);color:#58708F;white-space:nowrap}\n.rhiUxDomainIdentity strong{font-size:21px;line-height:1.03;letter-spacing:.045em;font-weight:var(--rhi-weight-strong);color:#0B467F;white-space:nowrap}\n.rhiUxModuleTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}\n.rhiUxModuleTab,.rhiUxDomainTab{appearance:none;border:0;background:transparent;font:inherit;color:#53647D;cursor:pointer;white-space:nowrap}\n.rhiUxModuleTab{min-height:40px;border-radius:12px;padding:8px;font-size:12px;font-weight:var(--rhi-weight-medium)}\n.rhiUxModuleTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border),0 6px 16px rgba(15,23,42,.035)}\n.rhiUxDomainShellBottom{padding:5px 22px 7px;border-top:1px solid var(--rhi-color-line-soft);background:rgba(255,255,255,.52);min-height:46px;box-sizing:border-box}\n.rhiUxDomainTabs{display:flex;align-items:center;gap:10px;min-height:34px;overflow-x:auto;scrollbar-width:none}\n.rhiUxDomainTabs::-webkit-scrollbar{display:none}\n.rhiUxDomainTab{flex:0 0 auto;min-height:34px;border-radius:11px;padding:7px 12px;font-size:11.5px;font-weight:var(--rhi-weight-medium);color:#5F6D80}\n.rhiUxDomainTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border)}\n.rhiUxCompanyBrand{min-width:0;border-left:1px solid var(--rhi-color-line-soft);display:grid;place-items:center;padding:10px 16px;background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}\n.rhiUxCompanyLogo{display:block;width:min(100%,250px);max-height:116px;line-height:0;overflow:hidden}\n.rhiUxCompanyLogo svg{display:block;width:100%;height:auto;max-height:116px;object-fit:contain;object-position:center}\n\n/* Canonical page stack: visual order is invariant across domains. */\n.rhiUxPageStack{display:flex;flex-direction:column}\n.rhiUxPageStack>.rhiUxPageHero{order:1}\n.rhiUxPageStack>.rhiUxStatusGrid{order:2}\n.rhiUxPageStack>.rhiUxQuickActionBar{order:3}\n\n/* Canonical page hero: image is one background layer, never a split side panel. */\n.rhiUxPageHero{\n  position:relative;display:block;height:146px;min-height:146px;overflow:hidden;\n  border:0;border-radius:var(--rhi-radius-lg);background:#fff;box-shadow:none;margin:0;\n}\n.rhiUxPageHeroCopy{\n  position:relative;z-index:4;width:min(48%,650px);max-width:none;padding:20px 18px 18px 22px;box-sizing:border-box;\n}\n.rhiUxPageHeroCopy>small{display:none}\n.rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{\n  margin:4px 0 8px;font-size:var(--rhi-font-display);line-height:1.02;letter-spacing:-.038em;\n  color:#0B1739;font-weight:var(--rhi-weight-strong);\n}\n.rhiUxPageHeroCopy p{\n  margin:0;max-width:520px;font-size:clamp(12.5px,1.05vw,15px);line-height:var(--rhi-line-height-body);\n  color:#536781;font-weight:var(--rhi-weight-regular);\n}\n.rhiUxPageHeroArt{position:absolute;z-index:1;inset:0 0 0 28%;display:block;overflow:hidden;pointer-events:none}\n.rhiUxPageHeroArt:before{\n  content:\"\";display:block;position:absolute;z-index:2;inset:0;\n  background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.95) 8%,rgba(255,255,255,.62) 19%,rgba(255,255,255,.10) 38%,rgba(255,255,255,0) 57%);\n}\n.rhiUxPageHeroArt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;transform:none}\n\n/* One canonical page status layer. */\n.rhiUxStatusGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0 0;padding:0;border:0;background:transparent;box-shadow:none}\n.rhiUxStatusItem{\n  min-width:0;min-height:68px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;\n  padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:#fff;box-shadow:var(--rhi-shadow-md);\n}\n.rhiUxStatusIcon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#F0F5FC;color:#355D96;font-size:18px}\n.rhiUxStatusIcon ha-icon{--mdc-icon-size:var(--rhi-icon-status)}\n.rhiUxStatusCopy{min-width:0;display:block}\n.rhiUxStatusCopy small{display:block;margin:0 0 2px;color:#476487;font-size:var(--rhi-font-label);font-weight:var(--rhi-weight-medium);line-height:1.2}\n.rhiUxStatusCopy b{display:block;margin:0 0 2px;color:var(--rhi-color-text);font-size:clamp(14px,1.12vw,17px);font-weight:var(--rhi-weight-strong);line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.rhiUxStatusCopy em{display:block;margin-top:2px;color:var(--rhi-color-muted);font-size:var(--rhi-font-small);font-style:normal;font-weight:var(--rhi-weight-regular);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n\n/* Canonical page-level quick actions. */\n.rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{\n  min-height:48px;padding:5px 8px;margin:7px 0 0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;\n  font-weight:var(--rhi-weight-medium);margin-right:2px;white-space:nowrap;\n}\n.rhiUxQuickActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0}\n.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{\n  height:36px;min-height:36px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#125DB7;\n  box-shadow:none;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 12px;\n  display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxQuickAction.primary,.rhiUxQuickActionBar button:first-of-type,.rhiEnergyQuickActions .hiAction:first-of-type,.rhi-top-action.primary{\n  background:var(--rhi-color-primary);border-color:var(--rhi-color-primary);color:#fff;\n}\n.rhiUxQuickAction:disabled,.rhiEnergyQuickActions .hiAction:disabled,.rhi-top-action:disabled{opacity:.46}\n\n/* Canonical body grammar. */\n.rhiUxDomainBody{font-family:var(--rhi-font-family);color:var(--rhi-color-text);font-size:var(--rhi-font-body);line-height:var(--rhi-line-height-body)}\n.rhiUxDomainBody button,.rhiUxDomainBody select,.rhiUxDomainBody input,.rhiUxDomainBody textarea{font-family:inherit}\n.rhiUxPanel,.rhiUxDomainBody .panel,.rhiUxDomainBody .info,.rhiUxDomainBody .summary,.rhiUxDomainBody .ov-panel{\n  border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);\n}\n.rhiUxPanel{padding:14px 16px}\n.rhiUxDomainBody .panel h2,.rhiUxDomainBody .info h2,.rhiUxDomainBody .summary h2,.rhiUxDomainBody .ov-panel h2{\n  font-size:var(--rhi-font-section);font-weight:var(--rhi-weight-strong);line-height:var(--rhi-line-height-tight);letter-spacing:-.02em;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel h3,.rhiUxDomainBody .info h3,.rhiUxDomainBody .summary h3,.rhiUxDomainBody .ov-panel h3{\n  font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);line-height:1.2;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel p,.rhiUxDomainBody .info p,.rhiUxDomainBody .summary p,.rhiUxDomainBody .ov-panel p{\n  font-size:var(--rhi-font-body);font-weight:var(--rhi-weight-regular);line-height:var(--rhi-line-height-body);color:var(--rhi-color-muted);\n}\n.rhiUxDataList{display:grid;gap:6px}\n.rhiUxDataRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}\n.rhiUxState{display:grid;gap:4px;padding:14px 16px;border:1px dashed var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft);color:var(--rhi-color-muted)}\n.rhiUxState b{color:var(--rhi-color-text);font-size:13px}\n.rhiUxState[data-state=\"attention\"]{border-color:#F6D48C;background:#FFFBEB}\n.rhiUxState[data-state=\"error\"]{border-color:#F1B8B4;background:#FFF7F7}\n.rhiUxConclusion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}\n.rhiUxConclusion small{font-size:var(--rhi-font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--rhi-color-muted)}\n.rhiUxConclusion h2{font-size:var(--rhi-font-card);line-height:1.2;margin:1px 0 2px}\n.rhiUxConclusion p{font-size:var(--rhi-font-small);line-height:1.3;margin:0;color:var(--rhi-color-muted)}\n.rhiUxTechnicalFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:6px 0 0;padding:3px 2px 0;border-top:1px solid rgba(148,163,184,.20);color:#94A3B8;font-size:9px;line-height:1.2}\n.rhiUxTechnicalFooter span+span:before{content:\"·\";margin-right:9px;color:#CBD5E1}\n.rhiUxTechnicalFooter [data-severity=\"warning\"]{color:#B7791F;font-weight:var(--rhi-weight-strong)}\n.rhiUxTechnicalFooter [data-severity=\"error\"]{color:var(--rhi-color-error);font-weight:var(--rhi-weight-strong)}\n\n@media(max-width:1180px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:18px}\n  .rhiUxPageHero{height:140px;min-height:140px}\n  .rhiUxPageHeroCopy{width:51%;padding:18px 14px 16px 18px}\n  .rhiUxPageHeroArt{inset:0 0 0 30%}\n  .rhiUxStatusItem{grid-template-columns:40px minmax(0,1fr);padding:9px 10px;min-height:66px}\n  .rhiUxStatusIcon{width:37px;height:37px}\n}\n@media(max-width:760px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:10px;--rhi-page-pad-y:9px;--rhi-font-body:12px;--rhi-font-small:10.75px}\n  .rhiUxDomainShell{grid-template-columns:1fr}.rhiUxCompanyBrand{display:none}.rhiUxDomainShellTop{grid-template-columns:1fr;padding:10px 12px}.rhiUxDomainIdentity{min-height:auto}.rhiUxDomainShellBottom{padding:7px 12px 9px}\n  .rhiUxPageHero{height:128px;min-height:128px;border-radius:14px}\n  .rhiUxPageHeroCopy{width:59%;padding:18px 9px 16px 13px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:27px;letter-spacing:-.032em}\n  .rhiUxPageHeroCopy p{font-size:11px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}\n  .rhiUxPageHeroArt{inset:0 0 0 34%}\n  .rhiUxStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .rhiUxStatusItem{min-height:74px;grid-template-columns:34px minmax(0,1fr);gap:7px;padding:8px}\n  .rhiUxStatusIcon{width:32px;height:32px;border-radius:9px}.rhiUxStatusIcon ha-icon{--mdc-icon-size:20px}\n  .rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{overflow-x:auto;flex-wrap:nowrap}\n  .rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title,.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{flex:0 0 auto}\n  .rhiUxConclusion{grid-template-columns:1fr}\n}\n@media(max-width:430px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}\n  .rhiUxPageHero{height:118px;min-height:118px}\n  .rhiUxPageHeroCopy{width:64%;padding:16px 8px 14px 11px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:24px}\n  .rhiUxPageHeroCopy p{font-size:10.5px;-webkit-line-clamp:2}\n  .rhiUxPageHeroArt{inset:0 0 0 38%}\n  .rhiUxStatusGrid{grid-template-columns:1fr 1fr}\n}\n\n/* Optional body/section-scoped view and filter controls. */\n.rhiUxContextBar{\n  min-height:42px;padding:4px 7px;margin:0 0 8px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxContextBar>small{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap;\n}\n.rhiUxContextControls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}\n.rhiUxContextControl{\n  min-height:32px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#355D96;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 11px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxContextControl.active,.rhiUxContextControl[aria-pressed=\"true\"]{background:var(--rhi-color-primary-soft);border-color:#CFDEF1;color:#0F4CA4}\n.rhiUxContextControl:disabled{opacity:.46}\n@media(max-width:760px){.rhiUxContextBar{overflow-x:auto;flex-wrap:nowrap}.rhiUxContextBar>small,.rhiUxContextControls,.rhiUxContextControl{flex:0 0 auto}}\n\n/* Canonical cross-domain appearance picker. Domains own catalogs and persistence. */\n.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}\n.rhiUxVisualPickerPanel{width:min(920px,94vw);max-height:min(82vh,760px);overflow:hidden;background:#fff;border:1px solid var(--rhi-color-line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:16px;box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:10px}\n.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;min-height:0}\n.rhiUxVisualPickerHead small{font-size:var(--rhi-font-label);font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:2px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:3px 0 0;font-size:11px;color:#64748b}\n.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin:0;min-height:0}\n.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}\n.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:142px;gap:8px;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px;align-content:start}\n.rhiUxVisualChoice{height:142px;min-height:142px;max-height:142px;display:grid;grid-template-rows:86px minmax(0,1fr);gap:6px;align-items:stretch;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}\n.rhiUxVisualChoiceImage{width:100%;height:86px;min-width:0;min-height:86px;max-width:none;max-height:86px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}\n.rhiUxVisualChoiceCopy{min-width:0;align-self:end}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhiUxVisualChoiceCopy small{font-size:var(--rhi-font-label);color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:12px;margin-top:1px}.rhiUxVisualChoiceCopy em{font-size:var(--rhi-font-small);color:#64748b;font-style:normal;margin-top:1px}\n.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}.rhiUxVisualPickerRefine label span{display:block;font-size:var(--rhi-font-label);color:#64748b;margin-bottom:3px}.rhiUxVisualPickerRefine select{width:100%;height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}\n.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin:0;padding-top:9px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:34px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:var(--rhi-font-small);font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}\n@media(max-width:900px){.rhiUxVisualChoiceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:560px){.rhiUxVisualPickerBackdrop{padding:8px}.rhiUxVisualPickerPanel{width:96vw;max-height:88vh;padding:12px}.rhiUxVisualChoiceGrid{grid-template-columns:1fr;grid-auto-rows:116px}.rhiUxVisualChoice{height:116px;min-height:116px;max-height:116px;grid-template-columns:94px minmax(0,1fr);grid-template-rows:1fr}.rhiUxVisualChoiceImage{width:94px;height:86px;min-width:94px;max-width:94px}.rhiUxVisualChoiceCopy{align-self:center}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerFooter{flex-wrap:wrap}}\n\n\n/* Canonical page and asset composition primitives. */\n.rhiUxPage{display:block;width:100%;max-width:var(--rhi-page-max);margin:0 auto;padding:var(--rhi-page-pad-y) var(--rhi-page-pad-x);box-sizing:border-box}\n.rhiUxPageContent{display:grid;gap:var(--rhi-space-3);margin-top:var(--rhi-space-3)}\n.rhiUxAssetCardShell{display:grid;gap:var(--rhi-space-3);min-width:0;padding:12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm)}\n.rhiUxAssetCardIdentity,.rhiUxAssetCardFacts,.rhiUxAssetCardRelationships,.rhiUxAssetCardActions,.rhiUxAssetCardDetails,.rhiUxAssetCardFeedback{min-width:0}\n.rhiUxAssetCardRelationships{display:grid;gap:var(--rhi-space-2)}\n.rhiUxAssetCardActions{display:flex;align-items:center;gap:var(--rhi-space-2);flex-wrap:wrap}\n.rhiUxAssetCardDetails:empty,.rhiUxAssetCardFeedback:empty{display:none}\n.rhiUxAssetIdentity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;min-width:0}\n.rhiUxAssetVisual{width:72px;height:58px;display:grid;place-items:center;overflow:hidden}\n.rhiUxAssetVisual img{display:block;width:100%;height:100%;object-fit:contain}\n.rhiUxAssetIdentityCopy{min-width:0}.rhiUxAssetIdentityCopy small{display:block;color:var(--rhi-color-muted);font-size:var(--rhi-font-label);text-transform:uppercase;letter-spacing:.08em}\n.rhiUxAssetIdentityCopy h2{margin:2px 0;font-size:var(--rhi-font-section);line-height:1.12}.rhiUxAssetIdentityCopy p{margin:0;color:var(--rhi-color-muted);font-size:var(--rhi-font-body)}\n.rhiUxAssetFactGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--rhi-space-2)}\n.rhiUxAssetFact{min-width:0;padding:9px 10px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface)}\n.rhiUxAssetFact small,.rhiUxAssetFact b,.rhiUxAssetFact span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n.rhiUxAssetFact small{font-size:var(--rhi-font-label);color:var(--rhi-color-muted)}.rhiUxAssetFact b{margin-top:2px;font-size:13px}.rhiUxAssetFact span{margin-top:2px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxAssetRelationship{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft)}\n.rhiUxAssetRelationship small,.rhiUxAssetRelationship b,.rhiUxAssetRelationship span{display:block}.rhiUxAssetRelationship small,.rhiUxAssetRelationship span{color:var(--rhi-color-muted);font-size:var(--rhi-font-small)}\n.rhiUxAssetDisclosure{border-top:1px solid var(--rhi-color-line-soft);padding-top:8px}.rhiUxAssetDisclosure summary{cursor:pointer;font-weight:var(--rhi-weight-medium)}\n.rhiUxAssetDisclosure>div{padding-top:8px}\n.rhiUxWriteFeedback{margin-top:6px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}.rhiUxWriteFeedback[data-state=\"success\"]{color:#15803D}.rhiUxWriteFeedback[data-state=\"error\"]{color:var(--rhi-color-error)}\n@media(max-width:760px){.rhiUxAssetCardShell{padding:10px}.rhiUxAssetFactGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:430px){.rhiUxAssetCardShell{gap:var(--rhi-space-2);padding:9px}.rhiUxAssetFactGrid{grid-template-columns:1fr 1fr}}\n\n\n/* Compact asset grammar. Opt-in: existing page heroes, navigation and panels are unchanged.\n   Domains own asset facts and relationships; Core only lays out their presentation. */\n.rhiUxAssetRow{\n  display:grid;grid-template-columns:52px minmax(0,1fr) minmax(76px,max-content) auto;\n  align-items:center;gap:10px;min-width:0;padding:8px 10px;\n  border-bottom:1px solid var(--rhi-color-line-soft);\n}\n.rhiUxAssetRow:last-child{border-bottom:0}\n.rhiUxAssetImage{\n  display:flex;align-items:center;justify-content:center;width:52px;height:52px;\n  border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft);overflow:hidden;\n}\n.rhiUxAssetImage img{display:block;width:100%;height:100%;object-fit:contain}\n.rhiUxAssetRowIdentity{display:grid;gap:3px;min-width:0}\n.rhiUxAssetName{font-weight:var(--rhi-weight-strong);overflow-wrap:anywhere}\n.rhiUxAssetContext,.rhiUxAssetRowRelationship{font-size:var(--rhi-font-small);color:var(--rhi-color-muted);line-height:1.25}\n.rhiUxAssetRowRelationship .rhiUxAssetRelationshipLink{color:var(--rhi-color-primary);text-decoration:underline;text-underline-offset:2px}\n.rhiUxAssetRowRelationship .rhiUxAssetRelationshipLink:focus-visible{outline:2px solid var(--rhi-color-primary);outline-offset:3px}\n.rhiUxAssetLive{display:grid;justify-items:end;gap:3px;text-align:right;min-width:76px}\n.rhiUxAssetPower{font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);font-variant-numeric:tabular-nums;white-space:nowrap}\n.rhiUxAssetState{font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxAssetExpand{display:flex;align-items:center;justify-content:center;min-width:32px;min-height:36px}\n@media(max-width:430px){\n  .rhiUxAssetRow{grid-template-columns:42px minmax(0,1fr) minmax(64px,max-content) auto;gap:7px;padding:7px 5px}\n  .rhiUxAssetImage{width:42px;height:42px}\n  .rhiUxAssetLive{min-width:64px}\n}\n\n/* Opt-in time-series presentation: preserve domain-owned data, periods and charts. */\n.rhiUxChartPanel{min-width:0;padding:12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface)}\n.rhiUxChartHeader{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px}\n.rhiUxChartLegend{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxChartViewport{width:100%;min-width:0;overflow-x:auto}\n.rhiUxChartViewport svg,.rhiUxChartViewport canvas{display:block;max-width:100%}\n.rhiUxChartEmpty{padding:20px 12px;text-align:center;color:var(--rhi-color-muted);font-size:var(--rhi-font-small)}\n@media(max-width:760px){.rhiUxChartPanel{padding:9px}.rhiUxChartHeader{align-items:flex-start}}\n";
@@ -444,7 +444,7 @@ function rhiMmSiteDateTime(hass,at){
 // authority. No local store or device discovery: this is a thin typed route to
 // the existing integration wizard (the same backend as Configure).
 const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
-  'complete_setup',
+  'complete_setup','dell_add','device_add','device_settings','device_edit','device_assign','device_unassign','device_remove',
   'add_room','rename_room','edit_room','remove_room',
   'guided_activity','add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity',
   'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
@@ -482,7 +482,7 @@ async function rhiMmDiagnosticExport(hass,roomId=''){
   return scoped;
 }
 async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',
-  phase='',operation='',index=null,device='',stepType=''}){
+  phase='',operation='',index=null,device='',stepType='',asset=''}){
   if(hass?.user?.is_admin!==true)
     throw new Error('Multimedia admin permission required');
   if(typeof hass.callWS!=='function'||typeof hass.callApi!=='function')
@@ -514,6 +514,7 @@ async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''
         throw new Error('Expert YAML requires a specific configured object');
       await advance('expert_target',{scope,room,id});
     }
+    if(asset&&step?.step_id==='device_select')await advance('device_select',{device:asset});
     if(room&&step?.step_id==='existing_room')await advance('existing_room',{room});
     if(activity&&step?.step_id==='existing_activity')await advance('existing_activity',{activity});
     // Direct per-device Add / Edit still uses the official HA Options Flow.
@@ -1106,6 +1107,7 @@ const RHI_MM_TEXT = {
     "wh_review_permission": "Review control permission",
     "wh_assigned_room": "Assigned to selected room",
     "wh_step_devices": "Step 1 — Devices involved",
+    "wh_edit_cast_order": "Edit devices and startup order",
     "wh_native_wake": "Native / configured wake",
     "wh_wait_state": "Wait for actual HA state",
     "wh_temporarily_unavailable": "Temporarily unavailable",
@@ -1181,6 +1183,13 @@ const RHI_MM_TEXT = {
     "wh_watch_source": "Watch source",
     "wh_listen_music": "Listen music",
     "wh_add_display": "Add display",
+    "wh_add_device_native": "Add device",
+    "wh_device_catalog_empty": "No configured devices. Add a device or LAN display; assign a room later.",
+    "wh_room_device_details": "Room relationship",
+    "wh_edit_owner": "Edit owning device",
+    "wh_relationship_help": "Name, role and area belong to this room. Shared settings belong to the device.",
+    "wh_clear_wol": "Clear Wake-on-LAN override",
+    "wh_expert_yaml": "Expert YAML",
     "wh_configured": "Configured",
     "wh_unassigned": "Unassigned",
     "wh_classified": "Classified",
@@ -1822,6 +1831,7 @@ const RHI_MM_TEXT = {
     "wh_review_permission": "Controleer bedieningsrechten",
     "wh_assigned_room": "Toegewezen aan geselecteerde kamer",
     "wh_step_devices": "Stap 1 — Betrokken apparaten",
+    "wh_edit_cast_order": "Apparaten en opstartvolgorde aanpassen",
     "wh_native_wake": "Native / ingestelde wake",
     "wh_wait_state": "Wacht op actuele HA-status",
     "wh_temporarily_unavailable": "Tijdelijk niet beschikbaar",
@@ -1897,6 +1907,13 @@ const RHI_MM_TEXT = {
     "wh_watch_source": "Bron bekijken",
     "wh_listen_music": "Muziek luisteren",
     "wh_add_display": "Scherm toevoegen",
+    "wh_add_device_native": "Toestel toevoegen",
+    "wh_device_catalog_empty": "Nog geen geconfigureerde toestellen. Voeg een toestel of LAN-scherm toe; koppel later een ruimte.",
+    "wh_room_device_details": "Ruimtekoppeling",
+    "wh_edit_owner": "Apparaatinstellingen",
+    "wh_relationship_help": "Naam, rol en zone horen bij deze ruimte. Gedeelde instellingen horen bij het apparaat.",
+    "wh_clear_wol": "Wake-on-LAN-override verwijderen",
+    "wh_expert_yaml": "Expert YAML",
     "wh_configured": "Geconfigureerd",
     "wh_unassigned": "Niet toegewezen",
     "wh_classified": "Geclassificeerd",
@@ -2538,6 +2555,7 @@ const RHI_MM_TEXT = {
     "wh_review_permission": "Vérifier les droits de commande",
     "wh_assigned_room": "Affecté à la pièce sélectionnée",
     "wh_step_devices": "Étape 1 — Appareils concernés",
+    "wh_edit_cast_order": "Modifier les appareils et l’ordre de démarrage",
     "wh_native_wake": "Native / réveil configuré",
     "wh_wait_state": "Attendre l’état HA réel",
     "wh_temporarily_unavailable": "Temporairement indisponible",
@@ -2613,6 +2631,13 @@ const RHI_MM_TEXT = {
     "wh_watch_source": "Regarder une source",
     "wh_listen_music": "Écouter de la musique",
     "wh_add_display": "Ajouter un écran",
+    "wh_add_device_native": "Ajouter un appareil",
+    "wh_device_catalog_empty": "Aucun appareil configuré. Ajoutez un appareil ou un écran LAN ; associez une pièce plus tard.",
+    "wh_room_device_details": "Lien à la pièce",
+    "wh_edit_owner": "Paramètres de l’appareil",
+    "wh_relationship_help": "Le nom, le rôle et la zone appartiennent à la pièce. Les paramètres partagés appartiennent à l’appareil.",
+    "wh_clear_wol": "Supprimer la configuration Wake-on-LAN",
+    "wh_expert_yaml": "Expert YAML",
     "wh_configured": "Configuré",
     "wh_unassigned": "Non affecté",
     "wh_classified": "Classé",
@@ -2809,13 +2834,97 @@ function rhiMmWholeFromStep(step){
   const proposedRooms=JSON.parse(context.proposed_rooms_json||'{}');
   const proposalExceptions=JSON.parse(context.proposal_exceptions_json||'[]');
   const localScope=JSON.parse(context.expert_scope_json||'null');
+  const deviceCatalog=context.device_catalog_json!==undefined?JSON.parse(context.device_catalog_json):null;
+  const deviceContract=JSON.parse(context.device_contract_json||'null');
   const room=localScope?.[1]||Object.keys(doc.rooms)[0]||'';
   const tab=localScope?({room:'rooms',device:'devices',activity:'activities'})[localScope[0]]:'discovery';
-  return {doc,areas,floors,areaFloors,sources,computerIO,captureCandidates,logicalDevices,proposedRooms,proposalExceptions,localScope,room,
+  const draft={doc,areas,floors,areaFloors,sources,computerIO,captureCandidates,logicalDevices,proposedRooms,proposalExceptions,localScope,room,deviceCatalog,deviceContract,deviceDetail:'',roomDeviceEditor:false,
     device:localScope?.[0]==='device'?localScope[2]:'',activity:localScope?.[0]==='activity'?localScope[2]:'',tab,
     catalogFilter:'all',catalogType:'all',catalogQuery:'',bulkRoom:room,selectedAssets:[],detailAsset:'',dirty:false,error:'',newRoom:'',newRoomArea:'',newArea:Object.keys(areas)[0]||'',newSource:'',
     newPcApplication:'',newActivity:'',newType:'watch_tv',newActivityTarget:'',newActivityInput:'',newActivitySource:'',captureDevices:[],captureVolume:false,captureMute:false};
+  rhiMmWholeInstall(draft,doc,deviceCatalog);
+  return draft;
 }
+
+// One transient semantic draft. The existing room widgets see a lightweight
+// relationship view, not a second record or a synchronization mechanism.
+// The only owning fields in a room are the server-defined membership fields.
+const rhiMmOwn=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
+function rhiMmMembershipFields(d){return d.deviceContract?.membership_fields||['role','name','room_area'];}
+function rhiMmAssetId(device){return device.asset_ref||device.asset_id||device.physical_id||device.entity;}
+function rhiMmWholeLocalFields(d,device){
+  return Object.fromEntries(rhiMmMembershipFields(d).filter(k=>rhiMmOwn(device,k)).map(k=>[k,device[k]]));
+}
+function rhiMmWholeSharedFields(d,device){
+  return Object.fromEntries(Object.entries(device).filter(([k])=>k!=='asset_ref'&&k!=='device_label'&&!rhiMmMembershipFields(d).includes(k)));
+}
+function rhiMmWholeSame(a,b){
+  if(a===b)return true;
+  if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;
+  const keys=Object.keys(a);
+  return keys.length===Object.keys(b).length&&keys.every(k=>rhiMmOwn(b,k)&&rhiMmWholeSame(a[k],b[k]));
+}
+function rhiMmWholeLink(d,asset,membership){
+  const owner=d.deviceCatalog[asset],local=rhiMmWholeLocalFields(d,membership);
+  if(!owner)throw Error('Missing configured Device reference');
+  const isLocal=key=>rhiMmMembershipFields(d).includes(key);
+  const visible=key=>key!=='device_label'&&key!=='asset_ref';
+  return new Proxy(local,{
+    get(target,key){return key==='asset_ref'?asset:isLocal(key)?target[key]:visible(key)?owner[key]:undefined;},
+    set(target,key,value){
+      if(!visible(key)||key==='__proto__'||key==='constructor'||key==='prototype')return false;
+      (isLocal(key)?target:owner)[key]=value;return true;
+    },
+    deleteProperty(target,key){return visible(key)&&delete (isLocal(key)?target:owner)[key];},
+    ownKeys(target){return [...new Set([...Object.keys(target),...Object.keys(owner).filter(visible)])];},
+    has(target,key){return key==='asset_ref'||visible(key)&&rhiMmOwn(isLocal(key)?target:owner,key);},
+    getOwnPropertyDescriptor(target,key){
+      const obj=isLocal(key)?target:owner;
+      return visible(key)&&rhiMmOwn(obj,key)?{configurable:true,enumerable:true,writable:true,value:obj[key]}:undefined;
+    }
+  });
+}
+function rhiMmWholeInstall(d,document,retained=null){
+  // Exact scoped expert documents intentionally keep their old local view.
+  // Invalid expanded imports stay repairable, without picking a winner.
+  const copy=JSON.parse(JSON.stringify(document));
+  const canonical=rhiMmOwn(copy,'device_catalog');
+  if(d.localScope&&!canonical){d.doc=copy;d.deviceCatalog=null;d.canonicalWire=false;return;}
+  const catalog=Object.assign(Object.create(null),canonical?copy.device_catalog:retained||{});
+  const roomRows=Object.values(copy.rooms||{});
+  const seen=Object.create(null);
+  if(!canonical){
+    for(const room of roomRows)for(const device of Object.values(room.devices||{})){
+      const asset=rhiMmAssetId(device),shared=rhiMmWholeSharedFields(d,device);
+      if(!asset||rhiMmOwn(seen,asset)&&!rhiMmWholeSame(seen[asset],shared)){
+        d.doc=copy;d.deviceCatalog=null;d.canonicalWire=false;return;
+      }
+      seen[asset]=shared;
+      const label=catalog[asset]?.device_label||device.name;
+      catalog[asset]={...shared,...(label?{device_label:label}:{})};
+    }
+  }
+  // Validate reference shape before replacing the existing editable view.
+  for(const room of roomRows)for(const device of Object.values(room.devices||{})){
+    const asset=rhiMmAssetId(device);
+    if(!asset||!rhiMmOwn(catalog,asset)||!catalog[asset]||typeof catalog[asset]!=='object')
+      throw Error('Invalid native Device reference');
+  }
+  d.deviceCatalog=catalog;d.canonicalWire=!!d.deviceContract&&!d.localScope;
+  delete copy.device_catalog;
+  for(const room of roomRows)for(const [key,device] of Object.entries(room.devices||{}))
+    room.devices[key]=rhiMmWholeLink(d,rhiMmAssetId(device),device);
+  d.doc=copy;
+}
+function rhiMmWholeDocument(d,canonical=d.canonicalWire){
+  if(!canonical||!d.deviceCatalog)return d.doc;
+  const rooms=Object.fromEntries(Object.entries(d.doc.rooms).map(([roomId,room])=>[roomId,{
+    ...room,devices:Object.fromEntries(Object.entries(room.devices||{}).map(([key,device])=>[key,{
+      asset_ref:rhiMmAssetId(device),...rhiMmWholeLocalFields(d,device)}]))}]));
+  return {...d.doc,rooms,device_catalog:d.deviceCatalog};
+}
+function rhiMmWholeWireText(d){return d.rawDraft??JSON.stringify(rhiMmWholeDocument(d),null,2);}
+function rhiMmWholeSnapshot(d){return JSON.parse(JSON.stringify(rhiMmWholeDocument(d,!!d.deviceCatalog)));}
 function rhiMmPcApplicationIds(device){
   if(device?.windows_native)return [...(device.windows_native.applications||[])];
   const io=device?.computer_io||{};
@@ -2826,15 +2935,7 @@ function rhiMmWholeSlug(name){
     .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_')
     .replace(/^_+|_+$/g,'');
 }
-function rhiMmWholeForPhysical(d,device,mutate){
-  if(d.localScope){mutate(device);return;} // Expert scope never edits sibling bindings.
-  const physical=device.physical_id||device.entity;
-  for(const room of Object.values(d.doc.rooms||{})){
-    for(const current of Object.values(room.devices||{})){
-      if((current.physical_id||current.entity)===physical)mutate(current);
-    }
-  }
-}
+function rhiMmWholeEditDevice(device,mutate){mutate(device);}
 // Deliberate re-approval of a currently registered exact source; no new
 // scanner, store, writer or physical command outside the native Options Flow.
 function rhiMmWholeRepairable(d){
@@ -2865,22 +2966,22 @@ function rhiMmWholeRepairable(d){
 // Presentation matching is not command authorization. Preserve the saved
 // endpoint/asset identity independently of a changed Foundation concept.
 function rhiMmWholeSharedRole(d,role){
-  const result=JSON.parse(JSON.stringify(role));
-  const existing=Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{}))
-    .find(x=>x.entity===result.entity);
-  if(!existing)return result;
-  result.physical_id=existing.physical_id||existing.entity;
-  result.asset_id=existing.asset_id||result.physical_id;
-  for(const field of ['power_mode','power_on','power_off','wol_enabled',
-      'hdmi_cec_enabled','post_power_on_delay_ms','timeout','on_states','speech_tts_registry_id','computer_agent','computer_io','windows_native']){
-    if(Object.prototype.hasOwnProperty.call(existing,field))
-      result[field]=JSON.parse(JSON.stringify(existing[field]));
-    else delete result[field];
+  const local=rhiMmWholeLocalFields(d,role);
+  if(!d.deviceCatalog){
+    // Legacy conflict repair remains local; do not silently pick one of
+    // several incompatible room records.
+    const rows=Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{})).filter(x=>x.entity===role.entity);
+    if(rows.length&&!rows.every(x=>rhiMmWholeSame(rhiMmWholeSharedFields(d,x),rhiMmWholeSharedFields(d,rows[0]))))return null;
+    return rows.length?{...JSON.parse(JSON.stringify(rhiMmWholeSharedFields(d,rows[0]))),...local}:JSON.parse(JSON.stringify(role));
   }
-  if(existing.control_approved===false)result.control_approved=false;
-  if(result.speech_tts_registry_id&&result.foundation_concept!=='source')
-    return null;
-  return result;
+  const existing=Object.entries(d.deviceCatalog).filter(([,x])=>x.entity===role.entity);
+  if(existing.length>1)return null;
+  const asset=existing[0]?.[0]||rhiMmAssetId(role);
+  if(!asset)return null;
+  if(existing.length&&existing[0][1].foundation_concept!==role.foundation_concept)return null;
+  if(!existing.length&&rhiMmOwn(d.deviceCatalog,asset))return null;
+  if(!existing.length)d.deviceCatalog[asset]={...rhiMmWholeSharedFields(d,role),...(role.name?{device_label:role.name}:{})};
+  return rhiMmWholeLink(d,asset,local);
 }
 function rhiMmWholeAssetMatches(asset,device){
   if(!asset||!device)return false;
@@ -2932,11 +3033,13 @@ function rhiMmWholeCurrent(d){
     if(!Object.prototype.hasOwnProperty.call(room.activities||{},d.activity))
       d.activity=Object.keys(room.activities||{})[0]||'';
   }
-  return {room,device:room?.devices?.[d.device],activity:room?.activities?.[d.activity]};
+  const ownerMode=d.tab==='devices'&&!d.localScope&&d.deviceContract&&d.deviceCatalog&&!d.roomDeviceEditor;
+  if(ownerMode&&!d.deviceCatalog[d.deviceDetail])d.deviceDetail=Object.keys(d.deviceCatalog)[0]||'';
+  return {room,device:ownerMode?d.deviceCatalog[d.deviceDetail]:room?.devices?.[d.device],activity:room?.activities?.[d.activity],ownerMode};
 }
 function rhiMmWholeText(d){
   if(d.rawDraft!=null)return d.rawDraft;
-  if(!d.localScope)return JSON.stringify(d.doc,null,2);
+  if(!d.localScope)return rhiMmWholeWireText(d);
   const [scope,roomId,id]=d.localScope;
   const {room,device,activity}=rhiMmWholeCurrent(d);
   const object={...(scope==='room'?room:scope==='device'?device:activity)};
@@ -2953,12 +3056,29 @@ function rhiMmWholeLocalMessage(message,t){
   const prefix=entries.find(([,english])=>english.endsWith(': ')&&raw.startsWith(english));
   return prefix?t(prefix[0])+rhiMmWholeLocalMessage(raw.slice(prefix[1].length),t):raw;
 }
+function rhiMmWholeIssueAsset(d,path){
+  // Asset IDs can include provider delimiters and dots. Match exact catalog
+  // keys, longest first, rather than parsing them as room slugs.
+  return Object.keys(d.deviceCatalog||{}).sort((a,b)=>b.length-a.length)
+    .find(id=>path==='devices.'+id||path.startsWith('devices.'+id+'.'));
+}
 function rhiMmWholeIssues(d){
   const detail=d.validationDetail||'';
   const groups=new Map(),general=[];
   for(const line of [...new Set(detail.split('\n').filter(Boolean))]){
     const match=/^(rooms\.([a-z][a-z0-9_]*)(?:\.(devices|activities)\.([a-z][a-z0-9_]*))?(?:\.[a-z_]+(?:\[\d+\])?)*):\s*(.*)$/.exec(line);
-    if(!match||!d.doc.rooms[match[2]]){general.push(line);continue;}
+    if(!match||!d.doc.rooms[match[2]]){
+      const split=line.indexOf(': ');
+      const path=split<0?'':line.slice(0,split);
+      const asset=rhiMmWholeIssueAsset(d,path);
+      if(asset){
+        const owner=d.deviceCatalog[asset],groupKey='device:'+asset;
+        const group=groups.get(groupKey)||{name:owner.device_label||owner.entity,items:[]};
+        group.items.push({path,object:owner.device_label||owner.entity,message:line.slice(split+2),kind:'device'});
+        groups.set(groupKey,group);continue;
+      }
+      general.push(line);continue;
+    }
     const [,path,roomId,kind,key,reason]=match;
     const room=d.doc.rooms[roomId];
     const object=kind?room[kind]?.[key]:room;
@@ -2996,6 +3116,9 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   if(!d)return `<p role='alert'>${e(t('wh_unreadable'))}</p>`;
   const local=!!d.localScope;
   const specialist=(id,label)=>local?'':`<button type='button' data-wh-action='specialist' data-wh-id='${id}'>${escape(label)}</button>`;
+  const deviceAction=(action,label,asset='')=>local||!d.deviceContract?.actions?.includes(action)?'':
+    `<button type='button' data-wh-action='device_option' data-wh-id='${e(action)}' data-wh-asset='${e(asset)}'>${e(label)}</button>`;
+  const deviceFirst=!local&&d.deviceCatalog!=null&&!!d.deviceContract;
   const entry=(id,label,active,action)=>`<button type='button' data-wh-action='${action}'
     data-wh-id='${e(id)}' aria-pressed='${active}'>${e(label)}</button>`;
   const field=(key,value,kind='text',extra='')=>{
@@ -3018,7 +3141,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   const localSections=local||d.workspace==='discovery'?[]:
     d.workspace==='settings'?sections.filter(x=>x[0]!=='discovery'):sections;
   const rooms=Object.entries(d.doc.rooms);
-  const {room,device,activity}=rhiMmWholeCurrent(d);
+  const {room,device,activity,ownerMode}=rhiMmWholeCurrent(d);
   const floorRooms=new Map();
   for(const [id,r] of rooms){
     const floorId=d.areaFloors[r.area_id]||'__unassigned__';
@@ -3030,7 +3153,8 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <div class='mm-wh-list'>${items.map(([id,r])=>entry(id,r.name||id,id===d.room,'select_room')).join('')}</div>
     </div>`).join('');
   const associatedTrackers=new Set(d.sources.filter(s=>s.concept!=='network'&&s.provider!=='hass_agent').flatMap(s=>(s.network_observations||[]).map(x=>x.candidate_id)));
-  const boundCompanions=new Set(Object.values(d.doc.rooms||{}).flatMap(r=>Object.values(r.devices||{}).map(x=>x.computer_agent?.entity).filter(Boolean)));
+  const configuredOwners=d.deviceCatalog?Object.values(d.deviceCatalog):Object.values(d.doc.rooms||{}).flatMap(r=>Object.values(r.devices||{}));
+  const boundCompanions=new Set(configuredOwners.map(x=>x.computer_agent?.entity).filter(Boolean));
   const sourceRows=d.sources.map((s,i)=>[String(i),`${s.label} · ${s.logical_type||s.concept} · ${s.provider}${s.approved?'':' · '+ t('wh_pending_approval')}${s.review_reason?' · '+t('wh_needs_review')+': '+s.review_reason:''}${s.available?'':' · '+t('unavailable')}`]).filter(([index])=>!boundCompanions.has(d.sources[Number(index)].entity)&&(d.sources[Number(index)].concept!=='network'||!associatedTrackers.has(d.sources[Number(index)].candidate)));
   const deviceRows=Object.entries(room?.devices||{});
   const activityRows=Object.entries(room?.activities||{});
@@ -3038,7 +3162,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   const roomAreaChoices=[['',t('wh_whole_room')],...roomAreas.map(([id,area])=>[id,area.name])];
   const currentDevice=d.device&&room?.devices?.[d.device]?d.device:deviceRows[0]?.[0]||'';
   const currentActivity=d.activity&&room?.activities?.[d.activity]?d.activity:activityRows[0]?.[0]||'';
-  const selectedDevice=room?.devices?.[currentDevice];
+  const selectedDevice=ownerMode?device:room?.devices?.[currentDevice];
   const selectedActivity=room?.activities?.[currentActivity];
   const currentWake=selectedDevice?.power_on?.action==='wake_on_lan.send_magic_packet'
     ?selectedDevice.power_on.data||{}:null;
@@ -3051,7 +3175,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   const resolveChoices=d.sources.map((source,index)=>[String(index),source]).filter(([,source])=>
     source.concept===selectedDevice?.foundation_concept&&!source.review_reason&&
     source.entity_registry_id&&source.config_entry_id&&source.candidate&&
-    (selectedDevice?.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):selectedDevice?.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')));
+    (selectedDevice?.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):selectedDevice?.entity?.startsWith('remote.')?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')));
   const currentCandidate=selectedDevice?.foundation_candidate_id||'';
   const bindingCurrent=sameNativeCandidates.some(s=>s.candidate===currentCandidate&&
     (!selectedDevice?.foundation_entity_registry_id||selectedDevice.foundation_entity_registry_id===s.entity_registry_id)&&
@@ -3079,6 +3203,68 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       ...(asset.candidates||[]).map(x=>x.entity_id),
       ...(asset.source_entities||[]).map(x=>x.entity_id)].join(' ').toLowerCase().includes(q);
   });
+  const deviceSettings=()=>`        <label class='mm-wh-check'>${e(t('wh_enable_controls'))} ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
+        <small>${e(t('wh_exact_permissions'))}</small>
+        ${unresolvedDevice?`<label>${e(t('device'))}
+          ${select('device_resolve','',[['',selectedDevice.entity||t('wh_compatible_native')],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||t('wh_area_not_assigned'))+' · '+s.provider])],"aria-invalid='true' style='border-color:var(--error-color,#db4437)'")}</label>
+          <small>${e(t('wh_preserve_role'))}</small>
+          ${!resolveChoices.length?`<p class='mm-muted'>${e(t('wh_no_compatible'))}</p>`:''}`:
+          `<label>${e(t('device'))}
+          ${select('device_candidate',currentCandidate,nativeBindingChoices,(sameNativeCandidates.length?'':'disabled')+(!bindingCurrent?" aria-invalid='true' style='border-color:var(--error-color,#db4437)'":''))}</label>`}
+        ${unresolvedDevice?`<p class='mm-room-error'>${e(t('wh_link_missing'))}</p>`:
+          !bindingCurrent?`<p class='mm-room-error'>${e(t('wh_link_review'))}</p>`:
+          sameNativeCandidates.every(x=>!x.approved)?
+          `<p class="mm-room-error">${e(t('wh_approval_pending'))}</p>`:
+          sameNativeCandidates.every(x=>!x.available)?`<p class="mm-muted">${e(t('wh_linked_offline'))}</p>`:''}
+        <details><summary>${e(t('wh_native_identity'))}</summary><p class='mm-selectable'>${e(selectedDevice.entity||'')} · ${e(ownerMode?d.deviceDetail:currentDevice)}</p>
+          ${(d.sources.find(x=>x.entity===selectedDevice.entity&&
+            x.candidate===selectedDevice.foundation_candidate_id)?.related_entities||[])
+            .map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.provider||x.domain||'native')}
+              · ${e(x.availability)}</div>`).join('')}
+        </details>
+        <label>${e(t('wh_power_behaviour'))}${select('device_power',selectedDevice.power_mode||'native',
+          [['native',t('wh_auto_wol')],['passive',t('wh_passive_observe')]])}</label>
+        ${selectedDevice.foundation_concept==='network'?`<p class='mm-muted'>${e(t('wh_network_readiness'))}</p>`:`<label class='mm-wh-check'>${e(t('wh_cec_enabled'))} ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>`}
+        ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_observations||[]).map(observation=>`<small>${e(observation.entity_id)} · ${e(observation.state)}</small>`).join('')}
+        ${selectedDevice.foundation_concept==='network'?`<label class='mm-wh-check'>${e(t('wh_windows_native'))} ${field('device_windows_enable',!!selectedDevice.windows_native,'checkbox')}</label>
+          ${selectedDevice.windows_native?`<details open><summary>${e(t('wh_windows_native'))}</summary>
+          <small>${e(t('wh_windows_help'))}</small>
+          <label>${e(t('wh_network_address'))}${select('device_windows:host',selectedDevice.windows_native.host||'',[
+            ['',t('wh_choose_source')],...Array.from(new Set([...(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]),...(selectedDevice.windows_native.host?[selectedDevice.windows_native.host]:[])])).map(ip=>[ip,ip])])}</label>
+          ${['computer_name','endpoint','credential_ref','ca_file'].map(k=>`<label>${e(t('wh_windows_'+k))}${field('device_windows:'+k,selectedDevice.windows_native[k]||'')}</label>`).join('')}
+          <label>${e(t('wh_windows_apps'))}${field('device_windows:applications',(selectedDevice.windows_native.applications||[]).join(','))}</label>
+          <small>${e(t('wh_windows_secret_help'))}</small></details>`:''}` : ''}
+        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?`<label>${e(t('wh_computer_agent'))}${select('device_computer_agent',agentCurrent,[['',t('wh_no_agent')],...(!agentChoices.some(s=>s.candidate===agentCurrent)&&agentCurrent?[[agentCurrent,selectedDevice.computer_agent.entity+' · '+t('wh_no_longer_selected')]]:[]),...agentChoices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label><small>${e(t('wh_agent_help'))}</small>`:''}
+        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?['shutdown','restart','launch','session','process',...Array.from(new Set([...Object.keys(selectedDevice.computer_io||{}).filter(k=>/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(k)).map(k=>k.slice(k.indexOf('_')+1)),...(/^[a-z][a-z0-9_]{0,39}$/.test(d.newPcApplication)?[d.newPcApplication]:[])])).sort().flatMap(id=>['launch_'+id,'process_'+id])].map(role=>{
+          const current=selectedDevice.computer_io?.[role];
+          const sensorRole=['session','process'].includes(role)||role.startsWith('process_');
+          const choices=(d.computerIO||[]).filter(s=>sensorRole?s.entity.startsWith('sensor.'):s.entity.startsWith('button.')||s.entity.startsWith('switch.'));
+          const label=/^(launch|process)_/.test(role)?t('wh_pc_'+role.split('_')[0])+' · '+role.slice(role.indexOf('_')+1):t('wh_pc_'+role);
+          return `<label>${e(label)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
+        }).join('')+`<details><summary>${e(t('wh_pc_keys'))}</summary><small>${e(t('wh_pc_keys_help'))}</small>${(d.deviceContract?.pc_keys||RHI_MM_PC_KEYS).map(key=>{
+          const role='key_'+key.toLowerCase(),current=selectedDevice.computer_io?.[role];
+          const choices=(d.computerIO||[]).filter(s=>s.entity.startsWith('button.'));
+          return `<label>${e(key)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
+        }).join('')}</details><label>${e(t('wh_pc_application_id'))}${field('new_pc_application',d.newPcApplication||'')}</label><small>${e(t('wh_pc_application_help'))}</small><small>${e(t('wh_pc_io_help'))}</small>`:''}
+        <label>${e(t('wh_after_power'))}${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
+        <details class='mm-wh-device-wol' ${currentWake?'open':''}>
+          <summary>${e(t('wh_wol_optional'))}</summary>
+          <label>${e(t('wh_power_method'))}${select('device_wol_mode',currentWake&&selectedDevice.wol_enabled!==false?'directed':'native',
+            [['native',t('wh_native_no_wol')],['directed',t('wh_wol_lan')]])}</label>
+          <label>${e(t('wh_mac_verified'))} ${select('device_wol_mac',
+            currentWake?.mac||'',[['',t('wh_choose_mac')],...verifiedMacs.map(mac=>[mac,mac])])}</label>
+          ${currentWake?`<label>${e(t('wh_ipv4_optional'))}
+            ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
+            ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]).map(ip=>`<small>${e(t('wh_network_address'))}: ${e(ip)}</small>`).join('')}
+            <label>${e(t('wh_port'))} ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
+          ${currentWake&&!local?`<button type='button' data-wh-action='clear_wol'>${e(t('wh_clear_wol'))}</button>`:''}
+          <small>${e(t('wh_verified_macs'))}: ${e(verifiedMacs.join(', ')||t('wh_no_mac'))}.
+            ${e(t('wh_wol_help'))}</small>
+          ${selectedDevice.power_mode==='passive'?
+            `<small>${e(t('wh_passive_wol'))}</small>`:''}
+        </details>
+        <small>${e(t('wh_separate_cec_wol'))}</small>
+`;
   let content='';
   if(d.tab==='discovery'){
     const currentAsset=discovered.find(x=>x.asset_id===d.detailAsset)||
@@ -3097,6 +3283,8 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <div class='mm-wh-heading'><div><h4>${e(t('wh_discovery_heading'))}</h4>
         <p>${e(t('wh_found'))} ${allDiscovered.length} ${e(t('wh_supported_devices'))} · ${allDiscovered.filter(x=>!x.linkedRoomIds.length).length} ${e(t('wh_unassigned_draft'))}</p></div>
         <div class='mm-wh-step-actions'>
+          ${deviceFirst?deviceAction('device_add',t('wh_add_device_native')):''}
+          ${specialist('dell_add',t('wh_add_display'))}
           <button type='button' data-wh-action='repair_bindings'
             ${repairs.length?'':'disabled'}>${e(t('review'))} ${repairs.length} ${e(t(repairs.length===1?'wh_saved_link':'wh_saved_links'))}</button>
           <button type='button' data-wh-action='apply_proposals'
@@ -3170,7 +3358,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
             ${select('device_room_area',currentBinding.room_area||'',
               [['',t('wh_whole_room')],...Object.entries(d.doc.rooms[d.bulkRoom].room_areas)
                 .map(([id,area])=>[id,area.name])])}</label>`:''}
-          <label>${e(t('wh_power'))} ${select('device_power',currentBinding.power_mode||'native',
+          ${deviceFirst?`<button type='button' data-wh-action='focus_binding'>${e(t('wh_edit_owner'))}</button>`:`<label>${e(t('wh_power'))} ${select('device_power',currentBinding.power_mode||'native',
             [['native',t('wh_native_wake')],['passive',t('wh_passive')]])}</label>
           <label class='mm-wh-check'>HDMI-CEC ${field('device_cec',currentBinding.hdmi_cec_enabled===true,'checkbox')}</label>
           <label>Wake-on-LAN ${select('device_wol_mode',enabledWol?'directed':'native',
@@ -3180,7 +3368,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
               ...rhiMmWholeVerifiedMacs(d,currentBinding).map(m=>[m,m])])}</label>
           ${wol?`<label>${e(t('wh_ipv4'))} ${field('device_wol_ip',currentBinding.power_on.data.broadcast_address||'')}</label>
             <label>${e(t('wh_port'))} ${field('device_wol_port',currentBinding.power_on.data.broadcast_port??9,'number','min="1" max="65535"')}</label>`:''}
-        <label>${e(t('wh_after_power'))} ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>
+        <label>${e(t('wh_after_power'))} ${field('device_delay',currentBinding.post_power_on_delay_ms??0,'number','min="0" max="30000"')}</label>`}
           <details><summary>${e(t('wh_native_identity'))}</summary>
             <p>${e(currentBinding.entity)} · ${e(connected?.provider||t('wh_unknown_provider'))}</p>
             <button type='button' data-more-info='${e(currentBinding.entity)}'>${e(t('wh_open_native'))}</button>
@@ -3221,13 +3409,51 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
           <label>${e(t('wh_new_room_area'))} ${field('new_room_area',d.newRoomArea)}</label>
           <button type='button' data-wh-action='add_room_area'>${e(t('wh_add_room_area'))}</button>
         </details>
-        <details><summary>${e(t('wh_advanced_room'))}</summary>${specialist('harmony_owner',t('setup_harmony_owner'))}${specialist('speech_endpoint',t('wh_announcements'))}${specialist('cec_device',t('wh_cec_policy'))}${specialist('tv_wake',t('wh_wake_settings'))}</details>
+        <details><summary>${e(t('wh_advanced_room'))}</summary>${specialist('harmony_owner',t('setup_harmony_owner'))}${specialist('speech_endpoint',t('wh_announcements'))}${deviceFirst?'':specialist('cec_device',t('wh_cec_policy'))+specialist('tv_wake',t('wh_wake_settings'))}</details>
         <p>${count(Object.keys(room.devices||{}).length,'device')} · ${count(Object.keys(room.activities||{}).length,'activity')}</p>
+        ${deviceFirst?`<h4>${e(t('devices'))}</h4>
+          ${deviceRows.map(([id,row])=>`<div class='mm-wh-step-actions'><span>${e(row.name||id)}</span>
+            <button type='button' data-wh-action='edit_membership' data-wh-id='${e(JSON.stringify([d.room,id]))}'>${e(t('wh_room_device_details'))}</button></div>`).join('')}
+          <button type='button' data-wh-action='room_memberships'>${e(t('wh_assign_device'))}</button>`:''}
         ${local?'':`<button type='button' class='danger' data-wh-action='delete_room'>${e(t('settings_remove_room'))}</button>`}`:''}
     </section></div>`;
+  }else if(d.tab==='devices'&&deviceFirst&&!d.roomDeviceEditor){
+    const catalog=Object.entries(d.deviceCatalog);
+    const picked=catalog.find(([id])=>id===d.deviceDetail)||catalog[0];
+    if(picked)d.deviceDetail=picked[0];
+    const [assetId,saved]=picked||['',null];
+    const memberships=saved?rooms.flatMap(([roomId,row])=>Object.entries(row.devices||{})
+      .filter(([,dev])=>rhiMmAssetId(dev)===assetId)
+      .map(([key,dev])=>({roomId,key,label:row.name||roomId,name:dev.name||key}))):[];
+    const native=saved?d.sources.find(s=>s.entity===saved.entity&&s.candidate===saved.foundation_candidate_id):null;
+    content=`<div class='mm-wh-grid'><section class='mm-wh-panel'>
+      <h4>${e(t('devices'))} · ${catalog.length}</h4>
+      <div class='mm-wh-step-actions'>${deviceAction('device_add',t('wh_add_device_native'))}
+        ${specialist('dell_add',t('wh_add_display'))}</div>
+      <div class='mm-wh-list'>${catalog.map(([id,row])=>entry(id,row.device_label||row.entity,id===assetId,'select_asset')).join('')}</div>
+      ${!catalog.length?`<p>${e(t('wh_device_catalog_empty'))}</p>`:''}
+      ${Object.keys(d.doc.dell_displays||{}).length?`<h4>${e(t('wh_dell_registrations'))}</h4>
+        <p>${Object.values(d.doc.dell_displays).map(x=>e(x.name)).join(', ')}</p>
+        ${specialist('dell_edit',t('wh_rename_display'))}${specialist('dell_remove',t('wh_remove_display'))}`:''}
+      </section><section class='mm-wh-panel'>
+      <h4>${e(saved?.device_label||saved?.entity||t('wh_select_device'))}</h4>
+      ${saved?`<p>${e(saved.foundation_concept||'')} · ${e(native?.available?t('wh_available'):t('wh_temporarily_unavailable'))}</p>
+        <p class='mm-selectable'>${e(saved.entity)}</p>
+        <label>${e(t('wh_display_name'))}${field('device_name',saved.device_label||saved.entity)}</label>
+        ${deviceSettings()}
+        <div class='mm-wh-step-actions'>${deviceAction('device_assign',t('wh_assign_room'),assetId)}</div>
+        <h4>${e(t('rooms'))}</h4>
+        ${memberships.length?memberships.map(link=>`<div class='mm-wh-step-actions'><span>${e(link.label)} · ${e(link.name)}</span>
+          <button type='button' data-wh-action='edit_membership' data-wh-id='${e(JSON.stringify([link.roomId,link.key]))}'>${e(t('wh_room_device_details'))}</button></div>`).join(''):`<p>${e(t('wh_not_assigned'))}</p>`}
+        <div class='mm-wh-step-actions'>${memberships.length?deviceAction('device_unassign',t('wh_unassign_room'),assetId):deviceAction('device_remove',t('wh_remove_device'),assetId)}
+          ${deviceAction('device_edit',t('expert_local_text'),assetId)}</div>
+        ${saved.foundation_concept==='network'?`<small>${e(t('wh_network_readiness'))}</small>`:''}
+      `:''}</section></div>`;
   }else if(d.tab==='devices'){
     content=`<div class='mm-wh-grid'><section class='mm-wh-panel' ${local?"style='display:none'":''}>
+      ${deviceFirst?`<button type='button' data-wh-action='device_catalog'>${e(t('devices'))}</button>`:''}
       <h4>${e(t('devices'))} · ${e(room?.name||t('wh_no_room'))}</h4>
+      ${specialist('dell_add',t('wh_add_display'))}
       <div class='mm-wh-list'>${deviceRows.map(([id,x])=>entry(id,x.name||id,id===currentDevice,'select_device')).join('')}</div>
       <h4>${e(t('wh_assign_supported'))}</h4>
       <label>${e(t('wh_foundation_source'))}${select('new_source',d.newSource,
@@ -3238,74 +3464,16 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <h4>${e(selectedDevice?.name||t('wh_select_device'))}</h4>
       ${selectedDevice?`<small>${e(selectedDevice.name||currentDevice)} · ${e(selectedDevice.foundation_concept||'')}</small>
         <label>${e(t('wh_display_name'))}${field('device_name',selectedDevice.name||'')}</label>
-        <label class='mm-wh-check'>${e(t('wh_enable_controls'))} ${field('device_control_approved',selectedDevice.control_approved===true,'checkbox')}</label>
-        <small>${e(t('wh_exact_permissions'))}</small>
-        ${unresolvedDevice?`<label>${e(t('device'))}
-          ${select('device_resolve','',[['',selectedDevice.entity||t('wh_compatible_native')],...resolveChoices.map(([id,s])=>[id,s.label+' · '+(d.areas[s.area_id]||t('wh_area_not_assigned'))+' · '+s.provider])],"aria-invalid='true' style='border-color:var(--error-color,#db4437)'")}</label>
-          <small>${e(t('wh_preserve_role'))}</small>
-          ${!resolveChoices.length?`<p class='mm-muted'>${e(t('wh_no_compatible'))}</p>`:''}`:
-          `<label>${e(t('device'))}
-          ${select('device_candidate',currentCandidate,nativeBindingChoices,(sameNativeCandidates.length?'':'disabled')+(!bindingCurrent?" aria-invalid='true' style='border-color:var(--error-color,#db4437)'":''))}</label>`}
-        ${unresolvedDevice?`<p class='mm-room-error'>${e(t('wh_link_missing'))}</p>`:
-          !bindingCurrent?`<p class='mm-room-error'>${e(t('wh_link_review'))}</p>`:
-          sameNativeCandidates.every(x=>!x.approved)?
-          `<p class="mm-room-error">${e(t('wh_approval_pending'))}</p>`:
-          sameNativeCandidates.every(x=>!x.available)?`<p class="mm-muted">${e(t('wh_linked_offline'))}</p>`:''}
-        <details><summary>${e(t('wh_native_identity'))}</summary><p class='mm-selectable'>${e(selectedDevice.entity||'')} · ${e(currentDevice)}</p>
-          ${(d.sources.find(x=>x.entity===selectedDevice.entity&&
-            x.candidate===selectedDevice.foundation_candidate_id)?.related_entities||[])
-            .map(x=>`<div><code>${e(x.entity_id)}</code> · ${e(x.provider||x.domain||'native')}
-              · ${e(x.availability)}</div>`).join('')}
-        </details>
+        ${deviceFirst? `<p class='mm-muted'>${e(t('wh_relationship_help'))}</p>
+          <button type='button' data-wh-action='open_owner'>${e(t('wh_edit_owner'))}</button>` : deviceSettings()}
         <label>${e(t('wh_role'))}${select('device_role',selectedDevice.role||'player',
           selectedDevice.foundation_concept==='network'?[['computer',t('wh_computer')]]:[['display',t('wh_tv_display')],['receiver',t('wh_receiver_zone')],['player',t('role_player')],['remote',t('wh_remote_hub')]])}</label>
         ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('device_room_area',selectedDevice.room_area||'',roomAreaChoices)}</label>`:''}
-        <label>${e(t('wh_power_behaviour'))}${select('device_power',selectedDevice.power_mode||'native',
-          [['native',t('wh_auto_wol')],['passive',t('wh_passive_observe')]])}</label>
-        ${selectedDevice.foundation_concept==='network'?`<p class='mm-muted'>${e(t('wh_network_readiness'))}</p>`:`<label class='mm-wh-check'>${e(t('wh_cec_enabled'))} ${field('device_cec',selectedDevice.hdmi_cec_enabled===true,'checkbox')}</label>`}
-        ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_observations||[]).map(observation=>`<small>${e(observation.entity_id)} · ${e(observation.state)}</small>`).join('')}
-        ${selectedDevice.foundation_concept==='network'?`<label class='mm-wh-check'>${e(t('wh_windows_native'))} ${field('device_windows_enable',!!selectedDevice.windows_native,'checkbox')}</label>
-          ${selectedDevice.windows_native?`<details open><summary>${e(t('wh_windows_native'))}</summary>
-          <small>${e(t('wh_windows_help'))}</small>
-          <label>${e(t('wh_network_address'))}${select('device_windows:host',selectedDevice.windows_native.host||'',[
-            ['',t('wh_choose_source')],...Array.from(new Set([...(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]),...(selectedDevice.windows_native.host?[selectedDevice.windows_native.host]:[])])).map(ip=>[ip,ip])])}</label>
-          ${['computer_name','endpoint','credential_ref','ca_file'].map(k=>`<label>${e(t('wh_windows_'+k))}${field('device_windows:'+k,selectedDevice.windows_native[k]||'')}</label>`).join('')}
-          <label>${e(t('wh_windows_apps'))}${field('device_windows:applications',(selectedDevice.windows_native.applications||[]).join(','))}</label>
-          <small>${e(t('wh_windows_secret_help'))}</small></details>`:''}` : ''}
-        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?`<label>${e(t('wh_computer_agent'))}${select('device_computer_agent',agentCurrent,[['',t('wh_no_agent')],...(!agentChoices.some(s=>s.candidate===agentCurrent)&&agentCurrent?[[agentCurrent,selectedDevice.computer_agent.entity+' · '+t('wh_no_longer_selected')]]:[]),...agentChoices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label><small>${e(t('wh_agent_help'))}</small>`:''}
-        ${selectedDevice.foundation_concept==='network'&&!selectedDevice.windows_native?['shutdown','restart','launch','session','process',...Array.from(new Set([...Object.keys(selectedDevice.computer_io||{}).filter(k=>/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(k)).map(k=>k.slice(k.indexOf('_')+1)),...(/^[a-z][a-z0-9_]{0,39}$/.test(d.newPcApplication)?[d.newPcApplication]:[])])).sort().flatMap(id=>['launch_'+id,'process_'+id])].map(role=>{
-          const current=selectedDevice.computer_io?.[role];
-          const sensorRole=['session','process'].includes(role)||role.startsWith('process_');
-          const choices=(d.computerIO||[]).filter(s=>sensorRole?s.entity.startsWith('sensor.'):s.entity.startsWith('button.')||s.entity.startsWith('switch.'));
-          const label=/^(launch|process)_/.test(role)?t('wh_pc_'+role.split('_')[0])+' · '+role.slice(role.indexOf('_')+1):t('wh_pc_'+role);
-          return `<label>${e(label)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
-        }).join('')+`<details><summary>${e(t('wh_pc_keys'))}</summary><small>${e(t('wh_pc_keys_help'))}</small>${RHI_MM_PC_KEYS.map(key=>{
-          const role='key_'+key.toLowerCase(),current=selectedDevice.computer_io?.[role];
-          const choices=(d.computerIO||[]).filter(s=>s.entity.startsWith('button.'));
-          return `<label>${e(key)}${select('device_computer_io:'+role,current?.foundation_candidate_id||'',[['',t('wh_no_agent')],...(!choices.some(s=>s.candidate===current?.foundation_candidate_id)&&current?[[current.foundation_candidate_id,current.entity+' · '+t('wh_no_longer_selected')]]:[]),...choices.map(s=>[s.candidate,s.label+' · '+s.entity])])}</label>`;
-        }).join('')}</details><label>${e(t('wh_pc_application_id'))}${field('new_pc_application',d.newPcApplication||'')}</label><small>${e(t('wh_pc_application_help'))}</small><small>${e(t('wh_pc_io_help'))}</small>`:''}
-        <label>${e(t('wh_after_power'))}${field('device_delay',selectedDevice.post_power_on_delay_ms??0,'number','min="0" max="30000" step="1"')}</label>
-        <details class='mm-wh-device-wol' ${currentWake?'open':''}>
-          <summary>${e(t('wh_wol_optional'))}</summary>
-          <label>${e(t('wh_power_method'))}${select('device_wol_mode',currentWake&&selectedDevice.wol_enabled!==false?'directed':'native',
-            [['native',t('wh_native_no_wol')],['directed',t('wh_wol_lan')]])}</label>
-          <label>${e(t('wh_mac_verified'))} ${select('device_wol_mac',
-            currentWake?.mac||'',[['',t('wh_choose_mac')],...verifiedMacs.map(mac=>[mac,mac])])}</label>
-          ${currentWake?`<label>${e(t('wh_ipv4_optional'))}
-            ${field('device_wol_ip',currentWake.broadcast_address||'')}</label>
-            ${(d.sources.find(s=>s.entity===selectedDevice.entity&&s.candidate===selectedDevice.foundation_candidate_id)?.network_ipv4_choices||[]).map(ip=>`<small>${e(t('wh_network_address'))}: ${e(ip)}</small>`).join('')}
-            <label>${e(t('wh_port'))} ${field('device_wol_port',currentWake.broadcast_port??9,'number','min="1" max="65535" step="1"')}</label>`:''}
-          <small>${e(t('wh_verified_macs'))}: ${e(verifiedMacs.join(', ')||t('wh_no_mac'))}.
-            ${e(t('wh_wol_help'))}</small>
-          ${selectedDevice.power_mode==='passive'?
-            `<small>${e(t('wh_passive_wol'))}</small>`:''}
-        </details>
-        <small>${e(t('wh_separate_cec_wol'))}</small>
-        ${local?'':`<button type='button' class='danger' data-wh-action='delete_device'>${e(t('wh_remove_device'))}</button>`}`:''}
+        ${local?'':`<button type='button' class='danger' data-wh-action='delete_device'>${e(t(deviceFirst?'wh_unassign_room':'wh_remove_device'))}</button>`}`:''}
     </section></div>`;
   }else{
     const cast=selectedActivity?.devices||[];
-    const typeOptions=RHI_MM_WHOLE_TYPES.map(x=>[x,t(({"watch_tv":"wh_watch_tv","watch_hdmi":"wh_watch_hdmi","watch_source":"wh_watch_source","listen_music":"wh_listen_music","play_game":"wh_play_game","work_on_pc":"wh_work_on_pc"})[x])]);
+    const typeOptions=(d.deviceContract?.activity_types||RHI_MM_WHOLE_TYPES).map(x=>[x,t(({"watch_tv":"wh_watch_tv","watch_hdmi":"wh_watch_hdmi","watch_source":"wh_watch_source","listen_music":"wh_listen_music","play_game":"wh_play_game","work_on_pc":"wh_work_on_pc"})[x])]);
     const targets=deviceRows.filter(([,x])=>['display','amplifier'].includes(x.foundation_concept)&&
       x.entity.startsWith('media_player.'));
     const computerActivity=d.newType==='work_on_pc';
@@ -3348,7 +3516,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
             <label>${e(t('device'))}${select(`step_device:${phase}:${i}`,step.device||'',
               cast.map(k=>[k,room?.devices?.[k]?.name||k]))}</label>
             <label>${e(t('wh_action'))}${select(`step_type:${phase}:${i}`,step.type,
-              RHI_MM_WHOLE_STEPS.map(x=>[x,t('script_action_'+x)]))}</label>
+              (d.deviceContract?.step_types||RHI_MM_WHOLE_STEPS).map(x=>[x,t('script_action_'+x)]))}</label>
             ${val}
             ${!['wait_until','delay'].includes(step.type)?`<label>${e(t('wh_override_delay'))}${field(`step_override:${phase}:${i}`,step.delay_ms??'','number','min="0" max="30000" step="1"')}</label>`:''}
             <div class='mm-wh-step-actions'>
@@ -3392,10 +3560,12 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       <h4>${e(selectedActivity?.name||t('wh_choose_activity'))}</h4>
       ${selectedActivity?`<label>${e(t('wh_activity_name'))}${field('activity_name',selectedActivity.name||'')}</label>
         <label>${e(t('wh_type'))}${select('activity_type',selectedActivity.activity_type||'watch_tv',typeOptions)}</label>
+        <label class='mm-wh-check'>${field('activity_favorite',selectedActivity.favorite===true,'checkbox')}${e(t('favorite'))}</label>
         ${selectedActivity.activity_type==='work_on_pc'?`<label>${e(t('wh_pc_application'))}${select('activity_computer_application',selectedActivity.computer_application||'',[['',t('wh_pc_default')],...rhiMmPcApplicationIds(deviceRows.find(([k,x])=>cast.includes(k)&&x.foundation_concept==='network'&&x.role==='computer')?.[1]).map(id=>[id,id])])}</label>`:''}
         ${roomAreas.length?`<label>${e(t('wh_room_area_optional'))}${select('activity_room_area',selectedActivity.room_area||'',roomAreaChoices)}</label>`:''}
         <h4>${e(t('wh_step_devices'))}</h4>
-        <div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('activity_cast:'+key,cast.includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>
+        ${deviceFirst?`<ol class='mm-wh-cast-order'>${cast.map(key=>`<li>${e(room.devices[key]?.name||key)}</li>`).join('')}</ol>
+          ${specialist('activity_devices',t('wh_edit_cast_order'))}`:`<div class='mm-wh-cast'>${deviceRows.map(([key,x])=>`<label class='mm-wh-check'>${field('activity_cast:'+key,cast.includes(key),'checkbox')}${e(x.name||key)}</label>`).join('')}</div>`}
         <h4>${e(t('wh_step_actions'))}</h4>
         ${renderSteps('steps')}${renderSteps('stop_steps')}
         <details><summary>${e(t('wh_advanced_activity'))}</summary>${specialist('cec_activity',t('wh_cec_relationships'))}${specialist('button_mapping',t('wh_remote_mapping'))}${specialist('macro_manage',t('wh_shortcuts'))}${specialist('script_step',t('wh_action_editor'))}</details>
@@ -3405,13 +3575,15 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   return `<section class='mm-wh-editor mm-surface' data-mm-flow-editor>
     <header class='mm-wh-header'><div><h2>${e(t('setup_editor'))}</h2>
       <p>${local?e(t('expert_selected')):[t('rooms'),t('devices'),t('activities')].map(e).join(' · ')}</p></div>
-      <span class='mm-wh-draft'>${e(t(d.dirty?'whole_home_leave_title':'expert_saved'))}</span></header>
+      <div class='mm-wh-step-actions'>
+        ${deviceFirst&&!d.dirty&&d.rawDraft==null?`<button type='button' data-wh-action='open_expert'>${e(t('wh_expert_yaml'))}</button>`:''}
+        <span class='mm-wh-draft'>${e(t(d.dirty?'whole_home_leave_title':'expert_saved'))}</span></div></header>
     ${localSections.length?`<nav class='mm-wh-tabs' aria-label='${e(t('wh_categories'))}'>
       ${localSections.map(([id,label,icon])=>`<button type='button' data-wh-action='tab'
         data-wh-id='${id}' aria-pressed='${d.tab===id}'>
         <ha-icon icon='${icon}'></ha-icon>${e(label)}</button>`).join('')}
     </nav>`:''}
-    ${!local&&d.tab!=='rooms'&&rooms.length?`<div class='mm-wh-roomselect'><label>${e(t('wh_room'))}
+    ${!local&&d.tab!=='rooms'&&(!deviceFirst||d.tab!=='devices'||d.roomDeviceEditor)&&rooms.length?`<div class='mm-wh-roomselect'><label>${e(t('wh_room'))}
       ${select('room_select',d.room,rooms.map(([id,r])=>[id,r.name||id]))}</label></div>`:''}
     ${d.validationDetail?(()=>{const issues=rhiMmWholeIssues(d);return `<section class='mm-room-error mm-selectable' role='alert'>
       <strong>${e(t(d.validationStale?'expert_validation_stale':'expert_attention'))}</strong>
@@ -3433,7 +3605,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
         <label class='mm-wh-check'>${e(t('wh_enable_ux'))}
           ${field('global_enable',d.doc.enable_ux!==false,'checkbox')}</label>
       </div>
-      ${!local&&d.rawDraft==null?`<details><summary>${e(t('wh_dell_registrations'))}</summary><small>${e(t('wh_dell_help'))}</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||t('wh_no_displays')}</p>${specialist('dell_add',t('wh_add_display'))}${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit',t('wh_rename_display'))+specialist('dell_remove',t('wh_remove_display')):''}</details>`:''}
+      ${!local&&d.rawDraft==null?`<details><summary>${e(t('wh_dell_registrations'))}</summary><small>${e(t('wh_dell_help'))}</small><p>${Object.values(d.doc.dell_displays||{}).map(x=>e(x.name)).join(', ')||t('wh_no_displays')}</p>${Object.keys(d.doc.dell_displays||{}).length?specialist('dell_edit',t('wh_rename_display'))+specialist('dell_remove',t('wh_remove_display')):''}</details>`:''}
       <h4>${e(t('expert_heading'))}</h4>
       <p>${e(t(local?'expert_local_help':'expert_global_help'))}</p>
       <textarea data-wh-raw spellcheck='false' rows='15'
@@ -3443,7 +3615,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
       ${d.rawDraft!=null?`<button type='button' data-wh-action='discard_raw'>${e(t('expert_undo'))}</button>`:''}
     </details>
     <footer class='mm-wh-footer'>
-      <span>${count(rooms.length,'room')} · ${count(rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0),'device')} ·
+      <span>${count(rooms.length,'room')} · ${count(deviceFirst?Object.keys(d.deviceCatalog).length:rooms.reduce((n,[,r])=>n+Object.keys(r.devices||{}).length,0),'device')} ·
         ${count(rooms.reduce((n,[,r])=>n+Object.keys(r.activities||{}).length,0),'activity')}</span>
       <button type='button' class='mm-wh-save' data-wh-action='review'>${e(t('whole_home_review_save'))}</button>
       <button type='button' data-mm-option-cancel>${e(t('setup_cancel'))}</button>
@@ -3451,7 +3623,7 @@ function rhiMmWholeRender(d,t,escape,remediation=''){
   </section>`;
 }
 function rhiMmWholeChange(d,key,value,checked=false){
-  const {room,device,activity}=rhiMmWholeCurrent(d);
+  const {room,device,activity,ownerMode}=rhiMmWholeCurrent(d);
   if(d.localScope){
     const scope=d.localScope[0];
     const allowed=scope==='room'?key.startsWith('room_')&&key!=='room_select'||key==='new_room_area':
@@ -3470,7 +3642,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   }
   if(key==='global_enable'){d.doc.enable_ux=checked;d.dirty=true;}
   else if(key==='global_delay'){
-    if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');
+    if(!Number.isInteger(int)||int<0||int>(d.deviceContract?.max_step_delay_ms??30000))return fail('Delay must be 0–30000 ms');
     d.doc.default_step_delay_ms=int;d.dirty=true;
   }
   else if(key==='new_room')d.newRoom=value;
@@ -3511,7 +3683,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(key==='new_activity_input')d.newActivityInput=value;
   else if(key==='new_activity_source')d.newActivitySource=value;
   else if(key==='default_step_delay_ms'){
-    if(!Number.isInteger(int)||int<0||int>30000)return fail('Default delay must be 0–30000 ms');
+    if(!Number.isInteger(int)||int<0||int>(d.deviceContract?.max_step_delay_ms??30000))return fail('Default delay must be 0–30000 ms');
     d.doc.default_step_delay_ms=int;d.dirty=true;
   }
   else if(key==='room_name'&&room){room.name=value;d.dirty=true;}
@@ -3523,9 +3695,13 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(value&&!Object.prototype.hasOwnProperty.call(d.areas,value))return fail('Area is not registered in HA');
     room.area_id=value||null;d.dirty=true;
   }
-  else if(key==='device_name'&&device){device.name=value;d.dirty=true;}
+  else if(key==='device_name'&&device){
+    if(ownerMode){if(!value.trim()||value.trim().length>80)return fail('Device name must be 1–80 characters');device.device_label=value.trim();}
+    else device.name=value;
+    d.dirty=true;
+  }
   else if(key==='device_control_approved'&&device){device.control_approved=checked;d.dirty=true;}
-  else if(key==='device_room_area'&&device){
+  else if(key==='device_room_area'&&device&&!ownerMode){
     if(value&&!room?.room_areas?.[value])return fail('Choose a defined Room Area');
     if(value)device.room_area=value;else delete device.room_area;
     d.dirty=true;
@@ -3537,17 +3713,22 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(value===''||(!placeholder&&known)||!source||
        source.concept!==device.foundation_concept||source.review_reason||
        !source.candidate||!source.entity_registry_id||!source.config_entry_id||
-       !(device.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):device.role==='remote'?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')))
+       !(device.foundation_concept==='network'?source.entity.startsWith('device_tracker.'):device.entity.startsWith('remote.')?source.entity.startsWith('remote.'):source.entity.startsWith('media_player.')))
       return fail('Choose an exact compatible native device');
-    if(Object.values(room.devices).some(x=>x!==device&&x.entity===source.entity))
+    if(!ownerMode&&Object.values(room?.devices||{}).some(x=>x!==device&&x.entity===source.entity))
       return fail('This device is already assigned to the room');
-    const linked=Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{}))
-      .filter(x=>x!==device&&x.entity===source.entity);
+    const linked=(ownerMode?Object.values(d.deviceCatalog):Object.values(d.doc.rooms).flatMap(r=>Object.values(r.devices||{})))
+      .filter(x=>x!==device&&rhiMmAssetId(x)!==rhiMmAssetId(device)&&x.entity===source.entity);
     if(linked.length&&linked.some(x=>x.physical_id!==device.physical_id))
       return fail('This device belongs to an existing physical identity; review its shared assignment');
     const oldEntity=device.entity;
-    rhiMmWholeForPhysical(d,device,x=>{
+    const asset=rhiMmAssetId(device);
+    rhiMmWholeEditDevice(device,x=>{
       if(x.entity!==oldEntity)return;
+      if(d.canonicalWire&&oldEntity!==source.entity){
+        if(!x.asset_id)x.asset_id=asset;
+        if(!x.physical_id)x.physical_id=oldEntity;
+      }
       Object.assign(x,{entity:source.entity,foundation_candidate_id:source.candidate,
         foundation_entity_registry_id:source.entity_registry_id,
         foundation_config_entry_id:source.config_entry_id,
@@ -3574,7 +3755,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(checked&&(device.computer_agent||Object.keys(device.computer_io||{}).length))
       return fail('Remove the existing HASS.Agent bindings before selecting Windows management');
     const addresses=d.sources.find(s=>s.entity===device.entity&&s.candidate===device.foundation_candidate_id)?.network_ipv4_choices||[];
-    rhiMmWholeForPhysical(d,device,x=>{
+    rhiMmWholeEditDevice(device,x=>{
       if(!checked)delete x.windows_native;
       else if(!x.windows_native)x.windows_native={host:addresses.length===1?addresses[0]:'',computer_name:'',endpoint:'RhiMultimedia',credential_ref:'',ca_file:'',applications:[]};
     });d.dirty=true;
@@ -3584,40 +3765,40 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(!device.windows_native||!['host','computer_name','endpoint','credential_ref','ca_file','applications'].includes(name))
       return fail('Choose an exact Windows management setting');
     const target=name==='applications'?value.split(',').map(x=>x.trim()).filter(Boolean):value.trim();
-    rhiMmWholeForPhysical(d,device,x=>{x.windows_native[name]=target;});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{x.windows_native[name]=target;});d.dirty=true;
   }
   else if(key==='device_computer_agent'&&device){
     if(device.foundation_concept!=='network'||device.windows_native)return fail('Choose a network computer without native Windows management');
     const source=d.sources.find(s=>s.candidate===value&&s.concept==='source'&&s.provider==='hass_agent'&&!s.review_reason&&s.entity.startsWith('media_player.')&&s.entity_registry_id&&s.config_entry_id&&s.native_device_id);
     if(value&&!source)return fail('Choose a current exact HASS.Agent media endpoint');
     if(source&&Object.values(d.doc.rooms).some(r=>Object.values(r.devices||{}).some(x=>x.entity===source.entity||(x.computer_agent?.entity===source.entity&&(x.physical_id||x.entity)!==(device.physical_id||device.entity)))))return fail('This agent belongs to another configured device');
-    rhiMmWholeForPhysical(d,device,x=>{if(!source)delete x.computer_agent;else x.computer_agent={entity:source.entity,foundation_concept:'source',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:source.provider,control_approved:true};});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{if(!source)delete x.computer_agent;else x.computer_agent={entity:source.entity,foundation_concept:'source',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:source.provider,control_approved:true};});d.dirty=true;
   }
   else if(key.startsWith('device_computer_io:')&&device){
     const role=key.split(':')[1];
-    if(device.foundation_concept!=='network'||device.windows_native||(!['shutdown','restart','launch','session','process'].includes(role)&&!/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(role)&&!RHI_MM_PC_KEYS.some(key=>'key_'+key.toLowerCase()===role)))return fail('Choose an exact computer endpoint');
+    if(device.foundation_concept!=='network'||device.windows_native||(!['shutdown','restart','launch','session','process'].includes(role)&&!/^(launch|process)_[a-z][a-z0-9_]{0,39}$/.test(role)&&!(d.deviceContract?.pc_keys||RHI_MM_PC_KEYS).some(key=>'key_'+key.toLowerCase()===role)))return fail('Choose an exact computer endpoint');
     const source=(d.computerIO||[]).find(s=>s.candidate===value);
     if(value&&(!source||!((['session','process'].includes(role)||role.startsWith('process_'))?source.entity.startsWith('sensor.'):role.startsWith('key_')?source.entity.startsWith('button.'):source.entity.startsWith('button.')||source.entity.startsWith('switch.'))))return fail('Choose a compatible HASS.Agent endpoint');
     if(source&&Object.entries(device.computer_io||{}).some(([k,x])=>k!==role&&(x.foundation_device_registry_id!==source.native_device_id||x.entity===source.entity)))return fail('Choose distinct endpoints on the same native HASS.Agent device');
     if(source&&Object.values(d.doc.rooms||{}).some(r=>Object.values(r.devices||{}).some(x=>(x.physical_id||x.entity)!==(device.physical_id||device.entity)&&Object.values(x.computer_io||{}).some(b=>b.foundation_device_registry_id===source.native_device_id))))return fail('This HASS.Agent device is assigned to another computer');
-    rhiMmWholeForPhysical(d,device,x=>{x.computer_io=x.computer_io||{};if(!source)delete x.computer_io[role];else x.computer_io[role]={entity:source.entity,foundation_concept:'computer_io',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:'mqtt',control_approved:true};if(!Object.keys(x.computer_io).length)delete x.computer_io;});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{x.computer_io=x.computer_io||{};if(!source)delete x.computer_io[role];else x.computer_io[role]={entity:source.entity,foundation_concept:'computer_io',foundation_candidate_id:source.candidate,foundation_entity_registry_id:source.entity_registry_id,foundation_config_entry_id:source.config_entry_id,foundation_device_registry_id:source.native_device_id,foundation_provider:'mqtt',control_approved:true};if(!Object.keys(x.computer_io).length)delete x.computer_io;});d.dirty=true;
   }
-  else if(key==='device_role'&&device){device.role=value;d.dirty=true;}
+  else if(key==='device_role'&&device&&!ownerMode){device.role=value;d.dirty=true;}
   else if(key==='device_power'&&device){
     if(!['native','passive'].includes(value))return fail('Unknown power behaviour');
-    rhiMmWholeForPhysical(d,device,x=>{x.power_mode=value;});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{x.power_mode=value;});d.dirty=true;
   }
   else if(key==='device_cec'&&device){
-    rhiMmWholeForPhysical(d,device,x=>{x.hdmi_cec_enabled=checked;});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{x.hdmi_cec_enabled=checked;});d.dirty=true;
   }
   else if(key==='device_delay'&&device){
-    if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');
-    rhiMmWholeForPhysical(d,device,x=>{x.post_power_on_delay_ms=int;});d.dirty=true;
+    if(!Number.isInteger(int)||int<0||int>(d.deviceContract?.max_step_delay_ms??30000))return fail('Delay must be 0–30000 ms');
+    rhiMmWholeEditDevice(device,x=>{x.post_power_on_delay_ms=int;});d.dirty=true;
   }
   else if(key==='device_wol_mode'&&device){
     if(!['native','directed'].includes(value))return fail('Unknown Wake-on-LAN mode');
     if(value==='native'){
-      rhiMmWholeForPhysical(d,device,x=>{x.wol_enabled=false;});
+      rhiMmWholeEditDevice(device,x=>{x.wol_enabled=false;});
     }else{
       if(!device.entity.startsWith('media_player.')&&!device.entity.startsWith('remote.')&&
          !(device.foundation_concept==='network'&&device.entity.startsWith('device_tracker.')))
@@ -3635,7 +3816,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
       const action={action:'wake_on_lan.send_magic_packet',
         data:{mac,broadcast_port:existing?.broadcast_port??9,
           ...(existing?.broadcast_address?{broadcast_address:existing.broadcast_address}:{})}};
-      rhiMmWholeForPhysical(d,device,x=>{
+      rhiMmWholeEditDevice(device,x=>{
         x.power_on=JSON.parse(JSON.stringify(action));x.wol_enabled=true;
       });
     }
@@ -3645,7 +3826,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     const mac=String(value||'').trim().replaceAll('-',':').toLowerCase();
     if(!rhiMmWholeVerifiedMacs(d,device).includes(mac))
       return fail('MAC must match the current native HA Device Registry for this exact source');
-    rhiMmWholeForPhysical(d,device,x=>{
+    rhiMmWholeEditDevice(device,x=>{
       if(x.power_on?.action!=='wake_on_lan.send_magic_packet')
         x.power_on={action:'wake_on_lan.send_magic_packet',data:{mac,broadcast_port:9}};
       else x.power_on.data.mac=mac;
@@ -3658,7 +3839,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     if(ip&&!(parts.length===4&&parts.every(p=>/^(?:0|[1-9][0-9]{0,2})$/.test(p)&&Number(p)<=255)&&ip!=='0.0.0.0'))
       return fail('Enter a valid IPv4 destination or leave empty for default broadcast');
     if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
-    rhiMmWholeForPhysical(d,device,x=>{
+    rhiMmWholeEditDevice(device,x=>{
       if(ip)x.power_on.data.broadcast_address=ip;
       else delete x.power_on.data.broadcast_address;
     });d.dirty=true;
@@ -3666,9 +3847,10 @@ function rhiMmWholeChange(d,key,value,checked=false){
   else if(key==='device_wol_port'&&device){
     if(!Number.isInteger(int)||int<1||int>65535)return fail('UDP port must be 1–65535');
     if(device.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('Enable WOL first');
-    rhiMmWholeForPhysical(d,device,x=>{x.power_on.data.broadcast_port=int;});d.dirty=true;
+    rhiMmWholeEditDevice(device,x=>{x.power_on.data.broadcast_port=int;});d.dirty=true;
   }
   else if(key==='activity_name'&&activity){activity.name=value;d.dirty=true;}
+  else if(key==='activity_favorite'&&activity){if(checked)activity.favorite=true;else delete activity.favorite;d.dirty=true;}
   else if(key==='activity_room_area'&&activity){
     if(value&&!room?.room_areas?.[value])return fail('Choose a defined Room Area');
     if(value)activity.room_area=value;else delete activity.room_area;
@@ -3687,7 +3869,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     activity.devices=[...cast];d.dirty=true;
   }
   else if(step&&parts[0]==='step_device'&&activity?.devices?.includes(value)){step.device=value;d.dirty=true;}
-  else if(step&&parts[0]==='step_type'&&RHI_MM_WHOLE_STEPS.includes(value)){
+  else if(step&&parts[0]==='step_type'&&(d.deviceContract?.step_types||RHI_MM_WHOLE_STEPS).includes(value)){
     const device=step.device;const delay_ms=step.delay_ms;
     const defaults={source:{candidates:[]},sound_mode:{candidates:[]},volume:{level:.5},mute:{value:false},
       remote_key:{value:''},delay:{milliseconds:0},wait_until:{states:['on'],timeout:15}};
@@ -3702,7 +3884,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
     else if(step.type==='remote_key')step.value=value;
     else if(step.type==='volume'){if(!Number.isFinite(int)||int<0||int>1)return fail('Volume must be 0–1');step.level=int;}
     else if(step.type==='mute'){if(!['true','false'].includes(value))return false;step.value=value==='true';}
-    else if(step.type==='delay'){if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');step.milliseconds=int;}
+    else if(step.type==='delay'){if(!Number.isInteger(int)||int<0||int>(d.deviceContract?.max_step_delay_ms??30000))return fail('Delay must be 0–30000 ms');step.milliseconds=int;}
     d.dirty=true;
   }
   else if(step&&parts[0]==='step_state'&&step.type==='wait_until'){step.states=[value];d.dirty=true;}
@@ -3712,7 +3894,7 @@ function rhiMmWholeChange(d,key,value,checked=false){
   }
   else if(step&&parts[0]==='step_override'&&!['delay','wait_until'].includes(step.type)){
     if(value==='')delete step.delay_ms;
-    else {if(!Number.isInteger(int)||int<0||int>30000)return fail('Delay must be 0–30000 ms');step.delay_ms=int;}
+    else {if(!Number.isInteger(int)||int<0||int>(d.deviceContract?.max_step_delay_ms??30000))return fail('Delay must be 0–30000 ms');step.delay_ms=int;}
     d.dirty=true;
   }else return fail('Unsupported editor input');
   d.error='';return true;
@@ -3750,9 +3932,9 @@ function rhiMmWholeAction(d,action,id,phase,index){
           !proposed.dell_displays||typeof proposed.dell_displays!=='object'||
           typeof proposed.enable_ux!=='boolean'||
           !Number.isInteger(proposed.default_step_delay_ms)||
-          proposed.default_step_delay_ms<0||proposed.default_step_delay_ms>30000)
+          proposed.default_step_delay_ms<0||proposed.default_step_delay_ms>(d.deviceContract?.max_step_delay_ms??30000))
         return fail('Invalid advanced configuration');
-      d.doc=proposed;d.rawDraft=null;d.room=Object.keys(proposed.rooms)[0]||'';
+      rhiMmWholeInstall(d,proposed,d.deviceCatalog);d.rawDraft=null;d.room=Object.keys(proposed.rooms)[0]||'';
       d.device='';d.activity='';d.dirty=true;d.error='';return true;
     }catch(_){return fail('Advanced configuration must be valid JSON');}
   }
@@ -3791,6 +3973,9 @@ function rhiMmWholeAction(d,action,id,phase,index){
     const matches=rhiMmWholeAssetBindings(d.doc.rooms[d.bulkRoom],asset);
     if(matches.length!==1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
     d.room=d.bulkRoom;d.device=matches[0][0];d.tab='devices';
+    const owner=rhiMmAssetId(matches[0][1]);
+    d.roomDeviceEditor=!d.deviceContract||!d.deviceCatalog?.[owner];
+    if(!d.roomDeviceEditor)d.deviceDetail=owner;
     d.settingsTab='devices';d.workspace='settings';d.error='';return true;
   }
   if(action==='repair_bindings'||action==='repair_binding'){
@@ -3801,17 +3986,60 @@ function rhiMmWholeAction(d,action,id,phase,index){
     for(const row of selected)
       Object.assign(d.doc.rooms[row.roomId].devices[row.key],row.metadata);
     d.room=selected[0].roomId;d.bulkRoom=d.room;d.device=selected[0].key;
-    d.tab='devices';d.dirty=true;d.error='';return true;
+    d.tab='devices';const asset=rhiMmAssetId(d.doc.rooms[d.room].devices[d.device]);
+    d.roomDeviceEditor=!d.deviceContract||!d.deviceCatalog?.[asset];
+    if(!d.roomDeviceEditor)d.deviceDetail=asset;
+    d.dirty=true;d.error='';return true;
   }
   if(action==='focus_issue'){
+    const asset=rhiMmWholeIssueAsset(d,id);
+    if(asset&&!d.localScope&&d.deviceContract){
+      d.tab='devices';d.settingsTab='devices';d.workspace='settings';
+      d.deviceDetail=asset;d.roomDeviceEditor=false;return true;
+    }
     const match=/^rooms\.([a-z][a-z0-9_]*)(?:\.(devices|activities)\.([a-z][a-z0-9_]*))?/.exec(id);
     if(!match||!d.doc.rooms[match[1]])return false;
     d.room=match[1];d.bulkRoom=d.room;d.tab=match[2]||'rooms';d.settingsTab=d.tab;d.workspace='settings';
-    if(match[2]==='devices')d.device=match[3];
+    if(match[2]==='devices'){
+      d.device=match[3];const linked=d.doc.rooms[d.room]?.devices?.[d.device];
+      const asset=linked&&rhiMmAssetId(linked);
+      const localField=/\.(name|role|room_area)$/.test(id);
+      d.roomDeviceEditor=localField||!d.deviceContract||!d.deviceCatalog?.[asset];
+      if(!d.roomDeviceEditor)d.deviceDetail=asset;
+    }
     if(match[2]==='activities')d.activity=match[3];
     return true;
   }
-  if(action==='tab'){if(!['discovery','rooms','devices','activities'].includes(id))return false;d.tab=id;d.error='';return true;}
+  if(action==='select_asset'){
+    if(!d.deviceCatalog?.[id]&&!Object.values(d.doc.rooms||{}).some(room=>
+      Object.values(room.devices||{}).some(dev=>(dev.asset_id||dev.physical_id||dev.entity)===id)))return fail('Unknown configured device');
+    d.deviceDetail=id;d.error='';return true;
+  }
+  if(action==='room_memberships'){
+    if(!room)return fail('Choose a room first');
+    d.tab='devices';d.settingsTab='devices';d.roomDeviceEditor=true;d.error='';return true;
+  }
+  if(action==='device_catalog'||action==='open_owner'){
+    if(action==='open_owner'){
+      const asset=room?.devices?.[d.device]&&rhiMmAssetId(room.devices[d.device]);
+      if(!asset||!d.deviceCatalog?.[asset])return fail('Unknown configured device');
+      d.deviceDetail=asset;
+    }
+    d.roomDeviceEditor=false;d.tab='devices';d.settingsTab='devices';d.error='';return true;
+  }
+  if(action==='clear_wol'){
+    const {device}=rhiMmWholeCurrent(d);
+    if(device?.power_on?.action!=='wake_on_lan.send_magic_packet')return fail('No Wake-on-LAN override');
+    delete device.power_on;delete device.wol_enabled;d.dirty=true;d.error='';return true;
+  }
+  if(action==='edit_membership'){
+    try{
+      const [roomId,key]=JSON.parse(id);
+      if(!d.doc.rooms[roomId]?.devices?.[key])return fail('Unknown room relationship');
+      d.room=roomId;d.device=key;d.roomDeviceEditor=true;d.tab='devices';d.settingsTab='devices';d.error='';return true;
+    }catch(_){return fail('Unknown room relationship');}
+  }
+  if(action==='tab'){if(!['discovery','rooms','devices','activities'].includes(id))return false;d.tab=id;d.roomDeviceEditor=false;d.error='';return true;}
   if(action==='select_room'){if(!d.doc.rooms[id])return false;d.room=id;d.bulkRoom=id;d.device='';d.activity='';d.error='';return true;}
   if(action==='clear_selected'){d.selectedAssets=[];d.error='';return true;}
   if(action==='catalog_detail'){
@@ -3841,18 +4069,18 @@ function rhiMmWholeAction(d,action,id,phase,index){
   }
   if(action==='bulk_remove'){
     if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose a room first');
-    const before=JSON.parse(JSON.stringify(d.doc.rooms)),selected=d.selectedAssets.slice();
+    const before=rhiMmWholeSnapshot(d),selected=d.selectedAssets.slice();
     const previousDirty=d.dirty,previousDevice=d.device;
     let removed=0;
     for(const assetId of selected){
       const asset=d.logicalDevices.find(x=>x.asset_id===assetId);
-      if(!asset){d.doc.rooms=before;d.dirty=previousDirty;d.device=previousDevice;
+      if(!asset){rhiMmWholeInstall(d,before);d.dirty=previousDirty;d.device=previousDevice;
         return fail('Unknown selected device');}
       const exists=rhiMmWholeAssetBindings(d.doc.rooms[d.bulkRoom],asset).length;
       if(!exists)continue;
       if(!rhiMmWholeAction(d,'remove_catalog',assetId)){
         const message=d.error;
-        d.doc.rooms=before;d.dirty=previousDirty;d.device=previousDevice;
+        rhiMmWholeInstall(d,before);d.dirty=previousDirty;d.device=previousDevice;
         return fail('No devices unassigned: '+message);
       }
       removed++;
@@ -3862,9 +4090,9 @@ function rhiMmWholeAction(d,action,id,phase,index){
   }
   if(action==='bulk_assign'){
     if(!d.bulkRoom||!d.doc.rooms[d.bulkRoom])return fail('Choose a room for assignment');
-    const before=JSON.parse(JSON.stringify(d.doc.rooms)),selected=d.selectedAssets.slice();
+    const before=rhiMmWholeSnapshot(d),selected=d.selectedAssets.slice();
     const previous={room:d.room,device:d.device,tab:d.tab,dirty:d.dirty,detailAsset:d.detailAsset,newSource:d.newSource};
-    const restore=()=>{d.doc.rooms=before;Object.assign(d,previous);};
+    const restore=()=>{rhiMmWholeInstall(d,before);Object.assign(d,previous);};
     let done=0;
     for(const assetId of selected){
       const asset=d.logicalDevices.find(x=>x.asset_id===assetId);
@@ -3893,8 +4121,13 @@ function rhiMmWholeAction(d,action,id,phase,index){
     const existing=rhiMmWholeAssetBindings(target,asset);
     if(existing.length>1)return fail('Ambiguous or missing room binding. Review the native source and room assignments.');
     if(existing.length===1){d.device=existing[0][0];d.detailAsset=id;d.tab='discovery';d.error='';return true;}
-    const candidate=(asset.candidates||[]).find(x=>x.entity_id.startsWith('media_player.'))||
-      asset.candidates?.[0];
+    const owner=d.deviceCatalog?.[id];
+    const media=(asset.candidates||[]).filter(x=>x.entity_id.startsWith('media_player.'));
+    const candidate=owner?(asset.candidates||[]).find(x=>x.entity_id===owner.entity&&
+      x.concept===owner.foundation_concept&&x.candidate_id===owner.foundation_candidate_id):
+      media.find(x=>x.provider==='androidtv_remote')&&new Set(media.map(x=>x.concept)).size>1?null:
+      media[0]||asset.candidates?.[0];
+    if(!candidate)return fail('Choose the exact display or source in Devices before assigning this device');
     const index=d.sources.findIndex(s=>s.entity===candidate?.entity_id&&
       s.candidate===candidate?.candidate_id&&s.concept===candidate?.concept);
     if(index<0)return fail('Foundation source identity changed; reopen configuration');
@@ -3936,7 +4169,8 @@ function rhiMmWholeAction(d,action,id,phase,index){
     if(!room)return fail('Select a room first');
     const source=d.sources[Number(d.newSource)];
     if(!source||!source.entity||!source.candidate)return fail('Choose a Foundation-supported source');
-    if(Object.values(d.doc.rooms||{}).some(r=>Object.values(r.devices||{}).some(x=>x.computer_agent?.entity===source.entity)))return fail('This media endpoint is already linked to a computer');
+    if((d.deviceCatalog?Object.values(d.deviceCatalog):Object.values(d.doc.rooms||{}).flatMap(r=>Object.values(r.devices||{})))
+      .some(x=>x.computer_agent?.entity===source.entity))return fail('This media endpoint is already linked to a computer');
     if(source.concept==='network'&&d.sources.some(s=>s.concept!=='network'&&s.provider!=='hass_agent'&&
        (s.network_observations||[]).some(x=>x.candidate_id===source.candidate)))
       return fail('Choose the existing AV device; this tracker supplies its network information');
@@ -4057,7 +4291,7 @@ function rhiMmWholeAction(d,action,id,phase,index){
 
 // RHI Multimedia Premium: one-card native Home Assistant dashboard.
 // Core owns look/feel; backend owns meaning and all physical writers.
-const RHI_MM_UX_VERSION = '0.1.24';
+const RHI_MM_UX_VERSION = '0.1.25';
 const RHI_MM_HERO_ASSETS = Object.freeze({
   multimedia: 'multimedia-overview.svg',
   activities: 'multimedia-activities.svg',
@@ -4174,7 +4408,7 @@ function rhiMmOptionDefaults(step){
   }
   return values;
 }
-const RHI_MM_SAVE_STEPS=new Set(['review','yaml','room_settings','tv_wake','speech_endpoint','harmony_owner','cec_device','cec_activity','button_value','macro_create','quick_edit_activity','script_defaults','dell_display','dell_remove']);
+const RHI_MM_SAVE_STEPS=new Set(['review','yaml','room_settings','tv_wake','speech_endpoint','harmony_owner','cec_device','cec_activity','button_value','macro_create','quick_edit_activity','script_defaults','dell_display','dell_remove','device_add','device_settings','device_edit','device_assign','device_unassign','device_remove']);
 class HomeBrainMultimediaCard extends HTMLElement {
   static getStubConfig() { return {type:'custom:homebrain-multimedia-card'}; }
   constructor() {
@@ -4404,7 +4638,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }else if(choice==='review'&&this._pendingNavigation){
         if(this._optionsBusy)return;
         if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
-          this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+          this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
           await this.submitOptions({save:true});
         }else if(this._optionsStep){
           await this.submitOptions({save:true});
@@ -4430,6 +4664,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const chosen=category.getAttribute('data-mm-settings-category');
       if(['locations','devices','activities'].includes(chosen)){
         this._settingsCategory=chosen;this._activitySettingsStage='devices';this._lastSignature='';this.render();
+        if(chosen==='devices'&&this._hass?.user?.is_admin===true&&
+           typeof this._hass.callApi==='function'&&typeof this._hass.callWS==='function')
+          await this.openOptions({action:'complete_setup',category:'devices'});
       }
       return;
     }
@@ -4501,12 +4738,32 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(wholeAction&&this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
       event.preventDefault();
       const action=wholeAction.getAttribute('data-wh-action');
-      if(action==='specialist'){
+      if(action==='open_expert'){
+        if(!this.hasUnsavedOptions())await this.openOptions({action:'yaml'});
+        return;
+      }else if(action==='device_option'){
         const name=wholeAction.getAttribute('data-wh-id');
+        const asset=wholeAction.getAttribute('data-wh-asset')||'';
+        if(!this._wholeHome.deviceContract?.actions?.includes(name))return;
+        if(!this.hasUnsavedOptions()){
+          await this.openOptions({action:name,asset});return;
+        }
+        if(!(this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_device')){
+          this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
+        }
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
+        await this.submitOptions({specialist:name,asset});
+      }else if(action==='specialist'){
+        const name=wholeAction.getAttribute('data-wh-id');
+        // A clean workspace can open the same native object form directly.
+        // Never discard a dirty home draft to register an independent device.
+        if(name==='dell_add'&&!this.hasUnsavedOptions()){
+          await this.openOptions({action:'dell_add'});return;
+        }
         if(!(this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
           this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
         }
-        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({specialist:name});
       }else if(['capture_new','capture_update','capture_refresh'].includes(action)){
         if(this._wholeHome.rawDraft!=null)return;
@@ -4514,10 +4771,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(!capture||!(this._optionsStep.data_schema||[]).some(field=>field.name==='capture_request')){
           this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
         }
-        this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({visual:true,capture});
       }else if(action==='review'||action==='review_yaml'){
-        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({save:action==='review',visual:action==='review_yaml'});
       }else{
         const id=action==='apply_json'
@@ -4553,7 +4810,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
       index:option.hasAttribute('data-mm-option-index')?
         Number(option.getAttribute('data-mm-option-index')):null,
       device:option.getAttribute('data-mm-option-device')||'',
-      stepType:option.getAttribute('data-mm-option-type')||''});return;}
+      stepType:option.getAttribute('data-mm-option-type')||'',
+      category:option.getAttribute('data-mm-option-category')||''});return;}
     const visualOption=event.target?.closest?.('[data-mm-option-visual]');
     if(visualOption){event.preventDefault();await this.submitOptions({visual:true});return;}
     const submitOption=event.target?.closest?.('[data-mm-option-submit]');
@@ -4796,7 +5054,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     await this.openOptions({action:'complete_setup',room,activity,device});
     if(this._optionsStep?.step_id!=='complete_setup'||!this._wholeHome)return;
     const d=this._wholeHome;
-    if(roomEdits.has(action))d.tab=action==='edit_room'?'devices':'rooms';
+    if(roomEdits.has(action)){d.tab=action==='edit_room'?'devices':'rooms';d.roomDeviceEditor=action==='edit_room';}
     else if(activityEdits.has(action)||activity||['script_step','button_mapping','macro_manage','cec_activity'].includes(action))d.tab='activities';
     else d.tab='rooms';
     d.workspace='settings';d.settingsTab=d.tab;
@@ -4817,16 +5075,16 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._optionRefresh();
     if(specialistEdits.has(action)&&!['script_defaults','script_step'].includes(action)&&
        (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
-      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      this._optionsData.yaml_text=rhiMmWholeWireText(d);
       await this.submitOptions({specialist:action});
     }else if(action==='script_step'&&!['up','down','edit'].includes(operation)&&
        (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
-      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      this._optionsData.yaml_text=rhiMmWholeWireText(d);
       await this.submitOptions({specialist:'script_step'});
     }
   }
   async openOptions({action,room='',activity='',scope='',id='',
-    phase='',operation='',index=null,device='',stepType=''}) {
+    phase='',operation='',index=null,device='',stepType='',asset='',category=''}) {
     if(!this._hass?.user?.is_admin||this._optionsBusy)return;
     if(this.hasUnsavedOptions()){this._optionsError=this.t('whole_home_leave_warning');this._optionRefresh();return;}
     const oldStep=this._optionsStep;
@@ -4844,7 +5102,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }
       if(epoch!==this._optionsEpoch)return;
       const step=await rhiMmOptionsBegin(this._hass,{
-        action,room,activity,scope,id,phase,operation,index,device,stepType});
+        action,room,activity,scope,id,phase,operation,index,device,stepType,asset});
       if(epoch!==this._optionsEpoch){
         await rhiMmOptionsCancel(this._hass,step);
         return;
@@ -4858,16 +5116,22 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._wholeHome=step.step_id==='complete_setup'?rhiMmWholeFromStep(step):null;
       if(this._wholeHome){
         this._wholeHome.workspace=this.currentRoute().view==='discovery'?'discovery':'settings';
-        this._wholeHome.tab=this._wholeHome.workspace==='discovery'?'discovery':'rooms';
-        this._wholeHome.settingsTab='rooms';
+        const selectedCategory=['devices','rooms','activities'].includes(category)?category:'rooms';
+        this._wholeHome.tab=this._wholeHome.workspace==='discovery'?'discovery':selectedCategory;
+        this._wholeHome.settingsTab=selectedCategory;
       }
       // Contextual Device Settings reuses the single Options Flow draft.
       if(this._wholeHome&&room&&this._wholeHome.doc.rooms[room]){
         this._wholeHome.room=room;this._wholeHome.tab=activity?'activities':device?'devices':'rooms';
         this._wholeHome.settingsTab=this._wholeHome.tab;
         if(activity&&this._wholeHome.doc.rooms[room].activities?.[activity])this._wholeHome.activity=activity;
-        if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
+        if(device&&this._wholeHome.doc.rooms[room].devices?.[device]){
           this._wholeHome.device=device;
+          const linked=this._wholeHome.doc.rooms[room].devices[device];
+          const assetId=rhiMmAssetId(linked);
+          this._wholeHome.roomDeviceEditor=!this._wholeHome.deviceContract||!this._wholeHome.deviceCatalog?.[assetId];
+          if(!this._wholeHome.roomDeviceEditor)this._wholeHome.deviceDetail=assetId;
+        }
       }
     }catch(error){
       if(epoch===this._optionsEpoch){this._wholeHomeFlow=false;this._optionsError=this.settingsFlowFailure(error);}
@@ -4875,7 +5139,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }
   }
-  async submitOptions({save=false,visual=false,specialist='',capture=null}={}){
+  async submitOptions({save=false,visual=false,specialist='',capture=null,asset=''}={}){
     const step=this._optionsStep;
     if(!step||this._optionsBusy||!this._hass?.user?.is_admin)return;
     if(!(step.data_schema||[]).every(rhiMmOptionSupported)){
@@ -4893,6 +5157,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         payload.specialist_action=specialist;
         payload.specialist_room=specialist?this._wholeHome?.room||'':'';
         payload.specialist_activity=specialist?this._wholeHome?.activity||'':'';
+        if((step.data_schema||[]).some(field=>field.name==='specialist_device'))payload.specialist_device=specialist?asset:'';
       }
       let response=await rhiMmOptionsAdvance(this._hass,step,payload);
       if(epoch!==this._optionsEpoch)return;
@@ -4928,13 +5193,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
             // Backend parsed the exact submitted document, including missing bindings.
             // Keep one semantic draft, not a second raw editor requiring conversion.
             const parsed=JSON.parse(this._wholeHome.editableDraft);
-            this._wholeHome.doc=parsed;this._wholeHome.rawDraft=null;this._wholeHome.editableDraft='';
+            rhiMmWholeInstall(this._wholeHome,parsed,this._wholeHome.deviceCatalog);this._wholeHome.rawDraft=null;this._wholeHome.editableDraft='';
             rhiMmWholeCurrent(this._wholeHome);
           }else if(!response.errors?.base&&(step.step_id!=='complete_setup'||visual)){
             const normalized=rhiMmWholeFromStep(response);
             // Refresh native evidence too: specialist edits may alter the
             // available choices, but the active room and category stay put.
-            for(const key of ['doc','areas','floors','areaFloors','sources','computerIO','captureCandidates','logicalDevices','proposedRooms','proposalExceptions'])
+            for(const key of ['doc','areas','floors','areaFloors','sources','computerIO','captureCandidates','logicalDevices','proposedRooms','proposalExceptions','deviceCatalog','deviceContract','canonicalWire'])
               this._wholeHome[key]=normalized[key];
             this._wholeHome.rawDraft=null;
             if(capture?.refresh===true){
@@ -5078,11 +5343,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
         step.description_placeholders||{}):null;
     const unsupported=!!step&&!(step.data_schema||[]).every(rhiMmOptionSupported);
     const nativeReview=step?.step_id==='review'&&typeof step.description_placeholders?.change_summary==='string';
-    const guidance=nativeReview?step.description_placeholders.change_summary:errors.base&&step?.step_id==='yaml'?'Draft not saved. Correct the issue below and try again.':description||step?.description_placeholders?.note;
+    const guidance=nativeReview?step.description_placeholders.change_summary:errors.base&&['yaml','device_edit'].includes(step?.step_id)?'Draft not saved. Correct the issue below and try again.':description||step?.description_placeholders?.note;
     const stageTitle=step?.step_id==='activity_devices'?this.t('choose_devices'):
       step?.step_id==='activity_device_order'?this.t('tune_actions'):null;
     return `${this.leaveDecision()}<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
-      ${this._wholeHomeFlow&&step?.step_id!=='review'?`<p class='mm-wh-draft'>${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.name||'Multimedia')} · ${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.activities?.[this._wholeHome?.activity]?.name||'Settings')}</p>`:''}
+      ${this._wholeHomeFlow&&step?.step_id!=='review'&&step?.step_id!=='dell_display'&&!step?.step_id?.startsWith('device_')?`<p class='mm-wh-draft'>${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.name||'Multimedia')} · ${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.activities?.[this._wholeHome?.activity]?.name||'Settings')}</p>`:''}
       <h3>${escape(stageTitle||label||this.t('setup_editor'))}</h3>
       ${this._optionsDirty?`<span class='mm-wh-draft'>Unsaved changes</span>`:''}
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
@@ -5093,7 +5358,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       ${step?.type==='form'?`<div class="mm-option-fields">
         ${(step.data_schema||[]).filter(field=>!['visual_edit','return_to_yaml'].includes(field.name)&&!(this._wholeHomeFlow&&field.name==='return_to_setup')&&!(nativeReview&&field.name==='confirm'))
           .map(field=>this.optionInput(step,field)).join('')}</div>`:''}
-      ${step?.step_id==='yaml'?`<div class="mm-setup-actions"><button type="button" data-mm-copy="yaml">${rhiUxEscape(this.t('copy_yaml'))}</button><button type="button" data-mm-paste="yaml">${rhiUxEscape(this.t('paste_yaml'))}</button><span data-mm-clipboard-status role="status"></span></div>`:''}
+      ${['yaml','device_edit'].includes(step?.step_id)?`<div class="mm-setup-actions"><button type="button" data-mm-copy="yaml">${rhiUxEscape(this.t('copy_yaml'))}</button><button type="button" data-mm-paste="yaml">${rhiUxEscape(this.t('paste_yaml'))}</button><span data-mm-clipboard-status role="status"></span></div>`:''}
       <div class="mm-setup-actions">
         ${step?.step_id==='yaml'&&(step.data_schema||[]).some(field=>field.name==='visual_edit')?`<button type='button' data-mm-option-visual ${this._optionsBusy?'disabled':''}>Edit visually</button>`:''}
         ${step&&(this._wholeHomeFlow&&(step.step_id==='review'||(step.data_schema||[]).some(field=>field.name==='return_to_setup'))||step.step_id==='review'&&(step.data_schema||[]).some(field=>field.name==='return_to_yaml'))?
@@ -6013,7 +6278,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }));
     const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length||cec.length?`<div class="mm-device-list">${cec.join('')}${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
   discovery(model){
-    if(this._optionsStep?.step_id==='complete_setup'&&this._hass?.user?.is_admin===true)
+    if((this._optionsStep||this._optionsBusy||this._optionsError)&&this._hass?.user?.is_admin===true)
       return this.renderOptionsEditor();
     return `<section class="mm-surface mm-discovery-launch">
       <h3>Discover and assign devices</h3>
@@ -6021,7 +6286,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
          filtering and bulk assignment. Configure WOL, HDMI-CEC, roles and
          native sources in one Review and Save.</p>
       ${this._hass?.user?.is_admin===true?
-        '<button type="button" data-mm-option-action="complete_setup">Open device discovery</button>':
+        `<div class='mm-setup-actions'><button type="button" data-mm-option-action="complete_setup">Open device discovery</button><button type='button' data-mm-option-action='dell_add'>${this.t('wh_add_display')}</button></div>${this._optionsNotice?this.renderOptionsEditor():''}`:
         '<p>Ask your Home Assistant administrator to configure devices.</p>'}
     </section>`;
   }
@@ -6273,7 +6538,12 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         ${selected?`data-mm-option-room="${esc(selected.room.id)}"`:''}>${this.t('setup_add_activity')}</button>
       <button type="button" data-mm-option-action="script_defaults">${this.t('settings_default_delay')}</button>
       ${selected?`<span class="mm-muted">${esc(selected.room.default_step_delay_ms??0)} ms</span>`:''}
-      </div>`:category==='locations'?`<button type="button" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>`:'';
+      </div>`:category==='locations'?`<button type="button" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>`:
+      `<div class="mm-setup-actions">
+        <button type="button" data-mm-option-action="complete_setup" data-mm-option-category="devices">${this.t('devices')}</button>
+        <button type="button" data-mm-option-action="device_add">${this.t('wh_add_device_native')}</button>
+        <button type="button" data-mm-option-action="dell_add">${this.t('wh_add_display')}</button>
+      </div>`;
     return `<section class="mm-section mm-settings">
       <div class="mm-heading"><h2>${this.t('settings')}</h2>
         ${manage?`<div class='mm-settings-primary-actions'>
@@ -6293,6 +6563,7 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
             `<div class="mm-settings-heading"><h3>${esc(selected?.label||classes.find(c=>c[0]===category)?.[1]||'')}</h3>
               ${scopeButton}</div>
               ${stageBar}${add}
+              ${manage&&category==='devices'?`<div class='mm-setup-actions'><button type='button' data-mm-option-action='dell_add'>${this.t('wh_add_display')}</button></div>`:''}
               <div class="mm-settings-choices">${itemRows}</div>
               ${details}
               ${this._optionsNotice?this.renderOptionsEditor():''}`}

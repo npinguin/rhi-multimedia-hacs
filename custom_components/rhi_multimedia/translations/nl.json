@@ -151,7 +151,8 @@
         "data": {
           "activity_type": "Type activiteit",
           "activity_name": "Activiteitsnaam",
-          "primary_source": "Primaire mediabron"
+          "primary_source": "Primaire mediabron",
+          "confirm_remove": "Bevestig verwijdering van afhankelijke acties, knoptoewijzingen en applicatiekeuze"
         }
       },
       "route": {
@@ -228,7 +229,7 @@
         "data": {
           "activity_name": "Naam van de activiteit",
           "primary_source": "Deelnemende native mediaspeler (optioneel)",
-          "confirm_source_steps": "Bevestig verwijdering van opdrachten voor de ontkoppelde speler",
+          "confirm_source_steps": "Bevestig verwijdering van afhankelijke acties en knoptoewijzingen",
           "favorite": "Favoriet · activiteit of kanaal met één druk"
         }
       },
@@ -312,6 +313,75 @@
           "tts": "Spraakprovider",
           "confirm": "Bevestig het apparaat en alle gekoppelde ruimtes"
         }
+      },
+      "device_add": {
+        "title": "Toestel toevoegen",
+        "description": "Selecteer één exact native toestel. Een netwerktracker toont enkel bereikbaarheid, niet de Windows-status. Geen ruimte of fysiek commando nodig.\n{validation_detail}",
+        "data": {
+          "name": "Naam",
+          "source": "Native bron",
+          "control_approved": "Deze exacte native koppeling goedkeuren"
+        }
+      },
+      "device_select": {
+        "title": "Toestel selecteren",
+        "data": {
+          "device": "Geconfigureerd toestel"
+        }
+      },
+      "device_edit": {
+        "title": "Toestel – Expert YAML",
+        "description": "Wijzig het centrale toestelrecord. Ruimtekoppelingen blijven behouden. Native identiteit kan niet stilzwijgend wijzigen.\n{validation_detail}",
+        "data": {
+          "yaml_text": "Toestelconfiguratie"
+        }
+      },
+      "device_remove": {
+        "title": "Toestel verwijderen",
+        "description": "Ontkoppel eerst alle ruimtes. Het native toestel blijft in Home Assistant.\n{validation_detail}",
+        "data": {
+          "confirm_remove": "Verwijderen bevestigen"
+        }
+      },
+      "device_assign": {
+        "title": "Toestel aan ruimte koppelen",
+        "description": "Kies of maak een ruimte. Alleen de koppeling verandert.\n{validation_detail}",
+        "data": {
+          "room": "Ruimte",
+          "room_name": "Naam nieuwe ruimte",
+          "area": "Home Assistant-ruimte (optioneel)"
+        }
+      },
+      "device_unassign": {
+        "title": "Toestel ontkoppelen",
+        "description": "Verwijder de gekozen ruimtekoppeling. Het toestel en de instellingen blijven behouden. Verwijder het eerst uit betrokken activiteiten.\n{validation_detail}",
+        "data": {
+          "membership": "Ruimtekoppeling",
+          "confirm_remove": "Ontkoppeling bevestigen"
+        }
+      },
+      "device_settings": {
+        "title": "Toestelinstellingen",
+        "description": "Wijzig het toestel zelf, niet de ruimte. Wake-on-LAN gebruikt geverifieerde MAC-adressen. Geavanceerde providerinstellingen blijven beschikbaar via Expert YAML.\n{validation_detail}",
+        "data": {
+          "name": "Naam",
+          "control_approved": "Deze exacte native koppeling goedkeuren",
+          "power_mode": "Voedingsmodus",
+          "post_power_on_delay_ms": "Wachttijd na inschakelen (ms)",
+          "hdmi_cec_enabled": "HDMI-CEC",
+          "wol_enabled": "Wake-on-LAN",
+          "wol_mac": "Geverifieerd MAC-adres",
+          "wol_destination": "LAN IPv4-adres (optioneel)",
+          "wol_port": "UDP-poort",
+          "wol_clear": "Opgeslagen Wake-on-LAN-override verwijderen (heeft voorrang op Wake-on-LAN-velden)"
+        }
+      },
+      "devices": {
+        "title": "Toestellen",
+        "description": "Voeg een toestel toe of configureer het onafhankelijk van de ruimtes. Gebruik Expert YAML voor geavanceerde providerinstellingen.",
+        "data": {
+          "task": "Toestelactie"
+        }
       }
     },
     "error": {
@@ -339,7 +409,7 @@
       "dell_duplicate_host": "Een ander Dell-scherm gebruikt dit adres al.",
       "dell_host_immutable": "Je kunt de netwerkidentiteit niet stilzwijgend vervangen. Ontkoppel en registreer het andere scherm opnieuw.",
       "source_route_required": "Kies minstens één actuele native TV-/receiveringang om de route of de gewijzigde speler te bevestigen.",
-      "confirm_source_steps": "Bevestig het verwijderen van opdrachten van de ontkoppelde speler.",
+      "confirm_source_steps": "Bevestig verwijdering van afhankelijke acties, knoptoewijzingen en applicatiekeuze",
       "cec_invalid": "Kies twee werkelijk CEC-ingeschakelde, in Foundation geselecteerde apparaten met geverifieerde HDMI-verbinding. Doel vereist een echte native inputroute en geen conflicterende CEC-aansturing.",
       "cec_in_use": "Deze gedeelde bron wordt nog door een CEC-activiteit gebruikt. Verwijder eerst die verbinding.",
       "cec_needs_endpoints": "Deze activiteit vereist een CEC-ingeschakelde speler/receiver en een CEC-doel met native inputroute.",

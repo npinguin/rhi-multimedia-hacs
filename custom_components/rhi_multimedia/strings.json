@@ -151,7 +151,8 @@
         "data": {
           "activity_type": "Activity type",
           "activity_name": "Activity name",
-          "primary_source": "Primary media source"
+          "primary_source": "Primary media source",
+          "confirm_remove": "Confirm removal of dependent actions, mappings and application selection"
         }
       },
       "route": {
@@ -228,7 +229,7 @@
         "data": {
           "activity_name": "Activity name",
           "primary_source": "Participating native media player (optional)",
-          "confirm_source_steps": "Confirm removal of commands belonging to the disconnected player",
+          "confirm_source_steps": "Confirm removal of dependent actions and mappings",
           "favorite": "Favorite · one-tap activity / channel preset"
         }
       },
@@ -312,6 +313,75 @@
           "tts": "Speech provider",
           "confirm": "Confirm the selected asset and all its room bindings"
         }
+      },
+      "device_add": {
+        "title": "Add device",
+        "description": "Select one exact discovered native endpoint. A network tracker represents connectivity only; approval does not prove Windows readiness. No room assignment or physical action is required.\n{validation_detail}",
+        "data": {
+          "name": "Device name",
+          "source": "Native source",
+          "control_approved": "Approve this exact native binding"
+        }
+      },
+      "device_select": {
+        "title": "Select device",
+        "data": {
+          "device": "Configured device"
+        }
+      },
+      "device_edit": {
+        "title": "Device – Expert YAML",
+        "description": "Edit the owning device record. Room links remain unchanged. Native identity cannot be silently replaced.\n{validation_detail}",
+        "data": {
+          "yaml_text": "Device configuration"
+        }
+      },
+      "device_remove": {
+        "title": "Remove device",
+        "description": "Unassign from every room before removing the device. No native vendor device is deleted.\n{validation_detail}",
+        "data": {
+          "confirm_remove": "Confirm removal"
+        }
+      },
+      "device_assign": {
+        "title": "Assign device to room",
+        "description": "Choose a room or create one. Only the room relationship changes.\n{validation_detail}",
+        "data": {
+          "room": "Room",
+          "room_name": "New room name",
+          "area": "Home Assistant area (optional)"
+        }
+      },
+      "device_unassign": {
+        "title": "Unassign device",
+        "description": "Remove the selected room relationship. The device and its settings remain. Remove it from affected activities first.\n{validation_detail}",
+        "data": {
+          "membership": "Room relationship",
+          "confirm_remove": "Confirm unassignment"
+        }
+      },
+      "device_settings": {
+        "title": "Device settings",
+        "description": "Edit the device itself, not a room. Wake-on-LAN uses verified native MAC evidence. Advanced provider configuration remains available in Expert YAML.\n{validation_detail}",
+        "data": {
+          "name": "Device name",
+          "control_approved": "Approve this exact native binding",
+          "power_mode": "Power mode",
+          "post_power_on_delay_ms": "Power-on delay (ms)",
+          "hdmi_cec_enabled": "HDMI-CEC",
+          "wol_enabled": "Wake-on-LAN",
+          "wol_mac": "Verified MAC",
+          "wol_destination": "LAN IPv4 address (optional)",
+          "wol_port": "UDP port",
+          "wol_clear": "Clear saved Wake-on-LAN override (takes precedence over Wake-on-LAN fields)"
+        }
+      },
+      "devices": {
+        "title": "Devices",
+        "description": "Add or configure a device independently of its rooms. Use Expert YAML for advanced provider settings.",
+        "data": {
+          "task": "Device action"
+        }
       }
     },
     "error": {
@@ -339,7 +409,7 @@
       "dell_duplicate_host": "Another configured Dell display already uses this address.",
       "dell_host_immutable": "A linked display's network identity cannot be replaced. Unbind and register a new display.",
       "source_route_required": "Select at least one currently offered native TV/receiver input to confirm the route or the changed player.",
-      "confirm_source_steps": "Confirm that commands belonging to the disconnected player may be removed.",
+      "confirm_source_steps": "Confirm removal of dependent actions, mappings and application selection",
       "cec_invalid": "Select two genuinely CEC-enabled, Foundation-selected endpoints and a verified HDMI connection. The target must have one real native input route and no conflicting CEC controller.",
       "cec_in_use": "This shared endpoint is still referenced by a verified CEC activity; remove that link first.",
       "cec_needs_endpoints": "This activity needs a selected CEC-enabled upstream player/receiver and a CEC-enabled target with a native input route.",

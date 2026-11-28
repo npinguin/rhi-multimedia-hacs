@@ -20,9 +20,10 @@ from homeassistant.helpers.event import async_track_state_change_event
 from .experience import queue_native_update, cancel_native_update
 
 from .adapter import HAAdapter
-from .const import CONF_ROOMS, DOMAIN, STORE_VERSION
+from .const import CONFIG_VERSION, DOMAIN, STORE_VERSION
 from .engine import ActivityEngine, MediaError
-from .validation import native_state, reconciliation_changed, validate_rooms, validate_step_delay
+from .validation import (DEVICE_CATALOG, configuration_model, configuration_source, entry_rooms,
+                         native_state, reconciliation_changed, validate_rooms, validate_step_delay)
 from .foundation import (SELECTION_CHANGED_EVENT, register_with_foundation,
                           unregister_visuals_with_foundation, projection_source_reads)
 
@@ -46,13 +47,17 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     if hass.data.get(DOMAIN, {}).get("engine"):
         raise ValueError("RHI Multimedia supports one household configuration entry")
     register_with_foundation(hass)
-    configured = entry.options.get(CONF_ROOMS, entry.data.get(CONF_ROOMS, {}))
+    configured = entry_rooms(entry)
+    catalog = configuration_source(entry).get(DEVICE_CATALOG)
+    # One read-only runtime snapshot of the authoritative entry; engine rooms
+    # are a derived execution view, not a second configuration owner.
+    owner = {DEVICE_CATALOG: deepcopy(catalog)} if catalog is not None else {}
     if not configured:
         # Empty room configuration can still own an explicitly configured
         # native Dell display that Foundation must select before room binding.
         # No activity engine, room commands or synthetic projections exist yet.
         dell_configured = bool(entry.options.get("dell_displays", entry.data.get("dell_displays", {})))
-        hass.data[DOMAIN] = {"entry": entry, "phase": "awaiting_foundation_configuration",
+        hass.data[DOMAIN] = {**owner, "entry": entry, "phase": "awaiting_foundation_configuration",
                              "dell_prepared": dell_configured}
         # Supported logical AV devices are read-only HA projections even
         # before the first room/activity. No command service or activity engine
@@ -69,7 +74,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     # command rights by inventing mappings during the upgrade.
     if any("foundation_candidate_id" not in dev or "foundation_concept" not in dev
            for spec in rooms.values() for dev in spec["devices"].values()):
-        hass.data[DOMAIN] = {"entry": entry, "phase": "legacy_foundation_review_required"}
+        hass.data[DOMAIN] = {**owner, "entry": entry, "phase": "legacy_foundation_review_required"}
         _register_entry_listeners(hass, entry)
         return True
     # Missing/revoked selections degrade only the affected actions. Retain the
@@ -98,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
             state.error = "Home Assistant restarted; recover or stop to reconcile physical device state"
             state.progress = "Recovery required"
     adapter.persisted = previous
-    runtime = {"entry": entry, "engine": engine, "adapter": adapter}
+    runtime = {**owner, "entry": entry, "engine": engine, "adapter": adapter}
     # Compare with the authoritative loaded options, excluding the purely
     # visual flag that does not require a runtime reload. No second store.
     loaded_options = deepcopy({k: v for k, v in entry.options.items() if k != "enable_ux"})
@@ -332,11 +337,29 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry) -> bool:
-    """Migrate the entry schema only; never invent approved source bindings."""
-    if entry.version > 2:
+    """Atomically replace legacy room copies with device ownership and links."""
+    if entry.version > CONFIG_VERSION:
         return False
-    if entry.version < 2:
-        hass.config_entries.async_update_entry(entry, version=2)
+    if entry.version < CONFIG_VERSION:
+        try:
+            model = configuration_model(configuration_source(entry))
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            # The original entry stays intact. Do not select one copy, grant
+            # authority or start a partially migrated room engine.
+            _LOGGER.error("Multimedia migration requires configuration repair: %s", exc)
+            return False
+        data, options = dict(entry.data), dict(entry.options)
+        # Options is the sole mutable configuration owner, including entries
+        # originally created by the older named wizard. Do not leave a stale
+        # second copy of devices/rooms in immutable initial data.
+        data.pop("rooms", None)
+        data.pop(DEVICE_CATALOG, None)
+        options.update(model)
+        for field in ("dell_displays", "enable_ux", "default_step_delay_ms"):
+            if field in data:
+                options.setdefault(field, data.pop(field))
+        hass.config_entries.async_update_entry(
+            entry, version=CONFIG_VERSION, data=data, options=options)
     return True
 
 

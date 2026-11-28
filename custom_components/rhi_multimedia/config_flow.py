@@ -15,17 +15,25 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 
-from .const import CONF_ROOMS, CONF_TITLE, DOMAIN
+from .const import CONFIG_VERSION, CONF_TITLE, DOMAIN
 from .dell_c8621qt import valid_host
 from .engine import READY_STATES, execution_in_progress
 from .foundation import authorized_source, reviewed_native_source, selected_native_macs, projection_source_reads
 from .source_discovery import (area_choices, av_sources, discovered_av_sources,
-                               logical_av_catalog, proposed_room_setup, source_lists, speech_player_eligible,
+                               logical_av_catalog, native_asset_key, proposed_room_setup, source_lists, speech_player_eligible,
                                native_source_evidence,
                                tts_choices)
 from .validation import (ACTIVITY_BUTTONS, BUTTON_ACTIONS, BUTTON_VALUE_ACTIONS,
                          native_state, native_choices, native_feature_mask, activity_computer_device, cec_links_for_activity, route_status, validate_action,
-                         validate_rooms, validate_step_delay)
+                         validate_rooms, validate_step_delay, logical_asset_id, wol_data, set_wol_policy,
+                         configuration_source, split_device_model, configuration_options,
+                         DEVICE_CATALOG, DEVICE_LABEL, DEFAULT_POWER_MODE, MEMBERSHIP_FIELDS,
+                         configuration_model, expand_device_model, change_device, change_membership, merge_device_model, reconcile_scoped_device_edits, ASSET_REF,
+                         ACTIVITY_TYPES, ACTIVITY_VIDEO_TYPES, ACTIVITY_PLAYER_TYPES,
+                         media_roles, device_concept, activity_cast_error, ALLOWED_STEPS,
+                         DEFAULT_STEP_DELAY_MS, DEFAULT_HDMI_CEC_ENABLED, DEFAULT_WOL_PORT,
+                         MAX_STEP_DELAY_MS, MAX_TIMEOUT_SECONDS, NATIVE_WAIT_STATES,
+                         POWER_MODES, DEVICE_ROLES, PC_KEYS)
 
 NONE = "__none__"
 CUSTOM_AREA = "__custom_room__"
@@ -136,6 +144,10 @@ def _remapped_device(device: dict, entity_id: str) -> dict:
     """Preserve a durable asset when HA renames an approved native entity."""
     updated = deepcopy(device)
     previous_entity = updated["entity"]
+    if previous_entity != entity_id:
+        # An old entity-only binding still owns its original reservation.
+        updated.setdefault("physical_id", previous_entity)
+        updated.setdefault("asset_id", logical_asset_id(device))
     updated["entity"] = entity_id
     for action in ("power_on", "power_off"):
         for container in ("target", "data"):
@@ -160,41 +172,38 @@ def _source_ref(flow, entity_id: str, concept: str) -> dict:
         return deepcopy(previous)
     if candidate is None:
         raise ValueError(f"{entity_id}: not in supported Foundation/{concept} discovery")
-    renamed = [dev for dev in old.values() if dev.get("foundation_concept") == concept
-               and dev.get("foundation_candidate_id") == candidate.candidate_id]
-    if len(renamed) == 1:
-        device = _remapped_device(renamed[0], entity_id)
-        identity = (device.get("physical_id", entity_id),
-                    device.get("asset_id", device.get("physical_id", entity_id)))
-        for other_room in flow._rooms.values():
-            for linked in other_room["devices"].values():
-                if (linked.get("foundation_concept") == concept
-                        and linked.get("foundation_candidate_id") == candidate.candidate_id):
-                    candidate_identity = (linked.get("physical_id", linked["entity"]),
-                                          linked.get("asset_id", linked.get("physical_id", linked["entity"])))
-                    if candidate_identity != identity:
-                        raise ValueError("Conflicting historical source identity")
-        for room in flow._rooms.values():
-            for key, shared in list(room["devices"].items()):
-                if (shared.get("foundation_candidate_id") == candidate.candidate_id
-                        and shared.get("foundation_concept") == concept):
-                    room["devices"][key] = _remapped_device(shared, entity_id)
-        return device
-    # A shared source must retain its original reservation identity when a
-    # second room is added, even if the first room used an older custom ID.
-    shared_candidates = [(room, role, dev) for room in flow._rooms.values()
-                         for role, dev in room["devices"].items()
-                         if dev.get("foundation_concept") == concept
-                         and dev.get("foundation_candidate_id") == candidate.candidate_id]
-    if shared_candidates:
-        identities = {(dev.get("physical_id", dev["entity"]),
-                       dev.get("asset_id", dev.get("physical_id", dev["entity"])))
-                      for _, _, dev in shared_candidates}
-        if len(identities) != 1:
+    # Room selection, native rename and detached Device reuse all refer to
+    # the same exact candidate. The previous room preserves local metadata;
+    # the owning catalog preserves shared policy and stable asset identity.
+    def same_source(device):
+        return (device.get("foundation_concept") == concept
+                and device.get("foundation_candidate_id") == candidate.candidate_id)
+
+    links = [(room, key, dev) for room in flow._rooms.values()
+             for key, dev in room["devices"].items() if same_source(dev)]
+    prior_links = [dev for dev in old.values() if same_source(dev)]
+    catalog = getattr(flow, "_draft_catalog", {})
+    saved = [(asset, dev) for asset, dev in catalog.items() if same_source(dev)]
+    records = [dev for _, _, dev in links] + prior_links + [dev for _, dev in saved]
+    if records:
+        identities = {(dev.get("physical_id", dev["entity"]), logical_asset_id(dev))
+                      for dev in records}
+        if len(identities) != 1 or len(saved) > 1:
             raise ValueError("Conflicting historical source identity")
-        for room, role, dev in shared_candidates:
-            room["devices"][role] = _remapped_device(dev, entity_id)
-        return _remapped_device(shared_candidates[0][2], entity_id)
+        # Never rebuild a shared policy from native discovery or select a
+        # different winner on the rename path. Preserve the local room role.
+        local = prior_links[0] if len(prior_links) == 1 else links[0][2] if links else None
+        owner = local if local is not None else saved[0][1]
+        result = _remapped_device({k: v for k, v in owner.items() if k != DEVICE_LABEL}, entity_id)
+        if local is None:
+            result["role"] = ("remote" if entity_id.startswith("remote.") else
+                              {"display": "display", "amplifier": "receiver", "source": "player",
+                               "network": "computer"}[concept])
+        for room, key, dev in links:
+            room["devices"][key] = _remapped_device(dev, entity_id)
+        for asset, dev in saved:
+            catalog[asset] = _remapped_device(dev, entity_id)
+        return result
     existing = next((dev for room in flow._rooms.values() for dev in room["devices"].values()
                      if dev["entity"] == entity_id), None)
     physical = existing.get("physical_id", entity_id) if existing else f"ha_entity:{entity_id}"
@@ -204,7 +213,74 @@ def _source_ref(flow, entity_id: str, concept: str) -> dict:
             "asset_id": existing.get("asset_id", physical) if existing else physical,
             "role": role,
             "foundation_concept": concept, "foundation_candidate_id": candidate.candidate_id,
-            "power_mode": "passive" if entity_id.startswith("remote.") else "native"}
+            "power_mode": "passive" if entity_id.startswith("remote.") else DEFAULT_POWER_MODE}
+
+
+def _activity_for_cast(activity, devices, cast, kind):
+    """Keep unrelated activity settings; report dependencies that need consent."""
+    candidate = deepcopy(activity)
+    chosen = set(cast)
+    dependent = False
+    for phase in ("steps", "stop_steps"):
+        if phase in candidate:
+            before = candidate[phase]
+            candidate[phase] = [step for step in before if step["device"] in chosen]
+            dependent |= candidate[phase] != before
+    if "button_map" in candidate:
+        before = candidate["button_map"]
+        candidate["button_map"] = {key: binding for key, binding in before.items()
+                                   if binding["device"] in chosen}
+        dependent |= candidate["button_map"] != before
+    if "macros" in candidate:
+        before = candidate["macros"]
+        candidate["macros"] = {key: {**macro, "steps": [step for step in macro["steps"]
+                                                     if step["device"] in chosen]}
+                               for key, macro in before.items()
+                               if any(step["device"] in chosen for step in macro["steps"])}
+        dependent |= candidate["macros"] != before
+    if "cec_links" in candidate:
+        before = candidate["cec_links"]
+        candidate["cec_links"] = [link for link in before
+                                  if link["source"] in chosen and link["target"] in chosen]
+        dependent |= candidate["cec_links"] != before
+    if "computer_application" in candidate:
+        def computers(keys):
+            return {key for key in keys if key in devices
+                    and device_concept(devices[key]) == "network"}
+        if kind != "work_on_pc" or computers(activity["devices"]) != computers(cast):
+            candidate.pop("computer_application")
+            dependent = True
+    candidate["devices"] = list(cast)
+    return candidate, dependent
+
+
+def _route_changes(options, existing, user_input, prefix=""):
+    """Check both route fields before changing the existing activity sequence."""
+    changes = []
+    for field in ("source", "sound_mode"):
+        chosen = user_input.get(prefix + field, UNCHANGED)
+        if chosen == UNCHANGED:
+            continue
+        prior = any(step["type"] == field for step in existing)
+        if chosen not in options[field + "_list"] and not (chosen == REMOVE_ROUTE and prior):
+            raise ValueError("Native route changed")
+        changes.append((field, chosen))
+    return changes
+
+
+def _change_route(steps, key, field, chosen):
+    """Edit only the final target; preserve earlier explicit script commands."""
+    position = next((i for i in range(len(steps) - 1, -1, -1)
+                     if steps[i]["device"] == key and steps[i]["type"] == field), len(steps))
+    result = list(steps)
+    if position < len(steps):
+        result.pop(position)
+    if chosen != REMOVE_ROUTE:
+        replacement = {"type": field, "device": key, "candidates": [chosen]}
+        if position < len(steps) and "delay_ms" in steps[position]:
+            replacement["delay_ms"] = steps[position]["delay_ms"]
+        result.insert(position, replacement)
+    return result
 
 
 class _Wizard:
@@ -247,46 +323,47 @@ class _Wizard:
             schema = {vol.Required("room_name"): str}
         return self.async_show_form(step_id="room", data_schema=vol.Schema(schema), errors=errors)
 
-    async def async_step_display(self, user_input=None):
-        choices = _sources(self, "display", self._rooms[self._room_id]["area_id"])
+    async def _single_room_source(self, concept, field, default_key, next_step, none_label, user_input):
+        """Shared native source selector. Default keys only name new links."""
+        room = self._rooms[self._room_id]
+        choices = _sources(self, concept, room.get("area_id"))
+        prior = media_roles((self._previous_room or {}).get("devices", {}), concept)
+        previous_key = next(iter(prior)) if len(prior) == 1 else None
         errors = {}
         if user_input is not None:
-            chosen = user_input.get("display", NONE)
+            chosen = user_input.get(field, NONE)
             if chosen != NONE and chosen not in choices:
                 errors["base"] = "not_foundation_selected"
             else:
                 if chosen != NONE:
-                    self._rooms[self._room_id]["devices"]["screen"] = _source_ref(self, chosen, "display")
-                return await self.async_step_amplifier()
-        default = (self._previous_room or {}).get("devices", {}).get("screen", {}).get("entity", NONE)
+                    device = _source_ref(self, chosen, concept)
+                    # Retain the existing local relationship key; activities
+                    # are never retargeted silently (room update validates cast).
+                    key = previous_key or default_key
+                    if key in room["devices"] and room["devices"][key] != device:
+                        key = default_key + "_" + _slug(chosen)
+                    room["devices"][key] = device
+                return await next_step()
+        default = prior[previous_key]["entity"] if previous_key else NONE
         if not self._editing_room:
-            default = _area_default(self, "display", self._rooms[self._room_id]["area_id"])
+            default = _area_default(self, concept, room.get("area_id"))
         default = default if default in choices else NONE
-        return self.async_show_form(step_id="display", errors=errors,
-            data_schema=vol.Schema({vol.Required("display", default=default):
-                                    vol.In({NONE: "No screen (music-only room)", **choices})}))
+        return self.async_show_form(step_id=field, errors=errors,
+            data_schema=vol.Schema({vol.Required(field, default=default):
+                                    vol.In({NONE: none_label, **choices})}))
+
+    async def async_step_display(self, user_input=None):
+        return await self._single_room_source(
+            "display", "display", "screen", self.async_step_amplifier,
+            "No screen (music-only room)", user_input)
 
     async def async_step_amplifier(self, user_input=None):
-        choices = _sources(self, "amplifier", self._rooms[self._room_id]["area_id"])
-        errors = {}
-        if user_input is not None:
-            chosen = user_input.get("amplifier", NONE)
-            if chosen != NONE and chosen not in choices:
-                errors["base"] = "not_foundation_selected"
-            else:
-                if chosen != NONE:
-                    self._rooms[self._room_id]["devices"]["amplifier"] = _source_ref(self, chosen, "amplifier")
-                return await self.async_step_sources()
-        default = (self._previous_room or {}).get("devices", {}).get("amplifier", {}).get("entity", NONE)
-        if not self._editing_room:
-            default = _area_default(self, "amplifier", self._rooms[self._room_id]["area_id"])
-        default = default if default in choices else NONE
-        return self.async_show_form(step_id="amplifier", errors=errors,
-            data_schema=vol.Schema({vol.Required("amplifier", default=default):
-                                    vol.In({NONE: "No amplifier (TV/internal speakers)", **choices})}))
+        return await self._single_room_source(
+            "amplifier", "amplifier", "amplifier", self.async_step_sources,
+            "No amplifier (TV/internal speakers)", user_input)
 
     async def async_step_sources(self, user_input=None):
-        choices = _sources(self, "source", self._rooms[self._room_id]["area_id"])
+        choices = _sources(self, "source", self._rooms[self._room_id].get("area_id"))
         errors = {}
         if user_input is not None:
             selected = user_input.get("sources") or []
@@ -308,7 +385,7 @@ class _Wizard:
                 else:
                     return await self.async_step_activity()
         previous_sources = [v["entity"] for k, v in (self._previous_room or {}).get("devices", {}).items()
-                            if k.startswith("source_") and v["entity"] in choices]
+                            if device_concept(v) == "source" and v["entity"] in choices]
         schema = {vol.Optional("sources", default=previous_sources): _select_many(choices)} if choices else {}
         return self.async_show_form(step_id="sources", errors=errors,
                                     data_schema=vol.Schema(schema),
@@ -353,14 +430,24 @@ class _Wizard:
         previous = room["activities"].get(editing, {}) if editing else {}
         # Remote endpoints are controls, not new playback sources. Keep an
         # existing legacy cast editable without silently changing its intent.
-        source_keys = {k: v["entity"] for k, v in devices.items() if k.startswith("source_")
-                       and (v["entity"].startswith("media_player.") or k in previous.get("devices", []))}
+        source_keys = {k: v["entity"] for k, v in media_roles(devices, "source").items()}
+        # Retain explicitly cast legacy remote roles only for existing edits.
+        source_keys.update({k: devices[k]["entity"] for k in previous.get("devices", [])
+                            if k in devices and device_concept(devices[k]) == "source"
+                            and devices[k]["entity"].startswith("remote.")})
         errors = {}
         choices = dict(_activity_choices(self.hass))
         computer_keys = {k: v["entity"] for k, v in devices.items()
                          if v.get("foundation_concept") == "network" and v.get("role") == "computer"}
-        display_keys = {k: v["entity"] for k, v in devices.items()
-                        if v.get("foundation_concept") == "display" and v["entity"].startswith("media_player.")}
+        display_keys = {k: v["entity"] for k, v in media_roles(devices, "display").items()}
+        amplifier_keys = media_roles(devices, "amplifier")
+        previous_cast = previous.get("devices", [])
+        # Preserve an explicit existing selection; suggest only a unique role.
+        def selected_role(keys):
+            prior = [key for key in previous_cast if key in keys]
+            return prior[0] if len(prior) == 1 else next(iter(keys)) if len(keys) == 1 else NONE
+        display = selected_role(display_keys)
+        amplifier = selected_role(amplifier_keys)
         from .validation import computer_application_ids
         app_choices = {app: app.replace("_", " ") for key in computer_keys
                        for app in sorted(computer_application_ids(devices[key]))}
@@ -376,17 +463,21 @@ class _Wizard:
             source = NONE if kind == "watch_hdmi" else user_input.get("primary_source", NONE)
             computer_display = user_input.get("computer_display", NONE)
             application = user_input.get("computer_application", NONE)
+            selected_display = user_input.get("display_device", display)
+            selected_amplifier = user_input.get("amplifier_device", amplifier)
             if kind == "work_on_pc" and (source not in computer_keys or
                     computer_display not in (NONE, *display_keys) or
                     (application != NONE and application not in computer_application_ids(devices[source]))):
                 errors["base"] = "source_required"
-            elif kind not in ACTIVITIES and kind != "work_on_pc":
+            elif kind not in ACTIVITY_TYPES:
                 errors["base"] = "invalid_activity"
-            elif kind in ("watch_tv", "watch_hdmi", "watch_source", "play_game") and "screen" not in devices:
+            elif selected_display not in (NONE, *display_keys) or selected_amplifier not in (NONE, *amplifier_keys):
+                errors["base"] = "selection_changed"
+            elif kind in ACTIVITY_VIDEO_TYPES and selected_display == NONE:
                 errors["base"] = "screen_required"
-            elif kind in ("watch_source", "play_game") and source not in source_keys:
+            elif kind in ACTIVITY_PLAYER_TYPES and source not in source_keys:
                 errors["base"] = "source_required"
-            elif kind == "listen_music" and not ("amplifier" in devices or source in source_keys):
+            elif kind == "listen_music" and not (selected_amplifier != NONE or source in source_keys):
                 errors["base"] = "audio_required"
             else:
                 label = str(user_input.get("activity_name") or "").strip()
@@ -404,30 +495,40 @@ class _Wizard:
                             if computer_display != NONE:
                                 cast.append(computer_display)
                         else:
-                            if kind != "listen_music" and "screen" in devices:
-                                cast.append("screen")
-                            if "amplifier" in devices:
-                                cast.append("amplifier")
+                            if kind != "listen_music" and selected_display != NONE:
+                                cast.append(selected_display)
+                            if selected_amplifier != NONE:
+                                cast.append(selected_amplifier)
                             if source in source_keys:
                                 cast.append(source)
-                        self._activity_key = key
-                        self._activity_name = label
-                        self._activity_cast = cast
-                        self._activity_type = kind
-                        self._activity_favorite = user_input.get(
-                            "favorite", previous.get("favorite", False))
-                        # A label-only edit must preserve routes and custom steps,
-                        # including when an endpoint is temporarily unavailable.
-                        # A changed cast needs explicit new routing.
-                        same_cast = previous.get("devices") == cast
-                        self._activity_previous = deepcopy(previous) if same_cast else {}
-                        if kind == "work_on_pc" and application != NONE:
-                            self._activity_previous["computer_application"] = application
+                        # Keep the user's startup order for retained devices.
+                        old_cast = previous.get("devices", [])
+                        cast = [item for item in old_cast if item in cast] + [
+                            item for item in cast if item not in old_cast]
+                        candidate, dependent = _activity_for_cast(previous, devices, cast, kind)
+                        if dependent and user_input.get("confirm_remove") is not True:
+                            errors["base"] = "confirm_source_steps"
                         else:
-                            self._activity_previous.pop("computer_application", None)
-                        self._steps = deepcopy(self._activity_previous.get("steps", []))
-                        self._route_cursor = 0
-                        return await self.async_step_route()
+                            self._activity_key = key
+                            self._activity_name = label
+                            self._activity_cast = cast
+                            self._activity_type = kind
+                            self._activity_favorite = user_input.get(
+                                "favorite", previous.get("favorite", False))
+                            self._activity_previous = candidate
+                            # Retained input steps do not by themselves prove
+                            # the route of a newly selected physical player.
+                            self._activity_route_recheck = bool(previous and
+                                (set(old_cast) != set(cast) or
+                                 previous.get("activity_type", kind) != kind))
+                            self._activity_confirmed_routes = set()
+                            if kind == "work_on_pc" and application != NONE:
+                                self._activity_previous["computer_application"] = application
+                            else:
+                                self._activity_previous.pop("computer_application", None)
+                            self._steps = deepcopy(self._activity_previous.get("steps", []))
+                            self._route_cursor = 0
+                            return await self.async_step_route()
         label = previous.get("name", "Watch TV")
         previous_cast = previous.get("devices", [])
         previous_source = next((key for key in previous_cast
@@ -436,7 +537,7 @@ class _Wizard:
         if not editing and self._guided_activity_type in ACTIVITIES:
             default_kind = self._guided_activity_type
         if default_kind not in choices:
-            default_kind = ("listen_music" if previous_cast and "screen" not in previous_cast
+            default_kind = ("listen_music" if previous_cast and not any(k in display_keys for k in previous_cast)
                             else "watch_source" if previous_source != NONE else "watch_tv")
         # The guided flow already captured intent; never ask twice or allow
         # a stale browser to silently change its original selection.
@@ -444,6 +545,13 @@ class _Wizard:
                   vol.Optional("favorite", default=previous.get("favorite", False)): bool}
         if editing or self._guided_activity_type not in ACTIVITIES:
             schema[vol.Required("activity_type", default=default_kind)] = vol.In(choices)
+        if editing:
+            schema[vol.Optional("confirm_remove", default=False)] = bool
+        if len(display_keys) > 1:
+            schema[vol.Optional("display_device", default=display)] = vol.In({NONE: "No display", **display_keys})
+        if len(amplifier_keys) > 1:
+            schema[vol.Optional("amplifier_device", default=amplifier)] = vol.In(
+                {NONE: "No receiver", **{k: v["entity"] for k, v in amplifier_keys.items()}})
         if source_keys or computer_keys:
             schema[vol.Required("primary_source", default=previous_source)] = vol.In(
                 {NONE: "None / built-in TV", **source_keys, **computer_keys})
@@ -469,28 +577,19 @@ class _Wizard:
                 self._route_cursor += 1
                 continue
             if user_input is not None:
-                changes = []
-                for field in ("source", "sound_mode"):
-                    chosen = user_input.get(field, UNCHANGED)
-                    offered = options["source_list" if field == "source" else "sound_mode_list"]
-                    if chosen == UNCHANGED:
-                        continue
-                    prior = [step for step in existing if step["type"] == field]
-                    if chosen in offered or (chosen == REMOVE_ROUTE and prior):
-                        changes.append((field, chosen))
-                    else:
-                        return self.async_show_form(step_id="route", errors={"base": "route_changed"},
-                                                    data_schema=vol.Schema(self._route_fields(options, existing)),
-                                                    description_placeholders={"device": entity})
-                # Validate the whole form before applying any route change.
+                try:
+                    changes = _route_changes(options, existing, user_input)
+                except ValueError:
+                    return self.async_show_form(step_id="route", errors={"base": "route_changed"},
+                                                data_schema=vol.Schema(self._route_fields(options, existing)),
+                                                description_placeholders={"device": entity})
                 for field, chosen in changes:
-                    matching = [idx for idx, step in enumerate(self._steps)
-                                if step["device"] == key and step["type"] == field]
-                    position = matching[0] if matching else len(self._steps)
-                    self._steps = [step for step in self._steps
-                                   if not (step["device"] == key and step["type"] == field)]
-                    if chosen != REMOVE_ROUTE:
-                        self._steps.insert(position, {"type": field, "device": key, "candidates": [chosen]})
+                    self._steps = _change_route(self._steps, key, field, chosen)
+                    if field == "source" and hasattr(self, "_activity_confirmed_routes"):
+                        if chosen == REMOVE_ROUTE:
+                            self._activity_confirmed_routes.discard(key)
+                        else:
+                            self._activity_confirmed_routes.add(key)
                 self._route_cursor += 1
                 user_input = None
                 continue
@@ -500,7 +599,7 @@ class _Wizard:
         # a real destination input. Native source readback alone does not prove
         # it is routed to this room. This is a configuration guard only:
         # no command is issued and existing activity IDs are preserved.
-        routed_external = self._activity_type in ("watch_source", "play_game") and any(
+        routed_external = self._activity_type in ACTIVITY_PLAYER_TYPES and any(
             devices[key].get("foundation_concept") == "source"
             and devices[key]["entity"].startswith("media_player.")
             for key in self._activity_cast
@@ -509,17 +608,22 @@ class _Wizard:
             for key in self._activity_cast:
                 if devices[key].get("foundation_concept") != "display":
                     continue
-                if not any(step["type"] == "source" and step["device"] == key for step in self._steps):
+                if (not any(step["type"] == "source" and step["device"] == key for step in self._steps)
+                        or (getattr(self, "_activity_route_recheck", False)
+                            and key not in self._activity_confirmed_routes)):
                     self._route_cursor = self._activity_cast.index(key)
                     options = source_lists(self.hass, devices[key]["entity"])
                     return self.async_show_form(step_id="route", errors={"base": "source_route_required"},
                         data_schema=vol.Schema(self._route_fields(options, [])),
                         description_placeholders={"device": devices[key]["entity"]})
-        if (self._activity_type == "watch_hdmi" or routed_external) and not any(
-                step["type"] == "source" and step["device"] in ("screen", "amplifier")
-                for step in self._steps):
+        destinations = media_roles(devices, "display").keys() | media_roles(devices, "amplifier").keys()
+        if (self._activity_type == "watch_hdmi" or routed_external) and (
+                not any(step["type"] == "source" and step["device"] in destinations
+                        for step in self._steps)
+                or (getattr(self, "_activity_route_recheck", False)
+                    and not destinations & self._activity_confirmed_routes)):
             route_idx = next((idx for idx, key in enumerate(self._activity_cast)
-                              if key in ("screen", "amplifier")
+                              if key in destinations
                               and source_lists(self.hass, devices[key]["entity"])["source_list"]), None)
             self._route_cursor = route_idx if route_idx is not None else 0
             if route_idx is None:
@@ -545,7 +649,7 @@ class _Wizard:
         return await self.async_step_next()
 
     @staticmethod
-    def _route_fields(options, existing=()):
+    def _route_fields(options, existing=(), prefix=""):
         schema = {}
         for field, values in (("source", options["source_list"]), ("sound_mode", options["sound_mode_list"])):
             prior = [step for step in existing if step["type"] == field]
@@ -553,8 +657,9 @@ class _Wizard:
                 choices = {UNCHANGED: ("Keep configured route" if prior else "No change / already routed"),
                            **{v: v for v in values}}
                 if prior:
-                    choices[REMOVE_ROUTE] = "Remove configured route"
-                schema[vol.Required(field, default=UNCHANGED)] = vol.In(choices)
+                    choices[REMOVE_ROUTE] = ("Remove final configured route" if len(prior) > 1
+                                             else "Remove configured route")
+                schema[vol.Required(prefix + field, default=UNCHANGED)] = vol.In(choices)
         return schema
 
     async def async_step_next(self, user_input=None):
@@ -692,114 +797,123 @@ class _Wizard:
     def _review_configuration(self):
         self._review_detail = ""
         self._review_blocker = None
-        if self._rooms:
-            validate_rooms(self._rooms)
+        model = split_device_model(self._rooms, getattr(self, "_draft_catalog", None))
+        if hasattr(self, "_original_dell_displays"):
+            for key in self._original_dell_displays.keys() - self._dell_displays.keys():
+                if self._dell_bound_assets(key, model):
+                    raise ValueError(f"Dell {key}: remove the owning Device before deleting the native registration")
+        original_catalog = (self._original_catalog if hasattr(self, "_original_catalog")
+                            else split_device_model(self._original_rooms)[DEVICE_CATALOG])
+        paths, changed_memberships = {}, set()
+        for room_id, room in model["rooms"].items():
+            for key, membership in room["devices"].items():
+                asset = membership[ASSET_REF]
+                path = f"rooms.{room_id}.devices.{key}"
+                paths.setdefault(asset, path)
+                prior = self._original_rooms.get(room_id, {}).get("devices", {}).get(key)
+                if (prior is None or logical_asset_id(prior) != asset
+                        or prior.get("role") != membership.get("role")):
+                    # A new association or role still needs current native
+                    # source evidence, even when the Device itself is unchanged.
+                    changed_memberships.add(asset)
+                    paths[asset] = path
+        # Review each owning Device exactly once. Room labels and placement
+        # are relationship metadata, not changes to native source authority.
+        # Activity and active-reservation validation remain room-scoped below.
+        rows = []
+        for asset, saved in model[DEVICE_CATALOG].items():
+            prior = original_catalog.get(asset) if asset not in changed_memberships else None
+            rows.append((paths.get(asset, f"devices.{asset}"),
+                         {k: v for k, v in saved.items() if k != DEVICE_LABEL},
+                         {k: v for k, v in prior.items() if k != DEVICE_LABEL}
+                         if prior is not None else None))
         current, _ = av_sources(self.hass)
         supported, _ = discovered_av_sources(self.hass)
-        selected = {(s.concept, s.entity_id, s.candidate_id) for s in current}
-        command_sources = list(current)
+        def binding_key(device):
+            return (device.get("foundation_concept"), device.get("entity"),
+                    device.get("foundation_candidate_id"))
+
+        # One transient exact lookup, not a new authorization authority.
+        command_sources = {}
+        for source in current:
+            command_sources.setdefault((source.concept, source.entity_id, source.candidate_id), source)
         problems = []
         # Reviewed semantic configuration is explicit control intent in the
         # single native Multimedia Options Flow. Verify exact current
         # Foundation/native identity BEFORE accepting this one Save. Discovery
         # alone never activates a device or weakens the runtime command guard.
-        for room_id, proposed_room in self._rooms.items():
-            previous_devices = self._original_rooms.get(room_id, {}).get("devices", {})
-            for device_key, device in proposed_room.get("devices", {}).items():
-                if device.get("control_approved") is not True:
+        for path, device, prior_device in rows:
+            if device.get("control_approved") is not True:
+                continue
+            # Keep a previously saved, unchanged stale source as an
+            # explicitly NON-executable HOLD. Its own runtime authorization
+            # remains fail-closed; it must not prevent unrelated room or
+            # single-device edits from reaching the same atomic Save.
+            approved_source = authorized_source(self.hass, device)
+            if approved_source is None:
+                if prior_device == device:
                     continue
-                # Keep a previously saved, unchanged stale source as an
-                # explicitly NON-executable HOLD. Its own runtime authorization
-                # remains fail-closed; it must not prevent unrelated room or
-                # single-device edits from reaching the same atomic Save.
-                approved_source = authorized_source(self.hass, device)
-                if approved_source is None:
-                    if previous_devices.get(device_key) == device:
-                        continue
-                    problems.append(f"rooms.{room_id}.devices.{device_key}: reviewed native control binding is no longer valid; select the matching Foundation device")
+                problems.append(f"{path}: reviewed native control binding is no longer valid; select the matching Foundation device")
+                continue
+            match = next((source for source in supported
+                          if source.concept == device.get("foundation_concept")
+                          and source.entity_id == device.get("entity")
+                          and source.candidate_id == device.get("foundation_candidate_id")
+                          and source.review_reason is None), None)
+            if match is None:
+                if prior_device == device:
                     continue
-                match = next((source for source in supported
-                              if source.concept == device.get("foundation_concept")
-                              and source.entity_id == device.get("entity")
-                              and source.candidate_id == device.get("foundation_candidate_id")
-                              and source.review_reason is None), None)
-                if match is None:
-                    if previous_devices.get(device_key) == device:
-                        continue
-                    problems.append(f"rooms.{room_id}.devices.{device_key}: reviewed native control is not in supported discovery; review the current native candidate")
-                    continue
-                key = (match.concept, match.entity_id, match.candidate_id)
-                selected.add(key)
-                if not any((source.concept, source.entity_id, source.candidate_id) == key
-                           for source in command_sources):
-                    command_sources.append(match)
+                problems.append(f"{path}: reviewed native control is not in supported discovery; review the current native candidate")
+                continue
+            key = (match.concept, match.entity_id, match.candidate_id)
+            command_sources.setdefault(key, match)
         # Ambiguous technical identity is visible for repair but cannot be
         # saved as a new semantic binding until Foundation resolves it.
         discovered = {(s.concept, s.entity_id, s.candidate_id) for s in supported
                       if s.review_reason != "ambiguous_candidate_identity"}
+        for path, device, prior_device in rows:
+            if binding_key(device) not in discovered and prior_device != device:
+                problems.append(f"{path}: {device.get('entity')} not in Foundation-supported discovery; select the exact current candidate")
+                continue
+            if device.get("windows_native") and device != prior_device:
+                observed = native_state(self.hass, device["entity"])
+                address = ((observed.attributes.get("ip") or observed.attributes.get("ip_address")) if observed else None)
+                if (device.get("control_approved") is not True or authorized_source(self.hass, device) is None
+                        or address != device["windows_native"]["host"]):
+                    problems.append(f"{path}.windows_native: review the exact network computer and its native IPv4 address")
+            if device.get("computer_agent") and device != prior_device:
+                from .foundation import computer_agent_source
+                if computer_agent_source(self.hass, device) is None:
+                    problems.append(f"{path}.computer_agent: select a current exact HASS.Agent media endpoint")
+            if device.get("computer_io") and device != prior_device:
+                from .foundation import computer_io_source
+                for intent in device["computer_io"]:
+                    if computer_io_source(self.hass, device, intent) is None:
+                        problems.append(f"{path}.computer_io.{intent}: select an exact current HASS.Agent native endpoint")
+            tts_id = device.get("speech_tts_registry_id")
+            if tts_id and tts_id != (prior_device or {}).get("speech_tts_registry_id"):
+                approved_speech = command_sources.get(binding_key(device))
+                if (not speech_player_eligible(
+                        self.hass, device, approved_speech) or tts_id not in tts_choices(self.hass)):
+                    problems.append(f"{path}.speech_tts_registry_id: speech requires an exact selected Cast source and native TTS provider")
+            # The visual whole-home editor and scoped/global YAML share
+            # the exact native MAC + approved source gate. A read-only
+            # discovered device is never authorized for Wake-on-LAN.
+            wol = device.get("power_on", {})
+            prior_wol = (prior_device or {}).get("power_on")
+            if (isinstance(wol, dict)
+                    and wol.get("action") == "wake_on_lan.send_magic_packet"
+                    and (wol != prior_wol or (device.get("wol_enabled", True)
+                         and (prior_device or {}).get("wol_enabled") is False))):
+                approved_wol = command_sources.get(binding_key(device))
+                if (device.get("control_approved") is False or approved_wol is None
+                        or approved_wol.provider == "harmony"
+                        or not device["entity"].startswith(("media_player.", "remote.", "device_tracker."))
+                        or str(wol.get("data", {}).get("mac", "")).lower()
+                        not in selected_native_macs(self.hass, approved_wol)):
+                    problems.append(f"{path}.power_on: Wake-on-LAN MAC must belong to the authorized native device; choose a verified native MAC")
         for room_id, room in self._rooms.items():
             previous = self._original_rooms.get(room_id, {})
-            for key, device in room["devices"].items():
-                if ((device.get("foundation_concept"), device.get("entity"),
-                     device.get("foundation_candidate_id")) not in discovered
-                        and previous.get("devices", {}).get(key) != device):
-                    problems.append(f"rooms.{room_id}.devices.{key}: {device.get('entity')} not in Foundation-supported discovery; select the exact current candidate")
-                    continue
-                if device.get("windows_native") and device != previous.get("devices", {}).get(key):
-                    observed = native_state(self.hass, device["entity"])
-                    address = ((observed.attributes.get("ip") or observed.attributes.get("ip_address")) if observed else None)
-                    if (device.get("control_approved") is not True or authorized_source(self.hass, device) is None
-                            or address != device["windows_native"]["host"]):
-                        problems.append(f"rooms.{room_id}.devices.{key}.windows_native: review the exact network computer and its native IPv4 address")
-                if device.get("computer_agent") and device != previous.get("devices", {}).get(key):
-                    from .foundation import computer_agent_source
-                    if computer_agent_source(self.hass, device) is None:
-                        problems.append(f"rooms.{room_id}.devices.{key}.computer_agent: select a current exact HASS.Agent media endpoint")
-                if device.get("computer_io") and device != previous.get("devices", {}).get(key):
-                    from .foundation import computer_io_source
-                    for intent in device["computer_io"]:
-                        if computer_io_source(self.hass, device, intent) is None:
-                            problems.append(f"rooms.{room_id}.devices.{key}.computer_io.{intent}: select an exact current HASS.Agent native endpoint")
-                tts_id = device.get("speech_tts_registry_id")
-                if tts_id and tts_id != previous.get("devices", {}).get(key, {}).get("speech_tts_registry_id"):
-                    approved_speech = next((source for source in command_sources
-                                            if source.concept == device.get("foundation_concept")
-                                            and source.entity_id == device["entity"]
-                                            and source.candidate_id == device.get("foundation_candidate_id")), None)
-                    if (not speech_player_eligible(
-                            self.hass, device, approved_speech) or tts_id not in tts_choices(self.hass)):
-                        problems.append(f"rooms.{room_id}.devices.{key}.speech_tts_registry_id: speech requires an exact selected Cast source and native TTS provider")
-                # The visual whole-home editor and scoped/global YAML share
-                # the exact native MAC + approved source gate. A read-only
-                # discovered device is never authorized for Wake-on-LAN.
-                wol = device.get("power_on", {})
-                prior_wol = previous.get("devices", {}).get(key, {}).get("power_on")
-                if (isinstance(wol, dict)
-                        and wol.get("action") == "wake_on_lan.send_magic_packet"
-                        and wol != prior_wol):
-                    approved_wol = next((source for source in command_sources
-                                         if source.concept == device.get("foundation_concept")
-                                         and source.entity_id == device.get("entity")
-                                         and source.candidate_id == device.get("foundation_candidate_id")), None)
-                    if (approved_wol is None
-                            or approved_wol.provider == "harmony"
-                            or not device["entity"].startswith(("media_player.", "remote.", "device_tracker."))
-                            or str(wol.get("data", {}).get("mac", "")).lower()
-                            not in selected_native_macs(self.hass, approved_wol)):
-                        problems.append(f"rooms.{room_id}.devices.{key}.power_on: Wake-on-LAN MAC must belong to the authorized native device; choose a verified native MAC")
-                # A physical AV device has one wake destination across all
-                # consuming rooms. Existing unchanged legacy settings remain
-                # readable, but newly edited WOL cannot diverge by room.
-                if (wol != (prior_wol or {})
-                        and (wol.get("action") == "wake_on_lan.send_magic_packet"
-                             or (isinstance(prior_wol, dict)
-                                 and prior_wol.get("action") == "wake_on_lan.send_magic_packet"))):
-                    physical = device.get("physical_id", device["entity"])
-                    if any(other.get("power_on", {}) != wol
-                           for spec in self._rooms.values()
-                           for other in spec["devices"].values()
-                           if other.get("physical_id", other["entity"]) == physical):
-                        problems.append(f"rooms.{room_id}.devices.{key}.power_on: shared physical device has conflicting Wake-on-LAN settings")
             for activity_id, activity in room["activities"].items():
                 prior = previous.get("activities", {}).get(activity_id, {})
                 if activity == prior:
@@ -807,8 +921,7 @@ class _Wizard:
                 for key in activity["devices"]:
                     device = room["devices"][key]
                     if (device.get("control_approved") is False or
-                            (device.get("foundation_concept"), device["entity"],
-                             device.get("foundation_candidate_id")) not in selected):
+                            binding_key(device) not in command_sources):
                         problems.append(f"rooms.{room_id}.activities.{activity_id}.devices.{key}: changed activity includes revoked source or pending command approval")
                     if (activity.get("computer_application") and device.get("foundation_concept") == "network"
                             and not device.get("windows_native")):
@@ -849,10 +962,7 @@ class _Wizard:
                         device = room["devices"][step["device"]]
                         if step.get("type") == "remote_key":
                             from .adapter import WEBOS_KEYS, REMOTE_KEYSETS
-                            source = next((selected_source for selected_source in command_sources
-                                           if selected_source.concept == device.get("foundation_concept")
-                                           and selected_source.entity_id == device["entity"]
-                                           and selected_source.candidate_id == device.get("foundation_candidate_id")), None)
+                            source = command_sources.get(binding_key(device))
                             integration = getattr(source, "provider", None)
                             offered = (WEBOS_KEYS if integration == "webostv"
                                        and device["entity"].startswith("media_player.") else
@@ -918,9 +1028,9 @@ class _Wizard:
                     continue
                 device = spec["devices"].get(controller, {})
                 entity = device.get("entity")
-                candidate = next((source for source in command_sources if source.entity_id == entity
-                                  and source.candidate_id == device.get("foundation_candidate_id")
-                                  and source.concept == "source" and source.provider == "harmony"), None)
+                candidate = command_sources.get(("source", entity, device.get("foundation_candidate_id")))
+                if candidate is not None and candidate.provider != "harmony":
+                    candidate = None
                 state = native_state(self.hass, entity) if entity else None
                 if (not candidate or not state or state.state != "off"
                         or state.attributes.get("current_activity") != "PowerOff"
@@ -955,6 +1065,12 @@ class _Wizard:
                     if activity and execution_fields(before.get("activities", {}).get(activity), ("name", "favorite")) != execution_fields(after.get("activities", {}).get(activity), ("name", "favorite")):
                         return room_conflict(room_id, state, f"rooms.{room_id}.activities.{activity}",
                                              "the current activity's executable settings have changed")
+        # One reviewed semantic model for every input surface. Keep accepted
+        # Device policy in the same draft even when the next edit removes its
+        # last room relationship. Never advance the owner on rejected review.
+        self._reviewed_model = model
+        if hasattr(self, "_draft_catalog"):
+            self._draft_catalog = deepcopy(model[DEVICE_CATALOG])
         return None
 
     def _blocked_room_json(self, errors):
@@ -972,7 +1088,6 @@ class _Wizard:
             return await self._complete_setup_form()
         if (getattr(self, "_complete_setup", False) and user_input
                 and user_input.get("return_to_setup") is True):
-            self._complete_setup_finish = False
             return await self.async_step_complete_setup()
         if (getattr(self, "_yaml_import", False) and not getattr(self, "_complete_setup", False)
                 and user_input and user_input.get("return_to_yaml") is True):
@@ -984,16 +1099,8 @@ class _Wizard:
             if not user_input.get("confirm"):
                 errors["base"] = "confirm_save"
             elif hasattr(self, "_entry") and (
-                    self._entry.options.get(CONF_ROOMS,
-                                            self._entry.data.get(CONF_ROOMS, {}))
-                    != self._original_rooms
-                    or self._entry.options.get("dell_displays",
-                                             self._entry.data.get("dell_displays", {}))
-                    != self._original_dell_displays
-                    or self._entry.options.get("enable_ux", True)
-                    != self._original_enable_ux
-                    or self._entry.options.get("default_step_delay_ms", 0)
-                    != self._original_step_delay_ms):
+                    dict(self._entry.options) != self._original_entry_options
+                    or dict(self._entry.data) != self._original_entry_data):
                 errors["base"] = "selection_changed"
             elif (getattr(self, "_yaml_deleted_rooms", None)
                   and not user_input.get("confirm_remove")):
@@ -1031,17 +1138,58 @@ class _Wizard:
                       device.get("computer_agent"), device.get("computer_io"), device.get("windows_native"))
                 for key, device in room.get("devices", {}).items()
             })
-        removed = (set(previous) - set(proposed) or any(
-            set(previous[key].get(group, {})) - set(proposed[key].get(group, {}))
-            for key in set(previous) & set(proposed) for group in ("devices", "activities")))
-        sensitive = bool(removed or getattr(self, "_yaml_deleted_rooms", None)
+        removals = [f"room {key}" for key in sorted(previous.keys() - proposed.keys())]
+        for key in sorted(previous.keys() & proposed.keys()):
+            for group, scope in (("devices", "device"), ("activities", "activity")):
+                removals.extend(f"{scope} {key}/{item}" for item in sorted(
+                    previous[key].get(group, {}).keys() - proposed[key].get(group, {}).keys()))
+        sensitive = bool(removals or getattr(self, "_yaml_deleted_rooms", None)
                          or set(previous) != set(proposed)
                          or any(authority(previous[key]) != authority(proposed[key])
                                 for key in set(previous) & set(proposed))
-                         or getattr(self, "_original_dell_displays", {}) != getattr(self, "_dell_displays", {}))
+                         or any(getattr(self, "_dell_displays", {}).get(key) != value
+                                for key, value in getattr(self, "_original_dell_displays", {}).items()))
         native_preview = self._review_summary()
-        change_summary = (self._yaml_diff if getattr(self, "_yaml_import", False)
-                          else _yaml_change_summary(previous, proposed))
+        if hasattr(self, "_draft_catalog"):
+            old_catalog = self._original_catalog
+            # An invalid draft must stay editable with its review error.
+            try:
+                new_catalog = self._device_model()[DEVICE_CATALOG]
+            except (ValueError, TypeError, KeyError, AttributeError):
+                new_catalog = self._draft_catalog
+            changes = [f"Device {key}: " + ("added" if key not in old_catalog else
+                       "removed" if key not in new_catalog else "updated")
+                       for key in sorted(old_catalog.keys() | new_catalog.keys())
+                       if old_catalog.get(key) != new_catalog.get(key)]
+            if changes:
+                native_preview = "\n".join(changes) + "\n" + native_preview
+            # A detached Device has no room authority tuple. Its native
+            # approval or provider/power changes still require explicit review.
+            authority_fields = ("entity", "foundation_candidate_id", "foundation_concept",
+                                "control_approved", "power_on", "power_off",
+                                "computer_agent", "computer_io", "windows_native")
+            sensitive = sensitive or bool(old_catalog.keys() - new_catalog.keys()) or any(
+                any(old_catalog.get(key, {}).get(field) != device.get(field)
+                    for field in authority_fields)
+                for key, device in new_catalog.items()
+                if key in old_catalog or device.get("control_approved") is True)
+        change_summary = _yaml_change_summary(previous, proposed)
+        if hasattr(self, "_original_dell_displays"):
+            old_dell, new_dell = self._original_dell_displays, self._dell_displays
+            for label, keys in (
+                    ("Dell display labels changed", sorted(k for k in old_dell.keys() & new_dell.keys()
+                                                          if old_dell[k] != new_dell[k])),
+                    ("Dell displays added", sorted(new_dell.keys() - old_dell.keys())),
+                    ("Dell displays removed", sorted(old_dell.keys() - new_dell.keys()))):
+                if keys:
+                    change_summary += "\n" + label + ": " + ", ".join(keys)
+            if self._yaml_enable_ux is not None and self._yaml_enable_ux != self._original_enable_ux:
+                change_summary += f"\nPremium UX enabled: {self._yaml_enable_ux}"
+            if self._yaml_step_delay_ms is not None and self._yaml_step_delay_ms != self._original_step_delay_ms:
+                change_summary += f"\nDefault inter-step delay: {self._yaml_step_delay_ms} ms"
+        # Render the same destructive targets used by the confirmation decision.
+        if removals:
+            change_summary += "\nExplicit removals: " + ", ".join(removals)
         preview = change_summary + "\n\n" + native_preview
         return self.async_show_form(step_id="review", errors=errors,
                                     data_schema=vol.Schema(fields),
@@ -1054,7 +1202,7 @@ class _Wizard:
 
 
 class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 2
+    VERSION = CONFIG_VERSION
 
     async def async_step_user(self, user_input=None):
         if not hasattr(self, "_rooms"):
@@ -1072,7 +1220,8 @@ class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
             return self.async_create_entry(
                 title="Multimedia",
-                data={CONF_TITLE: "Multimedia", CONF_ROOMS: {}},
+                data={CONF_TITLE: "Multimedia"},
+                options=split_device_model({}),
             )
         if user_input and CONF_TITLE in user_input:
             # Preserve a resumed legacy named wizard, not the default path.
@@ -1084,7 +1233,8 @@ class MultimediaConfigFlow(_Wizard, config_entries.ConfigFlow, domain=DOMAIN):
     async def _finish(self):
         await self.async_set_unique_id("rhi_multimedia_household")
         self._abort_if_unique_id_configured()
-        return self.async_create_entry(title=self._name, data={CONF_TITLE: self._name, CONF_ROOMS: self._rooms})
+        return self.async_create_entry(title=self._name, data={CONF_TITLE: self._name},
+                                       options=self._reviewed_model)
 
     @staticmethod
     def async_get_options_flow(config_entry):
@@ -1218,6 +1368,11 @@ def _yaml_plan(document: str, existing: dict, mode: str, *, resolve_bindings=Non
     configuration against live Foundation selection and command reservations.
     """
     result, removals = _yaml_candidate(document, existing, mode)
+    payload = _yaml_document(document)
+    if set(payload) == {"changes"}:
+        targets = [(change["room"], change["id"]) for change in payload["changes"]
+                   if change["scope"] == "device" and "set" in change]
+        result = reconcile_scoped_device_edits(existing, result, targets)
     _validate_home(result, resolve_bindings)
     return result, removals
 
@@ -1320,80 +1475,91 @@ def _yaml_change_summary(previous: dict, proposed: dict) -> str:
     return "\n".join(lines)[:3500]
 
 
+# One action registry: label, owning context, handler, available in visual draft.
+OPTION_TASKS = {
+    "device_add": ("Devices · add a native device", "global", "device_add", True),
+    "device_settings": ("Devices · edit settings", "device", "device_select", True),
+    "device_edit": ("Devices · Expert YAML", "device", "device_select", True),
+    "device_remove": ("Devices · remove an unassigned device", "device", "device_select", True),
+    "device_assign": ("Devices · assign to a room", "device", "device_select", True),
+    "device_unassign": ("Devices · unassign from a room", "device", "device_select", True),
+    "add_room": ("Rooms · add a location and select devices", "global", "room", False),
+    "edit_room": ("Rooms · edit a location's devices", "room", "display", False),
+    "rename_room": ("Rooms · edit name or Home Assistant area", "room", "room_settings", False),
+    "remove_room": ("Rooms · remove a location", "room", "review", False),
+    "guided_activity": ("Activities · create TV, movie, music or presentation", "global", "guided_activity", False),
+    "add_activity": ("Activities · add a custom activity", "room", "activity", False),
+    "edit_activity": ("Activities · edit a full activity", "activity", "activity", False),
+    "activity_devices": ("Activities · choose devices and startup order", "activity", "activity_devices", True),
+    "quick_edit_activity": ("Activities · quick edit name and real HDMI input", "activity", "quick_edit_activity", False),
+    "remove_activity": ("Activities · remove an activity", "activity", "review", False),
+    "harmony_owner": ("Advanced · Harmony / Premium command ownership", "room", "harmony_owner", True),
+    "tv_wake": ("Advanced · Device Wake-on-LAN", "room", "tv_wake", True),
+    "speech_endpoint": ("Notifications · Native speech for idle speakers", "room", "speech_endpoint", True),
+    "cec_device": ("Advanced · HDMI-CEC device settings", "room", "cec_device", True),
+    "cec_activity": ("Advanced · HDMI-CEC activity relationship", "activity", "cec_activity", True),
+    "dell_add": ("Devices · add a Dell C8621QT LAN display", "global", "dell_display", True),
+    "dell_edit": ("Devices · edit Dell display", "dell", "existing_dell", True),
+    "dell_remove": ("Devices · remove unassigned Dell display", "dell", "existing_dell", True),
+    "frontend": ("Dashboard · enable or disable card", "global", "frontend", False),
+    "expert_yaml": ("Advanced · edit one exact object via Expert YAML", "global", "expert_target", False),
+    "script_defaults": ("Activities · standard wait between commands", "global", "script_defaults", False),
+    "script_step": ("Activities · edit the ordered script steps", "activity", "script_step", True),
+    "button_mapping": ("Activities · assign button to selected device", "activity", "button_mapping", True),
+    "macro_manage": ("Activities · manage named one-touch shortcuts", "activity", "macro_manage", True),
+    "review": ("Review and save existing pending configuration", "global", "review", False),
+}
+OPTION_SPECIALISTS = tuple(key for key, task in OPTION_TASKS.items() if task[3])
+OPTION_DEVICE_ACTIONS = tuple(key for key, task in OPTION_TASKS.items()
+                              if task[1] in ("device", "dell") or key in ("device_add", "dell_add"))
+
+
 class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
     def __init__(self, config_entry):
         self._entry = config_entry
-        self._begin(rooms=config_entry.options.get(CONF_ROOMS, config_entry.data.get(CONF_ROOMS, {})),
+        self._original_entry_options = deepcopy(dict(config_entry.options))
+        self._original_entry_data = deepcopy(dict(config_entry.data))
+        model = configuration_model(configuration_source(config_entry))
+        self._original_catalog = model[DEVICE_CATALOG]
+        self._draft_catalog = deepcopy(self._original_catalog)
+        self._begin(rooms=expand_device_model(model, validate=False),
                     name=config_entry.data.get(CONF_TITLE, "Multimedia"))
         self._dell_displays = deepcopy(config_entry.options.get("dell_displays",
                                                                config_entry.data.get("dell_displays", {})))
         self._original_dell_displays = deepcopy(self._dell_displays)
         self._original_enable_ux = config_entry.options.get("enable_ux", True)
         self._yaml_enable_ux = None
-        self._original_step_delay_ms = validate_step_delay(config_entry.options.get("default_step_delay_ms", 0))
+        self._original_step_delay_ms = validate_step_delay(config_entry.options.get("default_step_delay_ms", DEFAULT_STEP_DELAY_MS))
         self._yaml_step_delay_ms = None
         self._dell_key = None
 
     async def async_step_init(self, user_input=None):
-        options = {"complete_setup": "Complete home setup — one Review and Save",
-                   "assisted": "Assisted — configure rooms, devices and activities",
-                   "yaml": "YAML — update one room/device/activity or import (advanced)",
-                   "expert_yaml": "Expert YAML — edit one selected object",
-                   "add_room": "Add room", "edit_room": "Edit room devices and connections",
-                   "guided_activity": "Create an activity: start with what you want to do",
-                   "add_activity": "Add activity", "rename_room": "Rename room / change area",
-                   "edit_activity": "Edit activity", "activity_devices": "Choose approved activity devices and startup order", "quick_edit_activity": "Quick edit activity name and inputs",
-                   "remove_activity": "Remove activity",
-                   "remove_room": "Remove room", "review": "Review and save", "frontend": "Dashboard card",
-                   "harmony_owner": "Harmony / Premium control ownership",
-                   "tv_wake": "Device Wake-on-LAN (MAC / IP)",
-                   "speech_endpoint": "Speaker speech notifications",
-                   "cec_device": "HDMI-CEC setting per selected device",
-                   "cec_activity": "HDMI-CEC relationship and activity actions",
-                   "script_defaults": "Activity scripts — default delay between actions",
-                   "script_step": "Activity scripts — add, edit or reorder a step",
-                   "button_mapping": "Activity buttons — assign exact device and native command",
-                   "macro_manage": "One-touch shortcuts — create, edit or remove",
-                   "dell_add": "Add Dell C8621QT LAN display",
-                   "dell_edit": "Rename Dell C8621QT display",
-                   "dell_remove": "Remove unassigned Dell C8621QT display"}
+        methods = {
+            "devices": "Devices — add, configure or assign",
+            "assisted": "Rooms, activities and advanced settings",
+            "complete_setup": "Complete home setup",
+            "yaml": "Expert YAML — import or edit configuration",
+        }
         if user_input:
-            action = user_input["action"]
+            action = user_input.get("action")
+            if action not in methods and action not in OPTION_TASKS:
+                return self.async_show_form(step_id="init", errors={"base": "selection_changed"},
+                    data_schema=vol.Schema({vol.Required("action"): vol.In(methods)}))
             if action == "complete_setup":
                 return await self.async_step_complete_setup()
+            if action == "devices":
+                return await self.async_step_devices()
             if action == "assisted":
                 return await self.async_step_assisted()
             if action == "yaml":
                 self._global_yaml = True
                 return await self.async_step_yaml()
-            if action == "expert_yaml":
-                return await self.async_step_expert_target()
-            if action == "frontend":
-                return await self.async_step_frontend()
-            if action == "script_defaults":
-                return await self.async_step_script_defaults()
-            if action == "add_room":
-                return await self.async_step_room()
-            if action == "guided_activity":
-                return await self.async_step_guided_activity()
-            if action == "dell_add":
-                self._dell_key = None
-                return await self.async_step_dell_display()
-            if action in ("dell_edit", "dell_remove"):
-                self._option_action = action
-                return await self.async_step_existing_dell()
-            if action == "review":
-                return await self.async_step_review()
-            self._option_action = action
-            return await self.async_step_existing_room()
+            return await self._open_task(action)
         # One supported visual setup route, plus Expert YAML. Keep the old
         # direct action IDs/Assisted handlers for backward compatibility but
         # stop advertising obsolete wizard alternatives to new admins.
-        # Offer only three top-level routes in native HA. Assisted is the
-        # existing explicit advanced gateway for contextual card actions;
-        # hiding it from HA's actual form schema rejects those actions before
-        # async_step_init can dispatch. Keep it available, not the default.
-        methods = {key: options[key] for key in ("complete_setup", "yaml", "assisted")}
+        # Device-first native entry and Expert YAML; contextual clients still
+        # use the existing Assisted gateway, backed by the same task registry.
         return self.async_show_form(step_id="init", data_schema=vol.Schema({
             vol.Required("action"): vol.In(methods)}))
 
@@ -1416,10 +1582,21 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             raise ValueError(f"{path}: Capture needs native media-player readback, not blind remote keys")
         return state
 
+    @staticmethod
+    def _capture_document(text):
+        """Accept the canonical draft or the existing legacy capture document."""
+        doc = _yaml_document(text)
+        fields = {"rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}
+        if set(doc) not in (fields, fields | {DEVICE_CATALOG}):
+            raise ValueError("Capture requires the complete editable configuration")
+        if DEVICE_CATALOG in doc:
+            return {**doc, "rooms": expand_device_model(doc)}
+        return doc
+
     def _capture_candidates(self, text):
         """Read-only proposal from the same draft and native eligibility as capture."""
         try:
-            rooms = _yaml_document(text).get("rooms", {})
+            rooms = self._capture_document(text)["rooms"]
             candidates = {}
             for room_id, room in rooms.items():
                 rows = []
@@ -1444,9 +1621,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
 
         if getattr(self, "_yaml_focus", None) is not None:
             raise ValueError("Open the full Activities editor to capture current settings")
-        doc = _yaml_document(text)
-        if set(doc) != {"rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
-            raise ValueError("Capture requires the complete editable configuration")
+        doc = self._capture_document(text)
         required = {"room", "activity", "name", "activity_type", "devices", "include_volume"}
         if (not isinstance(request, dict) or not required <= set(request)
                 or set(request) - required - {"include_mute"}):
@@ -1456,7 +1631,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         name, kind = request["name"], request["activity_type"]
         if (not isinstance(room_id, str) or room_id not in doc["rooms"]
                 or not isinstance(activity_id, str) or not isinstance(name, str)
-                or not 0 < len(name.strip()) <= 80 or kind not in (*ACTIVITIES, "work_on_pc")
+                or not 0 < len(name.strip()) <= 80 or kind not in ACTIVITY_TYPES
                 or type(request["include_volume"]) is not bool
                 or type(request.get("include_mute", False)) is not bool
                 or not isinstance(cast, list) or not cast
@@ -1521,11 +1696,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 if devices[item].get("foundation_concept") == "display" and not any(
                         step["device"] == item and step["type"] == "source" for step in steps):
                     raise ValueError("Capture a verified computer display input")
-        if kind not in ("listen_music", "work_on_pc") and "display" not in concepts:
+        if kind in ACTIVITY_VIDEO_TYPES and "display" not in concepts:
             raise ValueError("Video activities need a configured display")
-        if kind in ("watch_source", "play_game") and "source" not in concepts:
+        if kind in ACTIVITY_PLAYER_TYPES and "source" not in concepts:
             raise ValueError("Choose a configured native source for this activity")
-        if prior is None and kind not in ("listen_music", "work_on_pc") and not any(step["type"] == "source" for step in steps):
+        if prior is None and kind in ACTIVITY_VIDEO_TYPES and not any(step["type"] == "source" for step in steps):
             raise ValueError("Capture a verified TV or receiver input for this video activity")
         if prior is None:
             proposed = {"name": name.strip(), "activity_type": kind,
@@ -1547,6 +1722,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     sequence[index] = step
         activities[key] = proposed
         validate_rooms(doc["rooms"])
+        if DEVICE_CATALOG in doc:
+            doc.update(split_device_model(doc["rooms"], doc[DEVICE_CATALOG]))
         return json.dumps(doc, ensure_ascii=False, allow_nan=False, indent=2), key
 
     async def async_step_complete_setup(self, user_input=None):
@@ -1569,8 +1746,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                             and request["refresh"] is True):
                         if getattr(self, "_yaml_focus", None) is not None:
                             raise ValueError("Open the full Activities editor to capture current settings")
-                        if set(_yaml_document(proposed)) != {"rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
-                            raise ValueError("Capture requires the complete editable configuration")
+                        self._capture_document(proposed)
                         return await self._complete_setup_form(text=proposed)
                     text, captured = self._capture_activity(proposed, request)
                 except (ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
@@ -1597,7 +1773,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     and not result.get("errors")):
                 room_id = user_input.get("specialist_room", "")
                 activity_id = user_input.get("specialist_activity", "")
-                return await self._open_specialist_section(specialist, room_id, activity_id)
+                return await self._open_specialist_section(
+                    specialist, room_id, activity_id, user_input.get("specialist_device", ""))
             if result.get("type") == "form" and result.get("step_id") == "yaml":
                 # Keep the full iPad editor and unsaved draft when validation
                 # rejects data, rather than falling back to the legacy forms.
@@ -1613,29 +1790,40 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             fields = {**fields, vol.Optional("return_to_setup", default=False): bool}
         return self.async_show_form(data_schema=vol.Schema(fields), **kwargs)
 
-    async def _open_specialist_section(self, action, room_id, activity_id):
+    async def _open_task(self, action, room_id=None, activity_id=None, asset_id=None):
+        """Resolve the same task and context for native and embedded editors."""
+        _, scope, step, _ = OPTION_TASKS[action]
+        self._option_action = action
+        if action == "dell_add":
+            self._dell_key = None
+        if scope in ("room", "activity"):
+            if room_id is None:
+                return await self.async_step_existing_room()
+            self._room_id = room_id
+            if scope == "activity":
+                return await self.async_step_existing_activity(
+                    {"activity": activity_id} if activity_id is not None else None)
+            return await self.async_step_existing_room({"room": room_id})
+        if scope == "device" and asset_id:
+            return await self.async_step_device_select({"device": asset_id})
+        return await getattr(self, f"async_step_{step}")()
+
+    async def _open_specialist_section(self, action, room_id, activity_id, asset_id=""):
         """Reuse the native specialist steps inside this existing Options Flow."""
-        room_actions = {"harmony_owner", "speech_endpoint", "tv_wake", "cec_device"}
-        activity_actions = {"button_mapping", "macro_manage", "cec_activity", "script_step"}
-        dell_actions = {"dell_add", "dell_edit", "dell_remove"}
+        task = OPTION_TASKS.get(action)
+        scope = task[1] if task else None
         room = self._rooms.get(room_id)
-        if (action not in room_actions | activity_actions | dell_actions
-                or (action in room_actions | activity_actions and room is None)
-                or (action in activity_actions and activity_id not in room["activities"])
-                or (action in {"dell_edit", "dell_remove"} and not self._dell_displays)):
+        if (action not in OPTION_SPECIALISTS
+                or (scope in ("room", "activity") and room is None)
+                or (scope == "activity" and activity_id not in room["activities"])
+                or (scope == "dell" and not self._dell_displays)
+                or (scope == "device" and asset_id and asset_id not in self._device_model()[DEVICE_CATALOG])):
             return await self._complete_setup_form(errors={"base": "selection_changed"},
                 validation_detail="Choose an existing room, activity or display for this setting.")
         self._specialist_section = True
         self._activity_tuning = False
         self._script_phase = "steps"
-        self._option_action = action
-        if action in dell_actions:
-            return await self.async_step_init({"action": action})
-        self._room_id = room_id
-        if action in activity_actions:
-            self._editing_activity = activity_id
-            return await self.async_step_existing_activity({"activity": activity_id})
-        return await self.async_step_existing_room({"room": room_id})
+        return await self._open_task(action, room_id, activity_id, asset_id)
 
     def _expert_object_document(self, payload):
         """Expand selected-object text into the existing complete draft guard.
@@ -1700,7 +1888,14 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         else:
             baseline[group][object_id] = deepcopy(after)
         if payload != expected:
-            raise ValueError("Expert YAML must update its selected object only")
+            # A rendered legacy draft can include the deterministic projection
+            # of the selected Device's policy into its other room relations.
+            # No unrelated fields or local membership edits are permitted.
+            if scope == "device":
+                expected["rooms"] = reconcile_scoped_device_edits(
+                    self._original_rooms, expected["rooms"], [(room_id, object_id)])
+            if payload != expected:
+                raise ValueError("Expert YAML must update its selected object only")
         return deepcopy(proposed)
 
     def _editable_home_draft(self, text, mode="replace"):
@@ -1714,7 +1909,19 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             focus = getattr(self, "_yaml_focus", None)
             if focus is not None and getattr(self, "_complete_setup", False) and "object" in payload:
                 payload = self._expert_object_document(payload)
-            if set(payload) == {"changes"}:
+            if focus is None and DEVICE_CATALOG in payload:
+                # A structurally renderable but semantically rejected
+                # canonical import remains the user's exact unsaved draft.
+                if set(payload) - {"rooms", DEVICE_CATALOG, "dell_displays", "enable_ux", "default_step_delay_ms"}:
+                    return ""
+                if mode == "merge":
+                    base = self._device_model()
+                    payload = {**payload, DEVICE_CATALOG: {**base[DEVICE_CATALOG], **payload[DEVICE_CATALOG]},
+                               "rooms": {**base["rooms"], **payload["rooms"]}}
+                elif mode != "replace":
+                    return ""
+                rooms = expand_device_model(payload, validate=False)
+            elif set(payload) == {"changes"}:
                 if focus is not None:
                     self._check_expert_patch(payload, focus)
                 rooms, _ = _yaml_candidate(text, self._original_rooms, mode)
@@ -1748,11 +1955,13 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                               for phase in ("steps", "stop_steps"))
                        for activity in room["activities"].values()):
                     return ""
-            try:
-                self._resolve_yaml_bindings(rooms)
-            except ValueError:
-                pass  # Keep all unresolved slots; the original diagnostic remains.
-            doc = {"rooms": rooms,
+            if DEVICE_CATALOG not in payload:
+                try:
+                    self._resolve_yaml_bindings(rooms)
+                except ValueError:
+                    pass  # Keep all unresolved slots; the original diagnostic remains.
+            doc = {**({DEVICE_CATALOG: payload[DEVICE_CATALOG], "rooms": payload["rooms"]}
+                       if DEVICE_CATALOG in payload else {"rooms": rooms}),
                    "dell_displays": payload.get("dell_displays", self._original_dell_displays),
                    "enable_ux": payload.get("enable_ux", self._original_enable_ux),
                    "default_step_delay_ms": payload.get("default_step_delay_ms", self._original_step_delay_ms)}
@@ -1786,9 +1995,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             pass  # Optional fixture/old HA: never fabricate a physical floor.
         discovery = discovered_av_sources(self.hass)
         discovered, discovery_origin = discovery
-        catalog = logical_av_catalog(self.hass, self._rooms, discovered=discovery)
+        try:
+            configured_devices = self._device_model()[DEVICE_CATALOG]
+        except (ValueError, TypeError, KeyError, AttributeError):
+            configured_devices = self._draft_catalog
+        catalog = logical_av_catalog(self.hass, self._rooms, discovered=discovery,
+                                     configured_devices=configured_devices)
         logical_devices, _ = catalog
-        proposals = proposed_room_setup(self.hass, self._rooms, discovered=discovery, catalog=catalog)
+        proposals = proposed_room_setup(self.hass, self._rooms, discovered=discovery,
+                                        catalog=catalog, configured_devices=configured_devices)
         asset_by_candidate = {
             (row["concept"], row["candidate_id"], row["entity_id"]): asset["asset_id"]
             for asset in logical_devices for row in asset["candidates"]
@@ -1815,12 +2030,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 sorted(selected_native_macs(self.hass, source))
             for source in native_sources
         }
-        reviewed_keys = {
-            (device.get("foundation_concept"), device.get("entity"),
-             device.get("foundation_candidate_id"))
-            for room in self._original_rooms.values()
-            for device in room.get("devices", {}).values()
-            if authorized_source(self.hass, device) is not None
+        # Reuse the same owner-aware candidate projection; do not recompute
+        # approval by traversing the original room copies.
+        approved_keys = {
+            (candidate["concept"], candidate["entity_id"], candidate["candidate_id"]): candidate["approved"]
+            for asset in logical_devices for candidate in asset["candidates"]
         }
         sources = []
         for src in discovered:
@@ -1839,8 +2053,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "concept": src.concept,
                 "provider": src.provider,
                 "available": src.available,
-                "approved": (src.approved or (src.concept, src.entity_id,
-                                               src.candidate_id) in reviewed_keys),
+                "approved": approved_keys.get((src.concept, src.entity_id, src.candidate_id), src.approved),
                 "verified_macs": approved_macs.get(
                     (src.concept, src.candidate_id, src.entity_id), []),
                 "network_ipv4_choices": network_address_choices(self.hass, src),
@@ -1859,7 +2072,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             })
         if text is None:
             text = json.dumps({
-                "rooms": self._rooms,
+                **(self._device_model() if getattr(self, "_yaml_focus", None) is None
+                   else {"rooms": self._rooms}),
                 "dell_displays": self._dell_displays,
                 "enable_ux": (self._yaml_enable_ux if self._yaml_enable_ux is not None
                               else self._original_enable_ux),
@@ -1867,6 +2081,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                                           if self._yaml_step_delay_ms is not None
                                           else self._original_step_delay_ms),
             }, ensure_ascii=False, indent=2)
+        try:
+            canonical_transport = DEVICE_CATALOG in _yaml_document(text)
+        except (ValueError, TypeError, AttributeError, KeyError):
+            canonical_transport = False
         return self.async_show_form(
             step_id="complete_setup",
             errors=errors or {},
@@ -1875,9 +2093,10 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
                 vol.Optional("visual_edit", default=False): bool,
                 **({vol.Optional("capture_request", default=""): str,
-                    vol.Optional("specialist_action", default=""): vol.In(["", "harmony_owner", "speech_endpoint", "tv_wake", "cec_device", "button_mapping", "macro_manage", "cec_activity", "script_step", "dell_add", "dell_edit", "dell_remove"]),
+                    vol.Optional("specialist_action", default=""): vol.In(("", *OPTION_SPECIALISTS)),
                     vol.Optional("specialist_room", default=""): str,
-                    vol.Optional("specialist_activity", default=""): str}
+                    vol.Optional("specialist_activity", default=""): str,
+                    vol.Optional("specialist_device", default=""): str}
                    if getattr(self, "_yaml_focus", None) is None else {}),
             }),
             description_placeholders={
@@ -1888,6 +2107,20 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 "capture_candidates_json": json.dumps(self._capture_candidates(text)),
                 "computer_io_json": json.dumps(computer_io, ensure_ascii=False),
                 "logical_devices_json": json.dumps(logical_devices, ensure_ascii=False),
+                # Only legacy expanded transport needs a retained catalog
+                # hint. Canonical documents already contain the single owner.
+                **({} if canonical_transport else {
+                    "device_catalog_json": json.dumps(configured_devices, ensure_ascii=False)}),
+                "device_contract_json": json.dumps({
+                    "actions": [key for key in OPTION_DEVICE_ACTIONS if key.startswith("device_")],
+                    "membership_fields": sorted(MEMBERSHIP_FIELDS),
+                    "activity_types": sorted(ACTIVITY_TYPES),
+                    "step_types": sorted(ALLOWED_STEPS),
+                    "power_modes": sorted(POWER_MODES),
+                    "roles": sorted(DEVICE_ROLES),
+                    "max_step_delay_ms": MAX_STEP_DELAY_MS,
+                    "pc_keys": list(PC_KEYS),
+                }),
                 "proposed_rooms_json": json.dumps(proposals["rooms"], ensure_ascii=False),
                 "proposal_exceptions_json": json.dumps(proposals["exceptions"], ensure_ascii=False),
                 "validation_detail": validation_detail if errors else "",
@@ -1902,43 +2135,27 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         "One draft and native Review/Save; Cancel discards all.",
             })
 
-    async def async_step_assisted(self, user_input=None):
-        """One friendly entry for the existing, fully functional HA wizard."""
-        tasks = {
-            "add_room": "Rooms · add a location and select devices",
-            "edit_room": "Rooms · edit a location's devices",
-            "rename_room": "Rooms · edit name or Home Assistant area",
-            "remove_room": "Rooms · remove a location",
-            "guided_activity": "Activities · create TV, movie, music or presentation",
-            "add_activity": "Activities · add a custom activity",
-            "edit_activity": "Activities · edit a full activity",
-            "activity_devices": "Activities · choose devices and startup order",
-            "quick_edit_activity": "Activities · quick edit name and real HDMI input",
-            "remove_activity": "Activities · remove an activity",
-            "harmony_owner": "Advanced · Harmony / Premium command ownership",
-            "tv_wake": "Advanced · Device Wake-on-LAN",
-            "speech_endpoint": "Notifications · Native speech for idle speakers",
-            "cec_device": "Advanced · HDMI-CEC device settings",
-            "cec_activity": "Advanced · HDMI-CEC activity relationship",
-            "dell_add": "Advanced · add an approved Dell C8621QT",
-            "dell_edit": "Advanced · edit Dell display",
-            "dell_remove": "Advanced · remove unassigned Dell display",
-            "frontend": "Dashboard · enable or disable card",
-            "expert_yaml": "Advanced · edit one exact object via Expert YAML",
-            "script_defaults": "Activities · standard wait between commands",
-            "script_step": "Activities · edit the ordered script steps",
-            "button_mapping": "Activities · assign button to selected device",
-            "macro_manage": "Activities · manage named one-touch shortcuts",
-            "review": "Review and save existing pending configuration",
-        }
+    async def async_step_devices(self, user_input=None):
+        """Short native HA Device menu, derived from the same action registry."""
+        errors = {}
         if user_input is not None:
             task = user_input.get("task")
-            if task in tasks:
+            if task in OPTION_DEVICE_ACTIONS:
+                return await self.async_step_init({"action": task})
+            errors["base"] = "selection_changed"
+        return self.async_show_form(step_id="devices", errors=errors, data_schema=vol.Schema({
+            vol.Required("task"): vol.In({key: OPTION_TASKS[key][0] for key in OPTION_DEVICE_ACTIONS})}))
+
+    async def async_step_assisted(self, user_input=None):
+        """Compatibility and advanced native routes from the same action registry."""
+        if user_input is not None:
+            task = user_input.get("task")
+            if task in OPTION_TASKS:
                 # Exactly the same internal routes as the pre-existing
                 # Options Flow and the card's direct admin actions.
                 return await self.async_step_init({"action": task})
         return self.async_show_form(step_id="assisted", data_schema=vol.Schema({
-            vol.Required("task"): vol.In(tasks)}))
+            vol.Required("task"): vol.In({key: task[0] for key, task in OPTION_TASKS.items()})}))
 
     async def async_step_expert_target(self, user_input=None):
         """Resolve one existing semantic object before providing YAML to the UX.
@@ -1989,6 +2206,26 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 or "set" not in changes[0] or "remove" in changes[0]):
             raise ValueError("Expert YAML must update its selected object only")
 
+    def _review_visual_rebind(self, asset, prior, proposed):
+        """Exact repair of a previously saved Device, never a generic rebind."""
+        # Freeze the historical asset and reservation when an entity-only
+        # legacy link gets repaired. A new physical identity is not inferred.
+        if (("asset_id" in prior and proposed.get("asset_id") != prior["asset_id"])
+                or ("physical_id" in prior and proposed.get("physical_id") != prior["physical_id"])
+                or (proposed.get("physical_id") or proposed["entity"]) !=
+                   (prior.get("physical_id") or prior["entity"])
+                or proposed.get("foundation_concept") != prior.get("foundation_concept")):
+            raise ValueError("Native repair cannot change Device or reservation identity")
+        if proposed.get("entity") != prior["entity"] and not prior["entity"].startswith("REPLACE_WITH_"):
+            if proposed.get("control_approved") is not False:
+                raise ValueError("Review command approval separately after replacing a native entity")
+            if prior.get("foundation_concept") == "network" and any(
+                    proposed.get(key) for key in ("computer_agent", "computer_io", "windows_native")):
+                raise ValueError("Review computer provider bindings after replacing its native entity")
+        # Exact current native evidence is required even for read-only repair.
+        if reviewed_native_source(self.hass, {**proposed, "control_approved": True}) is None:
+            raise ValueError("Select one exact current Foundation candidate and native registry identity")
+
     async def async_step_yaml(self, user_input=None, *, draft_text=None, draft_mode="merge"):
         """Advanced admin YAML import; never writes before normal Review/Save."""
         errors = {}
@@ -2009,11 +2246,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 local_visual = focus is not None and getattr(self, "_complete_setup", False) and set(payload) != {"changes"}
                 if focus is not None and not local_visual:
                     self._check_expert_patch(payload, focus)
-                # Whole Multimedia includes rooms and existing Dell display
-                # registrations / card preference; no new physical inventory
-                # or extra configuration authority. Scoped objects are unchanged.
+                # Native canonical YAML owns exactly the same Device and
+                # Room objects as Options Flow; legacy expanded input remains
+                # a compatibility boundary, never an independent writer.
+                catalog_candidate = None
                 if local_visual:
                     proposed = self._expert_scope_rooms(payload)
+                    if focus[0] == "device":
+                        proposed = reconcile_scoped_device_edits(
+                            self._original_rooms, proposed, [(focus[1], focus[2])])
                     _validate_home(proposed, self._resolve_yaml_bindings)
                     self._expert_scope_rooms({**payload, "rooms": proposed})
                     explicit_removals = []
@@ -2021,9 +2262,37 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     ux_option = self._original_enable_ux
                     step_delay_ms = self._original_step_delay_ms
                 elif focus is None and payload and set(payload) <= {
-                        "rooms", "dell_displays", "enable_ux", "default_step_delay_ms"}:
-                    room_document = yaml.safe_dump({"rooms": payload["rooms"]}) if "rooms" in payload else None
-                    if room_document is not None:
+                        "rooms", DEVICE_CATALOG, "dell_displays", "enable_ux", "default_step_delay_ms"}:
+                    room_document = yaml.safe_dump({"rooms": payload["rooms"]}) if "rooms" in payload and DEVICE_CATALOG not in payload else None
+                    if DEVICE_CATALOG in payload:
+                        if "rooms" not in payload:
+                            raise ValueError("Canonical import requires device_catalog and rooms")
+                        incoming = payload[DEVICE_CATALOG]
+                        if not isinstance(incoming, dict):
+                            raise ValueError("Canonical device_catalog must be a mapping")
+                        allowed = (YAML_SCOPED_FIELDS["device"] - MEMBERSHIP_FIELDS) | {DEVICE_LABEL}
+                        for asset, device in incoming.items():
+                            prior = self._original_catalog.get(asset, {})
+                            if (not isinstance(device, dict)
+                                    or set(device) - (allowed | set(prior))):
+                                raise ValueError(f"devices.{asset}: unknown device configuration field")
+                        visual = getattr(self, "_complete_setup", False)
+                        # A native specialist may already have explicitly removed or
+                        # added an object in this same draft. Do not resurrect it.
+                        base_model = (self._device_model() if visual else
+                                      split_device_model(self._original_rooms, self._original_catalog))
+                        candidate = merge_device_model(base_model,
+                            {DEVICE_CATALOG: incoming, "rooms": payload["rooms"]}, mode,
+                            review_rebind=self._review_visual_rebind if visual else None)
+                        proposed = expand_device_model(candidate)
+                        catalog_candidate = candidate[DEVICE_CATALOG]
+                        explicit_removals = []
+                    elif (getattr(self, "_complete_setup", False) and mode == "replace"
+                          and payload.get("rooms") == {} and room_document is not None):
+                        # The visual workspace also configures standalone devices.
+                        # Existing room removals still require explicit confirmation.
+                        proposed, explicit_removals = {}, []
+                    elif room_document is not None:
                         proposed, explicit_removals = _yaml_plan(
                             room_document, self._original_rooms, mode,
                             resolve_bindings=self._resolve_yaml_bindings)
@@ -2050,11 +2319,15 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                             raise ValueError("Dell host/registration cannot be rebound from YAML")
                         dell[key] = {"name": details["name"].strip(),
                                      "host": details["host"]}
-                    ux_option = payload.get("enable_ux", self._original_enable_ux)
+                    visual = getattr(self, "_complete_setup", False)
+                    ux_option = payload.get("enable_ux",
+                        self._yaml_enable_ux if visual and self._yaml_enable_ux is not None else self._original_enable_ux)
                     if type(ux_option) is not bool:
                         raise ValueError("Invalid frontend preference")
                     step_delay_ms = validate_step_delay(
-                        payload.get("default_step_delay_ms", self._original_step_delay_ms))
+                        payload.get("default_step_delay_ms",
+                            self._yaml_step_delay_ms if visual and self._yaml_step_delay_ms is not None
+                            else self._original_step_delay_ms))
                 else:
                     proposed, explicit_removals = _yaml_plan(
                         document, self._original_rooms, mode,
@@ -2062,9 +2335,11 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     dell = deepcopy(self._original_dell_displays)
                     ux_option = self._original_enable_ux
                     step_delay_ms = self._original_step_delay_ms
-                previous, previous_dell, previous_ux, previous_delay = (
+                previous, previous_dell, previous_ux, previous_delay, previous_catalog = (
                     self._rooms, self._dell_displays, self._yaml_enable_ux,
-                    self._yaml_step_delay_ms)
+                    self._yaml_step_delay_ms, self._draft_catalog)
+                if catalog_candidate is not None:
+                    self._draft_catalog = deepcopy(catalog_candidate)
                 self._rooms = deepcopy(proposed)
                 self._dell_displays = deepcopy(dell)
                 self._yaml_enable_ux = ux_option
@@ -2072,14 +2347,14 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 try:
                     reason = self._review_configuration()
                 except (ValueError, KeyError, TypeError, RecursionError, AttributeError) as exc:
-                    self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
-                        previous, previous_dell, previous_ux, previous_delay)
+                    self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms, self._draft_catalog = (
+                        previous, previous_dell, previous_ux, previous_delay, previous_catalog)
                     errors["base"] = "selection_changed"
                     rejection_detail = _validation_detail(exc)
                 else:
                     if reason:
-                        self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms = (
-                            previous, previous_dell, previous_ux, previous_delay)
+                        self._rooms, self._dell_displays, self._yaml_enable_ux, self._yaml_step_delay_ms, self._draft_catalog = (
+                            previous, previous_dell, previous_ux, previous_delay, previous_catalog)
                         errors["base"] = reason
                         rejection_detail = self._review_detail or ("The proposed settings failed native " + str(reason))
                     else:
@@ -2088,24 +2363,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         self._yaml_draft_mode = mode
                         self._yaml_deleted_rooms = sorted(
                             set(self._original_rooms) - set(proposed)) + explicit_removals
-                        self._yaml_diff = _yaml_change_summary(self._original_rooms, proposed)
-                        if dell != self._original_dell_displays:
-                            added_dell = sorted(set(dell) - set(self._original_dell_displays))
-                            removed_dell = sorted(set(self._original_dell_displays) - set(dell))
-                            renamed_dell = sorted(k for k in set(dell) & set(self._original_dell_displays)
-                                                  if dell[k] != self._original_dell_displays[k])
-                            self._yaml_diff += "\nDell display labels changed: " + ", ".join(renamed_dell)
-                            if added_dell:
-                                self._yaml_diff += "\nDell displays added: " + ", ".join(added_dell)
-                            if removed_dell:
-                                self._yaml_diff += "\nDell displays removed: " + ", ".join(removed_dell)
-                                self._yaml_deleted_rooms.extend("display " + k for k in removed_dell)
-                        if ux_option != self._original_enable_ux:
-                            self._yaml_diff += f"\nPremium UX enabled: {ux_option}"
-                        if step_delay_ms != self._original_step_delay_ms:
-                            self._yaml_diff += f"\nDefault inter-step delay: {step_delay_ms} ms"
-                        if explicit_removals:
-                            self._yaml_diff += "\nExplicit removals: " + ", ".join(explicit_removals)
+                        self._yaml_deleted_rooms.extend("display " + key for key in
+                                                       self._original_dell_displays.keys() - dell.keys())
                         if (user_input.get("visual_edit") is True
                                 and (focus is not None or getattr(self, "_global_yaml", False) or getattr(self, "_complete_setup", False))):
                             self._complete_setup = True
@@ -2139,7 +2398,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                     "Preview before the same guarded HA Options Flow Save.")
         else:
             current = yaml.safe_dump({
-                "rooms": self._rooms,
+                **self._device_model(),
                 "dell_displays": self._original_dell_displays,
                 "enable_ux": self._original_enable_ux,
                 "default_step_delay_ms": self._original_step_delay_ms,
@@ -2149,15 +2408,16 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             mode_default = attempted_mode if attempted_mode in ("merge", "replace") else "merge"
             schema = vol.Schema({
                 vol.Required("mode", default=mode_default): vol.In({
-                    "merge": "Apply scoped changes or merge complete rooms (preserve others)",
-                    "replace": "Replace all rooms (full rooms export only; destructive)"}),
+                    "merge": "Merge devices and rooms, or apply scoped changes (preserve others)",
+                    "replace": "Replace room relationships (preserve devices; destructive)"}),
                 vol.Required("yaml_text", default=current):
                     selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
                 **({vol.Optional("visual_edit", default=False): bool}
                    if getattr(self, "_global_yaml", False) else {})})
-            note = ("Live HA Options Flow: use changes: for independent room/device/activity edits, "
-                    "or rooms: for complete room import/export. Review before Save; "
-                    "Foundation alone selects physical sources. No configuration.yaml/.storage writes.")
+            note = ("Live HA Options Flow: device_catalog and rooms are the canonical export, including "
+                    "unassigned devices. Legacy expanded rooms and scoped changes remain supported. "
+                    "Review before Save; Foundation alone selects physical sources. "
+                    "No configuration.yaml/.storage writes.")
         if errors:
             note += "\n\nDraft NOT saved."
             # Both entry points reuse the visual workspace. The local scope
@@ -2201,6 +2461,314 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 return await self.async_step_activity()
         return self.async_show_form(step_id="guided_room",
             data_schema=vol.Schema({vol.Required("room"): vol.In(rooms)}))
+
+    def _device_model(self):
+        return split_device_model(self._rooms, self._draft_catalog)
+
+    def _stage_model(self, model):
+        self._rooms = expand_device_model(model)
+        self._draft_catalog = model[DEVICE_CATALOG]
+
+    def _stage_device(self, asset, replacement):
+        self._stage_model(change_device(self._device_model(), asset, replacement))
+
+    def _update_device(self, asset, update):
+        model = self._device_model()
+        replacement = deepcopy(model[DEVICE_CATALOG][asset])
+        update(replacement)
+        self._stage_model(change_device(model, asset, replacement))
+
+    async def async_step_device_add(self, user_input=None):
+        """Select one exact existing native endpoint, independent of rooms."""
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        model = self._device_model()
+        saved_entities = {d["entity"] for d in model[DEVICE_CATALOG].values()}
+        saved_entities.update(d["computer_agent"]["entity"] for d in model[DEVICE_CATALOG].values()
+                              if d.get("computer_agent"))
+        sources, _ = discovered_av_sources(self.hass)
+        existing_groups = {native_asset_key(source) for source in sources
+                           if source.entity_id in saved_entities}
+        primary_groups = {native_asset_key(source) for source in sources
+                          if source.entity_id.startswith("media_player.") and not source.review_reason}
+        choices = {}
+        for source in sources:
+            if (source.review_reason or source.entity_id in saved_entities
+                    or native_asset_key(source) in existing_groups
+                    or source.concept not in ("display", "amplifier", "source", "network")
+                    or (source.entity_id.startswith("remote.") and native_asset_key(source) in primary_groups)):
+                continue
+            token = json.dumps([source.concept, source.candidate_id, source.entity_id])
+            choices[token] = source
+        errors = {}
+        detail = ""
+        if user_input is not None:
+            source = choices.get(user_input.get("source"))
+            label = str(user_input.get("name", "")).strip()
+            approval = user_input.get("control_approved", False)
+            try:
+                if source is None or not label or len(label) > 80 or type(approval) is not bool:
+                    raise ValueError("Select one exact native source and a device name")
+                # Use the same logical discovery identity for native AV devices;
+                # network trackers are only included on explicit selection.
+                asset = native_asset_key(source)
+                if asset in model[DEVICE_CATALOG]:
+                    raise ValueError("This logical device is already configured")
+                device = {"entity": source.entity_id, "asset_id": asset, "physical_id": asset,
+                          DEVICE_LABEL: label, "foundation_concept": source.concept,
+                          "foundation_candidate_id": source.candidate_id,
+                          "foundation_entity_registry_id": source.entity_registry_id,
+                          "foundation_config_entry_id": source.config_entry_id,
+                          "foundation_device_registry_id": source.device_registry_id,
+                          "foundation_provider": source.provider, "control_approved": approval}
+                if source.concept == "network":
+                    device["on_states"] = ["home"]
+                elif source.entity_id.startswith("remote."):
+                    device["power_mode"] = "passive"
+                self._stage_device(asset, device)
+            except (ValueError, TypeError, KeyError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_add", errors=errors,
+            fields={vol.Required("name", default=""): str,
+                vol.Required("source"): vol.In({token: f"{s.label or s.entity_id} · {s.concept} · {s.entity_id}"
+                                                for token, s in choices.items()}),
+                vol.Optional("control_approved", default=False): bool},
+            description_placeholders={"validation_detail": detail})
+
+    async def async_step_device_select(self, user_input=None):
+        model = self._device_model()
+        catalog = model[DEVICE_CATALOG]
+        choices = {}
+        for key, row in catalog.items():
+            linked = [room.get("name", room_id) for room_id, room in model["rooms"].items()
+                      if any(link[ASSET_REF] == key for link in room["devices"].values())]
+            choices[key] = f"{row.get(DEVICE_LABEL, row['entity'])} · {', '.join(linked) or 'No room'}"
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        if user_input is not None and user_input.get("device") in choices:
+            self._device_key = user_input["device"]
+            return await getattr(self, "async_step_" + self._option_action)()
+        return self._specialist_form(step_id="device_select", fields={
+            vol.Required("device"): vol.In(choices)},
+            errors={"base": "selection_changed"} if user_input is not None else {})
+
+    async def async_step_device_settings(self, user_input=None):
+        """Ordinary typed settings on the owning record; preserve expert fields."""
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        prior = self._device_model()[DEVICE_CATALOG][self._device_key]
+        is_network = prior.get("foundation_concept") == "network"
+        media = prior["entity"].startswith("media_player.")
+        default_approval = (prior["control_approved"] if "control_approved" in prior
+                            else authorized_source(self.hass, prior) is not None)
+        errors, detail = {}, ""
+        fields = {
+            vol.Required("name", default=prior.get(DEVICE_LABEL, prior["entity"])): str,
+            vol.Required("control_approved", default=default_approval): bool,
+            vol.Required("power_mode", default=prior.get("power_mode", DEFAULT_POWER_MODE)):
+                vol.In({mode: mode.title() for mode in sorted(POWER_MODES)}),
+            vol.Required("post_power_on_delay_ms", default=prior.get("post_power_on_delay_ms", DEFAULT_STEP_DELAY_MS)):
+                selector.NumberSelector(selector.NumberSelectorConfig(
+                    min=0, max=MAX_STEP_DELAY_MS, step=1, mode=selector.NumberSelectorMode.BOX)),
+        }
+        if media and not is_network:
+            fields[vol.Required("hdmi_cec_enabled", default=prior.get(
+                "hdmi_cec_enabled", DEFAULT_HDMI_CEC_ENABLED))] = bool
+        # One native evidence source, no guessed MACs or addresses. Keep the
+        # existing WoL data when disabling; no packet is sent during Save.
+        candidates, _ = discovered_av_sources(self.hass)
+        matches = [src for src in candidates if src.entity_id == prior["entity"]
+                   and src.concept == prior.get("foundation_concept")
+                   and src.candidate_id == prior.get("foundation_candidate_id")
+                   and not src.review_reason and src.provider != "harmony"]
+        macs = sorted(selected_native_macs(self.hass, matches[0])) if len(matches) == 1 else []
+        wol = wol_data(prior)
+        if macs or wol is not None:
+            current_mac = (wol or {}).get("mac", "")
+            fields.update({
+                vol.Optional("wol_enabled", default=bool(wol) and prior.get("wol_enabled", True)): bool,
+                vol.Optional("wol_mac", default=current_mac): vol.In({"": "No MAC", **{mac: mac for mac in macs},
+                    **({current_mac: current_mac + " (review required)"} if current_mac and current_mac not in macs else {})}),
+                vol.Optional("wol_destination", default=(wol or {}).get("broadcast_address", "")): str,
+                vol.Optional("wol_port", default=(wol or {}).get("broadcast_port", DEFAULT_WOL_PORT)): int,
+                **({vol.Optional("wol_clear", default=False): bool} if wol is not None else {}),
+            })
+        if user_input is not None:
+            try:
+                name = str(user_input.get("name", "")).strip()
+                approved = user_input.get("control_approved")
+                mode = user_input.get("power_mode")
+                delay = validate_step_delay(user_input.get("post_power_on_delay_ms"))
+                if not name or len(name) > 80 or type(approved) is not bool or mode not in POWER_MODES:
+                    raise ValueError("Choose a name and valid device policy")
+                device = {**prior, DEVICE_LABEL: name}
+                # Preserve field absence on no-op, including implicit
+                # Foundation-selected authority on historic records.
+                for key, value, default in (
+                        ("control_approved", approved, default_approval),
+                        ("power_mode", mode, DEFAULT_POWER_MODE),
+                        ("post_power_on_delay_ms", delay, DEFAULT_STEP_DELAY_MS)):
+                    if key in prior or value != default:
+                        device[key] = value
+                if media and not is_network:
+                    enabled = user_input.get("hdmi_cec_enabled")
+                    if type(enabled) is not bool:
+                        raise ValueError("Select a valid CEC setting")
+                    if "hdmi_cec_enabled" in prior or enabled != DEFAULT_HDMI_CEC_ENABLED:
+                        device["hdmi_cec_enabled"] = enabled
+                clear = user_input.get("wol_clear", False)
+                if type(clear) is not bool or (clear and wol is None):
+                    raise ValueError("Choose an existing Wake-on-LAN override to clear")
+                if clear:
+                    set_wol_policy(device, clear=True)
+                elif macs or wol is not None:
+                    enabled = user_input.get("wol_enabled", bool(wol) and prior.get("wol_enabled", True))
+                    mac = user_input.get("wol_mac", (wol or {}).get("mac", ""))
+                    destination = user_input.get("wol_destination", (wol or {}).get("broadcast_address", "")).strip()
+                    port = user_input.get("wol_port", (wol or {}).get("broadcast_port", DEFAULT_WOL_PORT))
+                    if type(enabled) is not bool:
+                        raise ValueError("Choose a valid Wake-on-LAN setting")
+                    if enabled or mac:
+                        data = {"mac": mac, "broadcast_port": port}
+                        if destination:
+                            data["broadcast_address"] = destination
+                        # A selector's default port does not change an old
+                        # override that implicitly used the default port.
+                        if wol is not None and data == {**wol, "broadcast_port": wol.get("broadcast_port", DEFAULT_WOL_PORT)}:
+                            data = wol
+                        changed = data != wol
+                        was_enabled = prior.get("wol_enabled", bool(wol))
+                        if changed or enabled != was_enabled:
+                            set_wol_policy(device, data=data, enabled=enabled, verified_macs=macs)
+                    elif wol is not None:
+                        set_wol_policy(device, enabled=False)
+                self._stage_device(self._device_key, device)
+            except (ValueError, TypeError, KeyError, AttributeError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_settings", errors=errors,
+            fields=fields, description_placeholders={"validation_detail": detail})
+
+    async def async_step_device_edit(self, user_input=None):
+        """Edit one canonical record, never a room membership or native identity."""
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        prior = self._device_model()[DEVICE_CATALOG][self._device_key]
+        errors, detail = {}, ""
+        text = json.dumps(prior, ensure_ascii=False, indent=2)
+        if user_input is not None:
+            text = user_input.get("yaml_text", "")
+            try:
+                device = _yaml_document(text)
+                allowed = (YAML_SCOPED_FIELDS["device"] - MEMBERSHIP_FIELDS) | {DEVICE_LABEL}
+                if set(device) - (allowed | set(prior)):
+                    raise ValueError("Unknown device configuration field")
+                self._stage_device(self._device_key, device)
+            except (ValueError, TypeError, KeyError, AttributeError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_edit", errors=errors,
+            fields={vol.Required("yaml_text", default=text):
+                selector.TextSelector(selector.TextSelectorConfig(multiline=True))},
+            description_placeholders={"validation_detail": detail})
+
+    async def async_step_device_assign(self, user_input=None):
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        model = self._device_model()
+        device = model[DEVICE_CATALOG][self._device_key]
+        rooms = model["rooms"]
+        available = {key: row.get("name", key) for key, row in rooms.items()
+                     if all(link[ASSET_REF] != self._device_key for link in row["devices"].values())}
+        areas = area_choices(self.hass)
+        errors, detail = {}, ""
+        if user_input is not None:
+            try:
+                room_id = user_input.get("room")
+                if room_id == CUSTOM_AREA:
+                    area = user_input.get("area", NONE)
+                    name = str(user_input.get("room_name", "")).strip() or areas.get(area, "")
+                    room_id = _slug(name)
+                    if not name or len(name) > 80 or room_id in rooms or area not in (NONE, *areas):
+                        raise ValueError("Choose a unique room name and optional native area")
+                    rooms[room_id] = {"name": name, "area_id": area if area in areas else None,
+                                      "devices": {}, "activities": {}}
+                elif room_id not in available:
+                    raise ValueError("Choose a room to which the device is not yet assigned")
+                role = ("remote" if device["entity"].startswith("remote.") else
+                        {"display": "display", "amplifier": "receiver", "source": "player",
+                         "network": "computer"}.get(device.get("foundation_concept")))
+                if role is None:
+                    raise ValueError("Review the exact device concept before assignment")
+                label = device.get(DEVICE_LABEL) or device["entity"]
+                key = _slug(label)
+                if key in rooms[room_id]["devices"]:
+                    key = _slug(self._device_key)
+                if key in rooms[room_id]["devices"]:
+                    raise ValueError("Room membership identity conflicts; choose another device name")
+                self._stage_model(change_membership(model, room_id, key,
+                    {ASSET_REF: self._device_key, "role": role, "name": label}))
+            except (ValueError, TypeError, KeyError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_assign", errors=errors,
+            fields={
+                vol.Required("room"): vol.In({**available, CUSTOM_AREA: "Create a room"}),
+                vol.Optional("room_name", default=""): str,
+                vol.Optional("area", default=NONE): vol.In({NONE: "No native area", **areas}),
+            }, description_placeholders={"validation_detail": detail})
+
+    async def async_step_device_unassign(self, user_input=None):
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        model = self._device_model()
+        choices = {json.dumps([room_id, key]): f"{room.get('name', room_id)} · {link.get('name', key)}"
+                   for room_id, room in model["rooms"].items()
+                   for key, link in room["devices"].items() if link[ASSET_REF] == self._device_key}
+        errors, detail = {}, ""
+        if user_input is not None:
+            try:
+                token = user_input.get("membership")
+                if token not in choices or user_input.get("confirm_remove") is not True:
+                    raise ValueError("Select and confirm an existing room relationship")
+                room_id, key = json.loads(token)
+                self._stage_model(change_membership(model, room_id, key, None))
+            except (ValueError, TypeError, KeyError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_unassign", errors=errors,
+            fields={vol.Required("membership"): vol.In(choices),
+                vol.Required("confirm_remove", default=False): bool},
+            description_placeholders={"validation_detail": detail})
+
+    async def async_step_device_remove(self, user_input=None):
+        if user_input and user_input.get("return_to_setup") is True and getattr(self, "_specialist_section", False):
+            return await self.async_step_review()
+        errors, detail = {}, ""
+        if user_input is not None:
+            try:
+                if user_input.get("confirm_remove") is not True:
+                    raise ValueError("Confirm removal of the unassigned device")
+                self._stage_device(self._device_key, None)
+            except (ValueError, KeyError) as exc:
+                errors["base"] = "selection_changed"
+                detail = _validation_detail(exc)
+            else:
+                return await self.async_step_review()
+        return self._specialist_form(step_id="device_remove", errors=errors,
+            fields={vol.Required("confirm_remove", default=False): bool},
+            description_placeholders={"validation_detail": detail})
 
     async def async_step_existing_dell(self, user_input=None):
         """No removal while selected in an existing room; no silent rebinding."""
@@ -2256,20 +2824,36 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 vol.Required("host", default=prior.get("host", "")): str,
             }, description_placeholders={"model": "Dell C8621QT", "port": "4661"})
 
+    def _dell_bound_assets(self, key, model):
+        """Exact current native registration identity, including renamed links."""
+        from homeassistant.helpers import entity_registry as er
+        registry = er.async_get(self.hass)
+        entity = registry.async_get_entity_id(
+            "media_player", DOMAIN, f"{self._entry.entry_id}:dell:{key}")
+        get_record = getattr(registry, "async_get", None)
+        record = get_record(entity) if entity and callable(get_record) else None
+        registry_id = getattr(record, "id", None)
+        device_id = getattr(record, "device_id", None)
+        return {asset for asset, device in model[DEVICE_CATALOG].items()
+                if ((entity and device["entity"] == entity)
+                    or (registry_id and device.get("foundation_entity_registry_id") == registry_id)
+                    or (device_id and device.get("foundation_device_registry_id") == device_id)
+                    or (not entity and device.get("foundation_provider") == DOMAIN))}
+
     async def async_step_dell_remove(self, user_input=None):
         """Never remove a selected native display before its room is unbound."""
         if getattr(self, "_specialist_section", False) and user_input and user_input.get("return_to_setup") is True:
             return await self.async_step_review()
-        from homeassistant.helpers import entity_registry as er
         key = self._dell_key
-        entity_id = er.async_get(self.hass).async_get_entity_id(
-            "media_player", DOMAIN, f"{self._entry.entry_id}:dell:{key}")
-        assigned = entity_id and any(
-            device.get("entity") == entity_id for room in self._rooms.values()
-            for device in room.get("devices", {}).values())
-        if assigned:
+        model = self._device_model()
+        bound = self._dell_bound_assets(key, model)
+        if any(link[ASSET_REF] in bound for room in model["rooms"].values()
+               for link in room["devices"].values()):
             return self._specialist_form(step_id="dell_remove",
                 errors={"base": "stop_room_before_edit"}, fields={})
+        if bound:
+            return self._specialist_form(step_id="dell_remove",
+                errors={"base": "selection_changed"}, fields={})
         if user_input and user_input.get("confirm"):
             self._dell_displays.pop(key)
             return await self.async_step_review()
@@ -2283,27 +2867,27 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return await self.async_step_room()
         if user_input:
             self._room_id = user_input["room"]
+            if self._room_id not in choices:
+                return self.async_show_form(step_id="existing_room", errors={"base": "selection_changed"},
+                    data_schema=vol.Schema({vol.Required("room"): vol.In(choices)}))
+            _, scope, step, _ = OPTION_TASKS[self._option_action]
+            if scope == "activity":
+                return await self.async_step_existing_activity()
             if self._option_action == "remove_room":
                 self._rooms.pop(self._room_id)
-                return await self.async_step_review()
-            if self._option_action == "rename_room":
-                return await self.async_step_room_settings()
-            if self._option_action == "harmony_owner":
-                return await self.async_step_harmony_owner()
-            if self._option_action == "tv_wake":
-                return await self.async_step_tv_wake()
-            if self._option_action == "speech_endpoint":
-                return await self.async_step_speech_endpoint()
-            if self._option_action == "cec_device":
-                return await self.async_step_cec_device()
-            if self._option_action == "edit_room":
+            elif self._option_action == "edit_room":
                 self._editing_room = True
                 self._previous_room = deepcopy(self._rooms[self._room_id])
-                self._rooms[self._room_id]["devices"] = {}
-                return await self.async_step_display()
-            if self._option_action == "add_activity":
-                return await self.async_step_activity()
-            return await self.async_step_existing_activity()
+                previous_devices = self._previous_room["devices"]
+                if any(len(media_roles(previous_devices, concept)) > 1
+                       for concept in ("display", "amplifier")):
+                    # The old single-display wizard cannot safely replace
+                    # multi-display rooms. Retain the draft in the full editor.
+                    return await self.async_step_complete_setup()
+                self._rooms[self._room_id]["devices"] = {
+                    key: deepcopy(device) for key, device in previous_devices.items()
+                    if device_concept(device) not in ("display", "amplifier", "source")}
+            return await getattr(self, f"async_step_{step}")()
         return self.async_show_form(step_id="existing_room", data_schema=vol.Schema({
             vol.Required("room"): vol.In(choices)}))
 
@@ -2336,8 +2920,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             macs = sorted(selected_native_macs(self.hass, approved)) if approved else []
             # A previously configured WOL override must remain removable,
             # even after Foundation revokes its approval or native MAC evidence.
-            existing = device.get("power_on", {})
-            if macs or existing.get("action") == "wake_on_lan.send_magic_packet":
+            if macs or wol_data(device) is not None:
                 choices[key] = f"{device.get('name') or key} · {device['entity']}"
                 macs_by_key[key] = macs
         if not choices:
@@ -2350,48 +2933,33 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             errors["base"] = "wake_invalid_target"
             chosen = next(iter(choices))
         device = room["devices"][chosen]
-        configured = device.get("power_on", {})
-        wol = configured if configured.get("action") == "wake_on_lan.send_magic_packet" else {}
-        prior = wol.get("data", {})
+        prior = wol_data(device) or {}
         macs = macs_by_key[chosen]
         if user_input is not None and not errors:
             mode = user_input.get("mode")
             if mode == "keep":
                 return await self.async_step_review()
             if mode in ("clear", "directed"):
-                proposed = deepcopy(self._rooms)
-                physical = device.get("physical_id", device["entity"])
-                action = None
-                if mode == "directed":
-                    data = {
-                        "mac": str(user_input.get("mac", "")).strip().replace("-", ":").lower(),
-                        "broadcast_port": user_input.get("broadcast_port", 9),
-                    }
-                    ip = str(user_input.get("broadcast_address") or "").strip()
-                    if ip:
-                        data["broadcast_address"] = ip
-                    action = {"action": "wake_on_lan.send_magic_packet", "data": data}
-                    try:
-                        validate_action(action, device["entity"], True)
-                        if data["mac"] not in macs:
-                            raise ValueError("MAC is not registered on the selected native device")
-                    except (ValueError, TypeError):
-                        errors["base"] = "wake_invalid_target"
-                if not errors:
-                    for spec in proposed.values():
-                        for target in spec["devices"].values():
-                            if target.get("physical_id", target["entity"]) == physical:
-                                if mode == "directed":
-                                    target["power_on"] = deepcopy(action)
-                                elif target.get("power_on", {}).get("action") == "wake_on_lan.send_magic_packet":
-                                    target.pop("power_on", None)
-                    try:
-                        validate_rooms(proposed)
-                    except ValueError:
-                        errors["base"] = "wake_invalid_target"
-                    else:
-                        self._rooms = proposed
-                        return await self.async_step_review()
+                try:
+                    def change(target):
+                        if mode == "clear":
+                            set_wol_policy(target, clear=True)
+                        else:
+                            data = {
+                                "mac": str(user_input.get("mac", "")).strip().replace("-", ":").lower(),
+                                "broadcast_port": user_input.get("broadcast_port", DEFAULT_WOL_PORT),
+                            }
+                            ip = str(user_input.get("broadcast_address") or "").strip()
+                            if ip:
+                                data["broadcast_address"] = ip
+                            if data["mac"] not in macs:
+                                raise ValueError("MAC is not registered on the selected native device")
+                            set_wol_policy(target, data=data, verified_macs=macs)
+                    self._update_device(logical_asset_id(device), change)
+                except (ValueError, TypeError):
+                    errors["base"] = "wake_invalid_target"
+                else:
+                    return await self.async_step_review()
             else:
                 errors["base"] = "wake_invalid_target"
         current_mac = str(prior.get("mac", "")).lower()
@@ -2407,7 +2975,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 }),
                 vol.Required("mac", default=suggested): str,
                 vol.Optional("broadcast_address", default=prior.get("broadcast_address", "")): str,
-                vol.Optional("broadcast_port", default=prior.get("broadcast_port", 9)): int,
+                vol.Optional("broadcast_port", default=prior.get("broadcast_port", DEFAULT_WOL_PORT)): int,
             },
             description_placeholders={"screen": device["entity"], "device": device["entity"]})
 
@@ -2433,15 +3001,17 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                                         or not speech_player_eligible(self.hass, device, source))):
                 errors["base"] = "speech_invalid"
             else:
-                physical = device.get("physical_id", device["entity"])
-                for spec in self._rooms.values():
-                    for linked in spec["devices"].values():
-                        if linked.get("physical_id", linked["entity"]) == physical:
-                            if target == NONE:
-                                linked.pop("speech_tts_registry_id", None)
-                            else:
-                                linked["speech_tts_registry_id"] = target
-                return await self.async_step_review()
+                def change(linked):
+                    if target == NONE:
+                        linked.pop("speech_tts_registry_id", None)
+                    else:
+                        linked["speech_tts_registry_id"] = target
+                try:
+                    self._update_device(logical_asset_id(device), change)
+                except ValueError:
+                    errors["base"] = "speech_invalid"
+                else:
+                    return await self.async_step_review()
         elif user_input is not None:
             errors["base"] = "speech_invalid"
         if not players:
@@ -2526,35 +3096,29 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 try:
                     settle_ms = validate_step_delay(user_input.get(
                         "post_power_on_delay_ms",
-                        room["devices"][key].get("post_power_on_delay_ms", 0)))
+                        room["devices"][key].get("post_power_on_delay_ms", DEFAULT_STEP_DELAY_MS)))
                 except ValueError:
                     errors["base"] = "cec_invalid"
                 else:
-                    physical = room["devices"][key].get("physical_id", room["devices"][key]["entity"])
-                    proposal = deepcopy(self._rooms)
-                    for spec in proposal.values():
-                        for dev in spec["devices"].values():
-                            if dev.get("physical_id", dev["entity"]) == physical:
-                                dev["hdmi_cec_enabled"] = enabled
-                                dev["post_power_on_delay_ms"] = settle_ms
                     try:
-                        validate_rooms(proposal)
+                        self._update_device(logical_asset_id(room["devices"][key]),
+                            lambda dev: dev.update(hdmi_cec_enabled=enabled,
+                                                   post_power_on_delay_ms=settle_ms))
                     except ValueError:
                         errors["base"] = "cec_in_use"
                     else:
-                        self._rooms = proposal
                         return await self.async_step_review()
         chosen = (user_input or {}).get("device", next(iter(choices)))
         return self._specialist_form(step_id="cec_device", errors=errors,
             fields={
                 vol.Required("device", default=chosen if chosen in choices else next(iter(choices))): vol.In(choices),
-                vol.Required("enabled", default=room["devices"][chosen].get("hdmi_cec_enabled", False)
+                vol.Required("enabled", default=room["devices"][chosen].get("hdmi_cec_enabled", DEFAULT_HDMI_CEC_ENABLED)
                              if chosen in choices else False): bool,
                 vol.Required("post_power_on_delay_ms",
-                             default=room["devices"][chosen].get("post_power_on_delay_ms", 0)
+                             default=room["devices"][chosen].get("post_power_on_delay_ms", DEFAULT_STEP_DELAY_MS)
                              if chosen in choices else 0):
                     selector.NumberSelector(selector.NumberSelectorConfig(
-                        min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)),
+                        min=0, max=MAX_STEP_DELAY_MS, step=1, mode=selector.NumberSelectorMode.BOX)),
             },
             description_placeholders={"room": room.get("name", self._room_id)})
 
@@ -2633,29 +3197,17 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             return await self.async_step_review()
         if user_input:
             key = user_input["activity"]
+            if key not in choices:
+                return self.async_show_form(step_id="existing_activity", errors={"base": "selection_changed"},
+                    data_schema=vol.Schema({vol.Required("activity"): vol.In(choices)}))
+            _, scope, step, _ = OPTION_TASKS[self._option_action]
+            if scope != "activity":
+                raise ValueError("Activity context does not match the requested task")
             if self._option_action == "remove_activity":
                 self._rooms[self._room_id]["activities"].pop(key)
-                return await self.async_step_review()
-            if self._option_action == "activity_devices":
+            else:
                 self._editing_activity = key
-                return await self.async_step_activity_devices()
-            if self._option_action == "quick_edit_activity":
-                self._editing_activity = key
-                return await self.async_step_quick_edit_activity()
-            if self._option_action == "script_step":
-                self._editing_activity = key
-                return await self.async_step_script_step()
-            if self._option_action == "button_mapping":
-                self._editing_activity = key
-                return await self.async_step_button_mapping()
-            if self._option_action == "macro_manage":
-                self._editing_activity = key
-                return await self.async_step_macro_manage()
-            if self._option_action == "cec_activity":
-                self._editing_activity = key
-                return await self.async_step_cec_activity()
-            self._editing_activity = key
-            return await self.async_step_activity()
+            return await getattr(self, f"async_step_{step}")()
         return self.async_show_form(step_id="existing_activity", data_schema=vol.Schema({
             vol.Required("activity"): vol.In(choices)}))
 
@@ -2671,12 +3223,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         activity = room["activities"][self._editing_activity]
         current = list(activity["devices"])
         devices = room["devices"]
-        sources, _ = av_sources(self.hass)
-        approved = {(src.concept, src.entity_id, src.candidate_id) for src in sources}
         choices = {key: f"{dev.get('name', key)} · {dev['entity']}"
                    for key, dev in devices.items()
-                   if (dev.get("foundation_concept"), dev["entity"],
-                       dev.get("foundation_candidate_id")) in approved}
+                   if authorized_source(self.hass, dev) is not None}
         errors = {}
         if user_input is not None:
             selected = user_input.get("devices")
@@ -2687,49 +3236,18 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
             else:
                 chosen = set(selected)
                 kind = activity.get("activity_type", "watch_tv")
-                if (kind in ("watch_tv", "watch_hdmi", "watch_source", "play_game")
-                        and "screen" not in chosen):
-                    errors["base"] = "screen_required"
-                elif (kind in ("watch_source", "play_game") and not any(
-                        devices[key].get("foundation_concept") == "source" for key in chosen)):
-                    errors["base"] = "source_required"
-                elif (kind == "listen_music" and not any(
-                        devices[key].get("foundation_concept") in ("amplifier", "source")
-                        for key in chosen)):
-                    errors["base"] = "audio_required"
+                cast_error = activity_cast_error(kind, devices, chosen)
+                if cast_error:
+                    errors["base"] = cast_error
                 else:
-                    removed = set(current) - chosen
-                    dependent = (any(step["device"] in removed
-                                     for phase in ("steps", "stop_steps")
-                                     for step in activity.get(phase, []))
-                                 or any(v["device"] in removed
-                                        for v in activity.get("button_map", {}).values())
-                                 or any(step["device"] in removed
-                                        for macro in activity.get("macros", {}).values()
-                                        for step in macro.get("steps", []))
-                                 or any(link["source"] in removed or link["target"] in removed
-                                        for link in activity.get("cec_links", [])))
+                    ordered = [key for key in current if key in chosen]
+                    ordered.extend(key for key in devices if key in chosen and key not in current)
+                    candidate, dependent = _activity_for_cast(activity, devices, ordered, kind)
                     if dependent and user_input.get("confirm_remove") is not True:
                         errors["base"] = "confirm_source_steps"
                     else:
-                        candidate = deepcopy(activity)
-                        candidate["steps"] = [s for s in candidate.get("steps", [])
-                                              if s["device"] in chosen]
-                        candidate["stop_steps"] = [s for s in candidate.get("stop_steps", [])
-                                                   if s["device"] in chosen]
-                        candidate["button_map"] = {name: mapping for name, mapping
-                                                   in candidate.get("button_map", {}).items()
-                                                   if mapping["device"] in chosen}
-                        candidate["macros"] = {name: {**macro, "steps": [s for s in macro["steps"]
-                                                   if s["device"] in chosen]}
-                                               for name, macro in candidate.get("macros", {}).items()
-                                               if any(s["device"] in chosen for s in macro["steps"])}
-                        candidate["cec_links"] = [link for link in candidate.get("cec_links", [])
-                                                  if link["source"] in chosen and link["target"] in chosen]
                         self._pending_activity = candidate
-                        self._pending_cast = [key for key in current if key in chosen]
-                        self._pending_cast.extend(key for key in devices
-                                                  if key in chosen and key not in current)
+                        self._pending_cast = ordered
                         return await self.async_step_activity_device_order()
         return self.async_show_form(step_id="activity_devices", errors=errors,
             data_schema=vol.Schema({
@@ -2991,9 +3509,7 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         errors = {}
         if user_input is not None:
             device, action = user_input.get("device"), user_input.get("type")
-            if device not in cast or action not in (
-                    "remote_key", "source", "sound_mode", "volume", "mute", "play",
-                    "pause", "delay", "wait_until"):
+            if device not in cast or action not in ALLOWED_STEPS:
                 errors["base"] = "selection_changed"
             else:
                 self._script_device = device
@@ -3060,21 +3576,21 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         elif kind == "delay":
             args[vol.Required("milliseconds", default=original.get("milliseconds", 1000))] = (
                 selector.NumberSelector(selector.NumberSelectorConfig(
-                    min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)))
+                    min=0, max=MAX_STEP_DELAY_MS, step=1, mode=selector.NumberSelectorMode.BOX)))
         elif kind == "wait_until":
-            states = ("on", "off", "idle", "playing", "paused", "standby", "buffering")
+            states = sorted(NATIVE_WAIT_STATES)
             initial = original.get("states", ["on"])[0]
             args[vol.Required("state", default=initial)] = vol.In({
                 state: state for state in states})
             args[vol.Required("timeout", default=original.get("timeout", 15))] = (
                 selector.NumberSelector(selector.NumberSelectorConfig(
-                    min=1, max=300, step=1, mode=selector.NumberSelectorMode.BOX)))
+                    min=1, max=MAX_TIMEOUT_SECONDS, step=1, mode=selector.NumberSelectorMode.BOX)))
         if kind not in ("delay", "wait_until"):
             args[vol.Required("delay_policy", default=default_policy)] = vol.In({
                 "inherit": "Use standard delay", "override": "Override after this step"})
             args[vol.Required("delay_ms", default=original.get("delay_ms", self._original_step_delay_ms))] = (
                 selector.NumberSelector(selector.NumberSelectorConfig(
-                    min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX)))
+                    min=0, max=MAX_STEP_DELAY_MS, step=1, mode=selector.NumberSelectorMode.BOX)))
         if user_input is not None:
             try:
                 step = {"device": self._script_device, "type": kind}
@@ -3102,8 +3618,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 elif kind == "wait_until":
                     state = user_input.get("state")
                     timeout = user_input.get("timeout")
-                    if state not in ("on", "off", "idle", "playing", "paused", "standby", "buffering") or (
-                            type(timeout) not in (int, float) or not 0 < timeout <= 300):
+                    if state not in NATIVE_WAIT_STATES or (
+                            type(timeout) not in (int, float) or not 0 < timeout <= MAX_TIMEOUT_SECONDS):
                         raise ValueError("Invalid wait target")
                     step.update(states=[state], timeout=timeout)
                 if kind not in ("delay", "wait_until"):
@@ -3128,11 +3644,9 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         """Selected room players only; leave complex legacy multi-source casts to full edit."""
         activity = self._rooms[self._room_id]["activities"][self._editing_activity]
         devices = self._rooms[self._room_id]["devices"]
-        roles = {key: device["entity"] for key, device in devices.items()
-                 if device.get("foundation_concept") == "source"
-                 and device["entity"].startswith("media_player.")}
+        roles = {key: device["entity"] for key, device in media_roles(devices, "source").items()}
         current = [key for key in activity["devices"] if key in roles]
-        if len(current) > 1 or any(key.startswith("source_") and key not in roles
+        if len(current) > 1 or any(device_concept(devices[key]) == "source" and key not in roles
                                     for key in activity["devices"]):
             return {}
         return roles
@@ -3144,18 +3658,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
         fields = {}
         for key in activity["devices"]:
             options = source_lists(self.hass, devices[key]["entity"])
-            for field, list_field in (("source", "source_list"), ("sound_mode", "sound_mode_list")):
-                existing = [step for step in activity.get("steps", [])
-                            if step["device"] == key and step["type"] == field]
-                offered = options[list_field]
-                if not offered and not existing:
-                    continue
-                name = f"route_{key}_{field}"
-                choices = {UNCHANGED: "Keep current input / no change",
-                           **{value: value for value in offered}}
-                if existing:
-                    choices[REMOVE_ROUTE] = "Remove this configured route"
-                fields[vol.Required(name, default=UNCHANGED)] = vol.In(choices)
+            existing = [step for step in activity.get("steps", []) if step["device"] == key]
+            fields.update(self._route_fields(options, existing, f"route_{key}_"))
         return fields
 
     async def async_step_quick_edit_activity(self, user_input=None):
@@ -3178,36 +3682,34 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 errors["base"] = "source_required"
             else:
                 changes = []
-                for key in activity["devices"]:
-                    options = source_lists(self.hass, devices[key]["entity"])
-                    for field, list_field in (("source", "source_list"), ("sound_mode", "sound_mode_list")):
-                        chosen = user_input.get(f"route_{key}_{field}", UNCHANGED)
-                        if chosen == UNCHANGED:
-                            continue
-                        existing = any(step["device"] == key and step["type"] == field
-                                       for step in activity.get("steps", []))
-                        if chosen not in options[list_field] and not (
-                                chosen == REMOVE_ROUTE and existing):
-                            errors["base"] = "route_changed"
-                            break
-                        changes.append((key, field, chosen))
-                    if errors:
-                        break
+                try:
+                    for key in activity["devices"]:
+                        options = source_lists(self.hass, devices[key]["entity"])
+                        existing = [step for step in activity.get("steps", []) if step["device"] == key]
+                        changes.extend((key, field, chosen) for field, chosen in
+                                       _route_changes(options, existing, user_input, f"route_{key}_"))
+                except ValueError:
+                    errors["base"] = "route_changed"
                 changing_source = new_source != current_source
+                candidate = deepcopy(activity)
                 if not errors and changing_source:
-                    destination_keys = [key for key in activity["devices"] if key not in sources
+                    destination_keys = [key for key in activity["devices"]
+                                        if device_concept(devices[key]) in ("display", "amplifier")
                                         and source_lists(self.hass, devices[key]["entity"])["source_list"]]
                     if destination_keys and not any(key in destination_keys and field == "source"
                                                     and chosen != REMOVE_ROUTE
                                                     for key, field, chosen in changes):
                         errors["base"] = "source_route_required"
-                    removed = {current_source} if current_source != NONE else set()
-                    destructive = any(step["device"] in removed for typ in ("steps", "stop_steps")
-                                      for step in activity.get(typ, []))
+                    cast = [key for key in activity["devices"] if key != current_source]
+                    if new_source != NONE and new_source not in cast:
+                        cast.append(new_source)
+                    candidate, destructive = _activity_for_cast(
+                        activity, devices, cast, activity.get("activity_type"))
+                    if not errors and any(key not in cast for key, _, _ in changes):
+                        errors["base"] = "route_changed"
                     if not errors and destructive and not user_input.get("confirm_source_steps"):
                         errors["base"] = "confirm_source_steps"
                 if not errors:
-                    candidate = deepcopy(activity)
                     candidate["name"] = name
                     if user_input.get("favorite", activity.get("favorite", False)) is True:
                         candidate["favorite"] = True
@@ -3219,23 +3721,8 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                         # longer default to the player-required wizard on next edit.
                         if candidate.get("activity_type") in ("watch_tv", "watch_hdmi", "watch_source"):
                             candidate["activity_type"] = "watch_source" if new_source != NONE else "watch_hdmi"
-                        removed = {current_source} if current_source != NONE else set()
-                        candidate["devices"] = [key for key in candidate["devices"] if key not in removed]
-                        if new_source != NONE and new_source not in candidate["devices"]:
-                            candidate["devices"].append(new_source)
-                        for typ in ("steps", "stop_steps"):
-                            if typ in candidate:
-                                candidate[typ] = [step for step in candidate[typ]
-                                                  if step["device"] not in removed]
                     for key, field, chosen in changes:
-                        steps = candidate.setdefault("steps", [])
-                        position = next((i for i, step in enumerate(steps)
-                                         if step["device"] == key and step["type"] == field), len(steps))
-                        candidate["steps"] = [step for step in steps
-                                              if not (step["device"] == key and step["type"] == field)]
-                        if chosen != REMOVE_ROUTE:
-                            candidate["steps"].insert(position, {
-                                "type": field, "device": key, "candidates": [chosen]})
+                        candidate["steps"] = _change_route(candidate.get("steps", []), key, field, chosen)
                     self._rooms[self._room_id]["activities"][self._editing_activity] = candidate
                     self._editing_activity = None
                     return await self.async_step_review()
@@ -3269,18 +3756,28 @@ class MultimediaOptionsFlow(_Wizard, config_entries.OptionsFlow):
                 vol.Required("default_step_delay_ms",
                              default=self._original_step_delay_ms):
                     selector.NumberSelector(selector.NumberSelectorConfig(
-                        min=0, max=30000, step=1, mode=selector.NumberSelectorMode.BOX))
+                        min=0, max=MAX_STEP_DELAY_MS, step=1, mode=selector.NumberSelectorMode.BOX))
             }))
 
     async def async_step_frontend(self, user_input=None):
+        errors = {}
         if user_input is not None:
-            return self.async_create_entry(title="", data={**self._entry.options, **user_input})
-        return self.async_show_form(step_id="frontend", data_schema=vol.Schema({
+            if (set(user_input) != {"enable_ux"} or type(user_input["enable_ux"]) is not bool
+                    or dict(self._entry.options) != self._original_entry_options
+                    or dict(self._entry.data) != self._original_entry_data):
+                errors["base"] = "selection_changed"
+            else:
+                # UX visibility is a presentation-only preference, not a
+                # generic arbitrary Options writer. Retain the existing
+                # runtime and all canonical configuration.
+                return self.async_create_entry(title="", data={
+                    **self._entry.options, "enable_ux": user_input["enable_ux"]})
+        return self.async_show_form(step_id="frontend", errors=errors, data_schema=vol.Schema({
             vol.Required("enable_ux", default=self._entry.options.get("enable_ux", True)): bool}))
 
     async def _finish(self):
-        options = {**self._entry.options, CONF_ROOMS: self._rooms,
-                   "dell_displays": self._dell_displays}
+        options = configuration_options(self._original_entry_options, self._reviewed_model)
+        options["dell_displays"] = self._dell_displays
         if self._yaml_enable_ux is not None:
             options["enable_ux"] = self._yaml_enable_ux
         if self._yaml_step_delay_ms is not None:

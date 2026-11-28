@@ -157,7 +157,7 @@ function rhiMmSiteDateTime(hass,at){
 // authority. No local store or device discovery: this is a thin typed route to
 // the existing integration wizard (the same backend as Configure).
 const RHI_MM_OPTION_ACTIONS=Object.freeze(new Set([
-  'complete_setup',
+  'complete_setup','dell_add','device_add','device_settings','device_edit','device_assign','device_unassign','device_remove',
   'add_room','rename_room','edit_room','remove_room',
   'guided_activity','add_activity','quick_edit_activity','edit_activity','activity_devices','remove_activity',
   'cec_device','cec_activity','tv_wake','harmony_owner','speech_endpoint','expert_yaml','yaml','script_defaults','script_step','button_mapping','macro_manage'
@@ -195,7 +195,7 @@ async function rhiMmDiagnosticExport(hass,roomId=''){
   return scoped;
 }
 async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id='',
-  phase='',operation='',index=null,device='',stepType=''}){
+  phase='',operation='',index=null,device='',stepType='',asset=''}){
   if(hass?.user?.is_admin!==true)
     throw new Error('Multimedia admin permission required');
   if(typeof hass.callWS!=='function'||typeof hass.callApi!=='function')
@@ -227,6 +227,7 @@ async function rhiMmOptionsBegin(hass,{action,room='',activity='',scope='',id=''
         throw new Error('Expert YAML requires a specific configured object');
       await advance('expert_target',{scope,room,id});
     }
+    if(asset&&step?.step_id==='device_select')await advance('device_select',{device:asset});
     if(room&&step?.step_id==='existing_room')await advance('existing_room',{room});
     if(activity&&step?.step_id==='existing_activity')await advance('existing_activity',{activity});
     // Direct per-device Add / Edit still uses the official HA Options Flow.

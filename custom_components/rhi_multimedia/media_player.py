@@ -18,7 +18,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from .const import EVENT_UPDATE
 from .engine import MediaError
 from .experience import NativeUpdate
-from .validation import live_related_source, native_choices, native_state
+from .validation import asset_bindings, live_related_source, native_choices, native_state
 
 from .const import DOMAIN
 from .dell_c8621qt import DellC8621QT, DellProtocolError, valid_host
@@ -264,16 +264,13 @@ class LogicalAssetMediaPlayer(MediaPlayerEntity):
         return native.attributes if native else {}
 
     def _binding(self):
-        from .experience import logical_asset_id
         engine = self.context.get("engine")
         if not engine or not self.source_published or self.conflicted_identity:
             return None
         bindings = [
             (room, role, device)
-            for room, spec in engine.rooms.items()
-            for role, device in spec["devices"].items()
+            for room, role, device in asset_bindings(engine.rooms, self.asset_id)
             if device["entity"] == self.device["entity"]
-            and logical_asset_id(device) == self.asset_id
         ]
         if len(bindings) == 1:
             return bindings[0]

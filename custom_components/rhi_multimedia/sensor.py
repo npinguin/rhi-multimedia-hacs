@@ -9,11 +9,12 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, EVENT_UPDATE
-from .experience import (VERSION, build_room, logical_asset_id, NativeUpdate, RoomUpdate,
+from .experience import (VERSION, build_room, NativeUpdate, RoomUpdate,
                          queue_native_update, cancel_native_update)
 from .foundation import authorized_source, selected_index, SELECTION_CHANGED_EVENT, projection_source_reads
 from .source_discovery import logical_source_type, related_source_entities, logical_av_catalog
-from .validation import live_related_source, native_availability, native_state
+from .validation import (DEVICE_CATALOG, DEVICE_LABEL, logical_asset_id,
+                         live_related_source, native_availability, native_state)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -146,42 +147,64 @@ def configured_asset_projection_specs(hass, rooms: dict, *, include_links=True) 
     """
     registry = er.async_get(hass)
     assets: dict[str, dict] = {}
-    for room_id, spec in rooms.items():
-        for device in spec["devices"].values():
-            entity_id = device["entity"]
-            if not (entity_id.startswith("media_player.") or
-                    (device.get("foundation_concept") == "network" and entity_id.startswith("device_tracker."))):
-                continue  # Native remotes remain related source entities, not duplicate HA devices.
-            registered = registry.async_get(entity_id)
-            if registered is not None and getattr(registered, "platform", None) == DOMAIN:
-                continue
-            key = logical_asset_id(device)
-            native_device_id = getattr(registered, "device_id", None)
-            logical_type = logical_source_type(
-                device.get("foundation_concept", ""),
-                str(getattr(registered, "platform", "") or ""),
-                entity_id,
-            )
-            item = assets.setdefault(key, {
-                "device": device, "rooms": set(),
-                "native_device_id": native_device_id,
-                "logical_type": logical_type, "source_entities": (),
-            })
-            # One stale physical ID must not silently fuse different HA sources.
-            if item["device"]["entity"] != entity_id:
-                item["conflicted_identity"] = True
-            item["rooms"].add(room_id)
-            if include_links and not item["source_entities"]:
-                item["source_entities"] = related_source_entities(
-                    hass, native_device_id, entity_id)
-                for endpoint in device.get("computer_io", {}).values():
-                    if all(link["entity_id"] != endpoint["entity"] for link in item["source_entities"]):
-                        item["source_entities"] += ({"entity_id": endpoint["entity"], "domain": endpoint["entity"].split(".")[0],
-                                                      "provider": "mqtt", "availability": "unavailable"},)
-                companion = device.get("computer_agent")
-                if companion and all(link["entity_id"] != companion["entity"] for link in item["source_entities"]):
-                    item["source_entities"] += ({"entity_id": companion["entity"], "domain": "media_player",
-                                                  "provider": "hass_agent", "availability": "unavailable"},)
+    catalog = getattr(hass, "data", {}).get(DOMAIN, {}).get(DEVICE_CATALOG)
+    if catalog is not None:
+        # One canonical record even after removing the last membership.
+        memberships = {}
+        for room_id, spec in rooms.items():
+            for role in spec["devices"].values():
+                memberships.setdefault(logical_asset_id(role), []).append((room_id, role))
+        rows = []
+        for asset_id, saved in catalog.items():
+            related = memberships.get(asset_id, [])
+            device = {k: v for k, v in saved.items() if k != DEVICE_LABEL}
+            if related:
+                first = related[0][1]
+                device.update({k: first[k] for k in ("name", "role") if k in first})
+            if saved.get(DEVICE_LABEL):
+                device["name"] = saved[DEVICE_LABEL]
+            if saved.get("foundation_concept") == "network":
+                device["role"] = "computer"
+            rows.append((device, {room_id for room_id, _ in related}))
+    else:
+        # Historic entry / test input has not yet been normalized.
+        rows = [(device, {room_id}) for room_id, spec in rooms.items()
+                for device in spec["devices"].values()]
+    for device, room_ids in rows:
+        entity_id = device["entity"]
+        if not (entity_id.startswith("media_player.") or
+                (device.get("foundation_concept") == "network" and entity_id.startswith("device_tracker."))):
+            continue  # Native remotes remain related source entities, not duplicate HA devices.
+        registered = registry.async_get(entity_id)
+        if registered is not None and getattr(registered, "platform", None) == DOMAIN:
+            continue
+        key = logical_asset_id(device)
+        native_device_id = getattr(registered, "device_id", None)
+        logical_type = logical_source_type(
+            device.get("foundation_concept", ""),
+            str(getattr(registered, "platform", "") or ""),
+            entity_id, configured=True,
+        )
+        item = assets.setdefault(key, {
+            "device": device, "rooms": set(),
+            "native_device_id": native_device_id,
+            "logical_type": logical_type, "source_entities": (),
+        })
+        # One stale physical ID must not silently fuse different HA sources.
+        if item["device"]["entity"] != entity_id:
+            item["conflicted_identity"] = True
+        item["rooms"].update(room_ids)
+        if include_links and not item["source_entities"]:
+            item["source_entities"] = related_source_entities(
+                hass, native_device_id, entity_id)
+            for endpoint in device.get("computer_io", {}).values():
+                if all(link["entity_id"] != endpoint["entity"] for link in item["source_entities"]):
+                    item["source_entities"] += ({"entity_id": endpoint["entity"], "domain": endpoint["entity"].split(".")[0],
+                                                  "provider": "mqtt", "availability": "unavailable"},)
+            companion = device.get("computer_agent")
+            if companion and all(link["entity_id"] != companion["entity"] for link in item["source_entities"]):
+                item["source_entities"] += ({"entity_id": companion["entity"], "domain": "media_player",
+                                              "provider": "hass_agent", "availability": "unavailable"},)
     return assets
 
 
@@ -197,6 +220,12 @@ def logical_asset_projection_specs(hass, rooms: dict) -> dict:
         device["entity"]: device
         for row in rooms.values() for device in row.get("devices", {}).values()
     }
+    catalog = getattr(hass, "data", {}).get(DOMAIN, {}).get(DEVICE_CATALOG) or {}
+    for saved in catalog.values():
+        configured_sources.setdefault(saved["entity"], {
+            **{k: v for k, v in saved.items() if k != DEVICE_LABEL},
+            **({"name": saved[DEVICE_LABEL]} if DEVICE_LABEL in saved else {}),
+        })
     for asset in discovered:
         candidates = asset.get("candidates") or []
         if not candidates:
@@ -384,6 +413,7 @@ class LogicalAssetSensor(SensorEntity):
             "discovery_status": ("published" if self.source_published else "source_unpublished"),
             "discovered_only": self.discovered_only,
             "command_authorization": ("source_unpublished" if not self.source_published
+                                      else "no_room_context" if source and not self.room_ids and not self.discovered_only
                                       else "approved" if source and not self.conflicted_identity
                                       else "pending_or_revoked"),
             "readback": ("source_unpublished" if not self.source_published

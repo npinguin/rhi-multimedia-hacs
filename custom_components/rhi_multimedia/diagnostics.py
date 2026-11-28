@@ -9,7 +9,8 @@ import json
 import re
 from pathlib import Path
 
-from .const import CONF_ROOMS, DOMAIN
+from .const import DOMAIN
+from .validation import entry_rooms
 from .foundation import authorized_source, selected_sources, projection_source_reads
 
 
@@ -50,7 +51,7 @@ def _config_entry_diagnostics(hass, entry):
     context = hass.data.get(DOMAIN, {})
     engine = context.get("engine")
     adapter = context.get("adapter")
-    configured = entry.options.get(CONF_ROOMS, entry.data.get(CONF_ROOMS, {}))
+    configured = entry_rooms(entry)
     rooms = engine.rooms if engine else configured
     manifest = json.loads((Path(__file__).parent / "manifest.json").read_text())
     from .frontend import ux_diagnostics

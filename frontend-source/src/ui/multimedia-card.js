@@ -117,7 +117,7 @@ function rhiMmOptionDefaults(step){
   }
   return values;
 }
-const RHI_MM_SAVE_STEPS=new Set(['review','yaml','room_settings','tv_wake','speech_endpoint','harmony_owner','cec_device','cec_activity','button_value','macro_create','quick_edit_activity','script_defaults','dell_display','dell_remove']);
+const RHI_MM_SAVE_STEPS=new Set(['review','yaml','room_settings','tv_wake','speech_endpoint','harmony_owner','cec_device','cec_activity','button_value','macro_create','quick_edit_activity','script_defaults','dell_display','dell_remove','device_add','device_settings','device_edit','device_assign','device_unassign','device_remove']);
 class HomeBrainMultimediaCard extends HTMLElement {
   static getStubConfig() { return {type:'custom:homebrain-multimedia-card'}; }
   constructor() {
@@ -347,7 +347,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }else if(choice==='review'&&this._pendingNavigation){
         if(this._optionsBusy)return;
         if(this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
-          this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+          this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
           await this.submitOptions({save:true});
         }else if(this._optionsStep){
           await this.submitOptions({save:true});
@@ -373,6 +373,9 @@ class HomeBrainMultimediaCard extends HTMLElement {
       const chosen=category.getAttribute('data-mm-settings-category');
       if(['locations','devices','activities'].includes(chosen)){
         this._settingsCategory=chosen;this._activitySettingsStage='devices';this._lastSignature='';this.render();
+        if(chosen==='devices'&&this._hass?.user?.is_admin===true&&
+           typeof this._hass.callApi==='function'&&typeof this._hass.callWS==='function')
+          await this.openOptions({action:'complete_setup',category:'devices'});
       }
       return;
     }
@@ -444,12 +447,32 @@ class HomeBrainMultimediaCard extends HTMLElement {
     if(wholeAction&&this._optionsStep?.step_id==='complete_setup'&&this._wholeHome){
       event.preventDefault();
       const action=wholeAction.getAttribute('data-wh-action');
-      if(action==='specialist'){
+      if(action==='open_expert'){
+        if(!this.hasUnsavedOptions())await this.openOptions({action:'yaml'});
+        return;
+      }else if(action==='device_option'){
         const name=wholeAction.getAttribute('data-wh-id');
+        const asset=wholeAction.getAttribute('data-wh-asset')||'';
+        if(!this._wholeHome.deviceContract?.actions?.includes(name))return;
+        if(!this.hasUnsavedOptions()){
+          await this.openOptions({action:name,asset});return;
+        }
+        if(!(this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_device')){
+          this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
+        }
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
+        await this.submitOptions({specialist:name,asset});
+      }else if(action==='specialist'){
+        const name=wholeAction.getAttribute('data-wh-id');
+        // A clean workspace can open the same native object form directly.
+        // Never discard a dirty home draft to register an independent device.
+        if(name==='dell_add'&&!this.hasUnsavedOptions()){
+          await this.openOptions({action:'dell_add'});return;
+        }
         if(!(this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
           this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
         }
-        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({specialist:name});
       }else if(['capture_new','capture_update','capture_refresh'].includes(action)){
         if(this._wholeHome.rawDraft!=null)return;
@@ -457,10 +480,10 @@ class HomeBrainMultimediaCard extends HTMLElement {
         if(!capture||!(this._optionsStep.data_schema||[]).some(field=>field.name==='capture_request')){
           this._optionsError=this.t('setup_flow_changed');this._optionRefresh();return;
         }
-        this._optionsData.yaml_text=JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({visual:true,capture});
       }else if(action==='review'||action==='review_yaml'){
-        this._optionsData.yaml_text=this._wholeHome.rawDraft??JSON.stringify(this._wholeHome.doc,null,2);
+        this._optionsData.yaml_text=rhiMmWholeWireText(this._wholeHome);
         await this.submitOptions({save:action==='review',visual:action==='review_yaml'});
       }else{
         const id=action==='apply_json'
@@ -496,7 +519,8 @@ class HomeBrainMultimediaCard extends HTMLElement {
       index:option.hasAttribute('data-mm-option-index')?
         Number(option.getAttribute('data-mm-option-index')):null,
       device:option.getAttribute('data-mm-option-device')||'',
-      stepType:option.getAttribute('data-mm-option-type')||''});return;}
+      stepType:option.getAttribute('data-mm-option-type')||'',
+      category:option.getAttribute('data-mm-option-category')||''});return;}
     const visualOption=event.target?.closest?.('[data-mm-option-visual]');
     if(visualOption){event.preventDefault();await this.submitOptions({visual:true});return;}
     const submitOption=event.target?.closest?.('[data-mm-option-submit]');
@@ -739,7 +763,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     await this.openOptions({action:'complete_setup',room,activity,device});
     if(this._optionsStep?.step_id!=='complete_setup'||!this._wholeHome)return;
     const d=this._wholeHome;
-    if(roomEdits.has(action))d.tab=action==='edit_room'?'devices':'rooms';
+    if(roomEdits.has(action)){d.tab=action==='edit_room'?'devices':'rooms';d.roomDeviceEditor=action==='edit_room';}
     else if(activityEdits.has(action)||activity||['script_step','button_mapping','macro_manage','cec_activity'].includes(action))d.tab='activities';
     else d.tab='rooms';
     d.workspace='settings';d.settingsTab=d.tab;
@@ -760,16 +784,16 @@ class HomeBrainMultimediaCard extends HTMLElement {
     this._optionRefresh();
     if(specialistEdits.has(action)&&!['script_defaults','script_step'].includes(action)&&
        (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
-      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      this._optionsData.yaml_text=rhiMmWholeWireText(d);
       await this.submitOptions({specialist:action});
     }else if(action==='script_step'&&!['up','down','edit'].includes(operation)&&
        (this._optionsStep.data_schema||[]).some(field=>field.name==='specialist_action')){
-      this._optionsData.yaml_text=JSON.stringify(d.doc,null,2);
+      this._optionsData.yaml_text=rhiMmWholeWireText(d);
       await this.submitOptions({specialist:'script_step'});
     }
   }
   async openOptions({action,room='',activity='',scope='',id='',
-    phase='',operation='',index=null,device='',stepType=''}) {
+    phase='',operation='',index=null,device='',stepType='',asset='',category=''}) {
     if(!this._hass?.user?.is_admin||this._optionsBusy)return;
     if(this.hasUnsavedOptions()){this._optionsError=this.t('whole_home_leave_warning');this._optionRefresh();return;}
     const oldStep=this._optionsStep;
@@ -787,7 +811,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       }
       if(epoch!==this._optionsEpoch)return;
       const step=await rhiMmOptionsBegin(this._hass,{
-        action,room,activity,scope,id,phase,operation,index,device,stepType});
+        action,room,activity,scope,id,phase,operation,index,device,stepType,asset});
       if(epoch!==this._optionsEpoch){
         await rhiMmOptionsCancel(this._hass,step);
         return;
@@ -801,16 +825,22 @@ class HomeBrainMultimediaCard extends HTMLElement {
       this._wholeHome=step.step_id==='complete_setup'?rhiMmWholeFromStep(step):null;
       if(this._wholeHome){
         this._wholeHome.workspace=this.currentRoute().view==='discovery'?'discovery':'settings';
-        this._wholeHome.tab=this._wholeHome.workspace==='discovery'?'discovery':'rooms';
-        this._wholeHome.settingsTab='rooms';
+        const selectedCategory=['devices','rooms','activities'].includes(category)?category:'rooms';
+        this._wholeHome.tab=this._wholeHome.workspace==='discovery'?'discovery':selectedCategory;
+        this._wholeHome.settingsTab=selectedCategory;
       }
       // Contextual Device Settings reuses the single Options Flow draft.
       if(this._wholeHome&&room&&this._wholeHome.doc.rooms[room]){
         this._wholeHome.room=room;this._wholeHome.tab=activity?'activities':device?'devices':'rooms';
         this._wholeHome.settingsTab=this._wholeHome.tab;
         if(activity&&this._wholeHome.doc.rooms[room].activities?.[activity])this._wholeHome.activity=activity;
-        if(device&&this._wholeHome.doc.rooms[room].devices?.[device])
+        if(device&&this._wholeHome.doc.rooms[room].devices?.[device]){
           this._wholeHome.device=device;
+          const linked=this._wholeHome.doc.rooms[room].devices[device];
+          const assetId=rhiMmAssetId(linked);
+          this._wholeHome.roomDeviceEditor=!this._wholeHome.deviceContract||!this._wholeHome.deviceCatalog?.[assetId];
+          if(!this._wholeHome.roomDeviceEditor)this._wholeHome.deviceDetail=assetId;
+        }
       }
     }catch(error){
       if(epoch===this._optionsEpoch){this._wholeHomeFlow=false;this._optionsError=this.settingsFlowFailure(error);}
@@ -818,7 +848,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       if(epoch===this._optionsEpoch){this._optionsBusy=false;this._optionRefresh();}
     }
   }
-  async submitOptions({save=false,visual=false,specialist='',capture=null}={}){
+  async submitOptions({save=false,visual=false,specialist='',capture=null,asset=''}={}){
     const step=this._optionsStep;
     if(!step||this._optionsBusy||!this._hass?.user?.is_admin)return;
     if(!(step.data_schema||[]).every(rhiMmOptionSupported)){
@@ -836,6 +866,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
         payload.specialist_action=specialist;
         payload.specialist_room=specialist?this._wholeHome?.room||'':'';
         payload.specialist_activity=specialist?this._wholeHome?.activity||'':'';
+        if((step.data_schema||[]).some(field=>field.name==='specialist_device'))payload.specialist_device=specialist?asset:'';
       }
       let response=await rhiMmOptionsAdvance(this._hass,step,payload);
       if(epoch!==this._optionsEpoch)return;
@@ -871,13 +902,13 @@ class HomeBrainMultimediaCard extends HTMLElement {
             // Backend parsed the exact submitted document, including missing bindings.
             // Keep one semantic draft, not a second raw editor requiring conversion.
             const parsed=JSON.parse(this._wholeHome.editableDraft);
-            this._wholeHome.doc=parsed;this._wholeHome.rawDraft=null;this._wholeHome.editableDraft='';
+            rhiMmWholeInstall(this._wholeHome,parsed,this._wholeHome.deviceCatalog);this._wholeHome.rawDraft=null;this._wholeHome.editableDraft='';
             rhiMmWholeCurrent(this._wholeHome);
           }else if(!response.errors?.base&&(step.step_id!=='complete_setup'||visual)){
             const normalized=rhiMmWholeFromStep(response);
             // Refresh native evidence too: specialist edits may alter the
             // available choices, but the active room and category stay put.
-            for(const key of ['doc','areas','floors','areaFloors','sources','computerIO','captureCandidates','logicalDevices','proposedRooms','proposalExceptions'])
+            for(const key of ['doc','areas','floors','areaFloors','sources','computerIO','captureCandidates','logicalDevices','proposedRooms','proposalExceptions','deviceCatalog','deviceContract','canonicalWire'])
               this._wholeHome[key]=normalized[key];
             this._wholeHome.rawDraft=null;
             if(capture?.refresh===true){
@@ -1021,11 +1052,11 @@ class HomeBrainMultimediaCard extends HTMLElement {
         step.description_placeholders||{}):null;
     const unsupported=!!step&&!(step.data_schema||[]).every(rhiMmOptionSupported);
     const nativeReview=step?.step_id==='review'&&typeof step.description_placeholders?.change_summary==='string';
-    const guidance=nativeReview?step.description_placeholders.change_summary:errors.base&&step?.step_id==='yaml'?'Draft not saved. Correct the issue below and try again.':description||step?.description_placeholders?.note;
+    const guidance=nativeReview?step.description_placeholders.change_summary:errors.base&&['yaml','device_edit'].includes(step?.step_id)?'Draft not saved. Correct the issue below and try again.':description||step?.description_placeholders?.note;
     const stageTitle=step?.step_id==='activity_devices'?this.t('choose_devices'):
       step?.step_id==='activity_device_order'?this.t('tune_actions'):null;
     return `${this.leaveDecision()}<section class="mm-surface mm-options-editor" aria-live="polite" data-mm-flow-editor>
-      ${this._wholeHomeFlow&&step?.step_id!=='review'?`<p class='mm-wh-draft'>${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.name||'Multimedia')} · ${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.activities?.[this._wholeHome?.activity]?.name||'Settings')}</p>`:''}
+      ${this._wholeHomeFlow&&step?.step_id!=='review'&&step?.step_id!=='dell_display'&&!step?.step_id?.startsWith('device_')?`<p class='mm-wh-draft'>${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.name||'Multimedia')} · ${escape(this._wholeHome?.doc?.rooms?.[this._wholeHome?.room]?.activities?.[this._wholeHome?.activity]?.name||'Settings')}</p>`:''}
       <h3>${escape(stageTitle||label||this.t('setup_editor'))}</h3>
       ${this._optionsDirty?`<span class='mm-wh-draft'>Unsaved changes</span>`:''}
       ${guidance?`<p class="mm-options-description">${escape(guidance)}</p>`:''}
@@ -1036,7 +1067,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
       ${step?.type==='form'?`<div class="mm-option-fields">
         ${(step.data_schema||[]).filter(field=>!['visual_edit','return_to_yaml'].includes(field.name)&&!(this._wholeHomeFlow&&field.name==='return_to_setup')&&!(nativeReview&&field.name==='confirm'))
           .map(field=>this.optionInput(step,field)).join('')}</div>`:''}
-      ${step?.step_id==='yaml'?`<div class="mm-setup-actions"><button type="button" data-mm-copy="yaml">${rhiUxEscape(this.t('copy_yaml'))}</button><button type="button" data-mm-paste="yaml">${rhiUxEscape(this.t('paste_yaml'))}</button><span data-mm-clipboard-status role="status"></span></div>`:''}
+      ${['yaml','device_edit'].includes(step?.step_id)?`<div class="mm-setup-actions"><button type="button" data-mm-copy="yaml">${rhiUxEscape(this.t('copy_yaml'))}</button><button type="button" data-mm-paste="yaml">${rhiUxEscape(this.t('paste_yaml'))}</button><span data-mm-clipboard-status role="status"></span></div>`:''}
       <div class="mm-setup-actions">
         ${step?.step_id==='yaml'&&(step.data_schema||[]).some(field=>field.name==='visual_edit')?`<button type='button' data-mm-option-visual ${this._optionsBusy?'disabled':''}>Edit visually</button>`:''}
         ${step&&(this._wholeHomeFlow&&(step.step_id==='review'||(step.data_schema||[]).some(field=>field.name==='return_to_setup'))||step.step_id==='review'&&(step.data_schema||[]).some(field=>field.name==='return_to_yaml'))?
@@ -1956,7 +1987,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
     }));
     const steps=room.activities.flatMap(a=>a.routes.map(r=>({...r,activity:a.name})));return `<article class="mm-surface"><h3>${this.t('routes')}</h3>${steps.length||cec.length?`<div class="mm-device-list">${cec.join('')}${steps.map(r=>`<div class="mm-route"><b>${rhiUxEscape(r.activity)}</b><span>${rhiUxEscape(r.type)} · ${rhiUxEscape(r.target||r.selected||this.t('not_published'))}${r.status?` · ${rhiUxEscape(r.status)}`:''}</span></div>`).join('')}</div>`:rhiUxState({state:'empty',title:this.t('no_routes'),detail:this.t('route_help')})}</article>`;}
   discovery(model){
-    if(this._optionsStep?.step_id==='complete_setup'&&this._hass?.user?.is_admin===true)
+    if((this._optionsStep||this._optionsBusy||this._optionsError)&&this._hass?.user?.is_admin===true)
       return this.renderOptionsEditor();
     return `<section class="mm-surface mm-discovery-launch">
       <h3>Discover and assign devices</h3>
@@ -1964,7 +1995,7 @@ class HomeBrainMultimediaCard extends HTMLElement {
          filtering and bulk assignment. Configure WOL, HDMI-CEC, roles and
          native sources in one Review and Save.</p>
       ${this._hass?.user?.is_admin===true?
-        '<button type="button" data-mm-option-action="complete_setup">Open device discovery</button>':
+        `<div class='mm-setup-actions'><button type="button" data-mm-option-action="complete_setup">Open device discovery</button><button type='button' data-mm-option-action='dell_add'>${this.t('wh_add_display')}</button></div>${this._optionsNotice?this.renderOptionsEditor():''}`:
         '<p>Ask your Home Assistant administrator to configure devices.</p>'}
     </section>`;
   }
@@ -2216,7 +2247,12 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
         ${selected?`data-mm-option-room="${esc(selected.room.id)}"`:''}>${this.t('setup_add_activity')}</button>
       <button type="button" data-mm-option-action="script_defaults">${this.t('settings_default_delay')}</button>
       ${selected?`<span class="mm-muted">${esc(selected.room.default_step_delay_ms??0)} ms</span>`:''}
-      </div>`:category==='locations'?`<button type="button" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>`:'';
+      </div>`:category==='locations'?`<button type="button" data-mm-option-action="add_room">${this.t('setup_add_room')}</button>`:
+      `<div class="mm-setup-actions">
+        <button type="button" data-mm-option-action="complete_setup" data-mm-option-category="devices">${this.t('devices')}</button>
+        <button type="button" data-mm-option-action="device_add">${this.t('wh_add_device_native')}</button>
+        <button type="button" data-mm-option-action="dell_add">${this.t('wh_add_display')}</button>
+      </div>`;
     return `<section class="mm-section mm-settings">
       <div class="mm-heading"><h2>${this.t('settings')}</h2>
         ${manage?`<div class='mm-settings-primary-actions'>
@@ -2236,6 +2272,7 @@ ${manage?`<div class="mm-setup-actions"><button type="button" data-mm-option-act
             `<div class="mm-settings-heading"><h3>${esc(selected?.label||classes.find(c=>c[0]===category)?.[1]||'')}</h3>
               ${scopeButton}</div>
               ${stageBar}${add}
+              ${manage&&category==='devices'?`<div class='mm-setup-actions'><button type='button' data-mm-option-action='dell_add'>${this.t('wh_add_display')}</button></div>`:''}
               <div class="mm-settings-choices">${itemRows}</div>
               ${details}
               ${this._optionsNotice?this.renderOptionsEditor():''}`}
